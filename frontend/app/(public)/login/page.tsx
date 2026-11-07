@@ -8,9 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { apiClient } from "@/lib/api-client";
-import { setToken } from "@/lib/auth";
-import Cookies from "js-cookie";
+import { parseApiError } from "@/lib/api-client";
+import { useAuthContext } from "@/providers/AuthProvider";
 import { motion } from "framer-motion";
 
 export default function LoginPage() {
@@ -20,18 +19,17 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
+  const { login } = useAuthContext();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     try {
-      const { data } = await apiClient.post("/auth/login", { email, password });
-      setToken(data.access_token);
-      Cookies.set("refresh_token", data.refresh_token, { expires: 7 });
+      await login(email, password);
       router.push("/dashboard");
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.response?.data?.error || "Login failed");
+    } catch (err: unknown) {
+      setError(parseApiError(err).message);
     } finally {
       setLoading(false);
     }

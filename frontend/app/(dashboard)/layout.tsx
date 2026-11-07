@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/sidebar";
 import TopNav from "@/components/layout/top-nav";
 import { useAuth } from "@/hooks/use-auth";
+import { MobileNav } from "@/components/shell/MobileNav";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -34,18 +35,18 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
+    <div className="flex h-screen w-full overflow-hidden bg-transparent">
       <Sidebar />
       <div
-        className="flex flex-col flex-1 h-screen overflow-hidden transition-all duration-300"
-        style={{ marginLeft: "var(--sidebar-width, 256px)" }}
+        className="flex flex-col flex-1 h-screen overflow-hidden transition-all duration-300 md:ml-[var(--sidebar-width,256px)]"
       >
         <TopNav />
-        <main className="flex-1 overflow-y-auto pt-16 bg-background">
-          <div className="p-6 lg:p-8 max-w-[1600px] mx-auto">
+        <main className="flex-1 overflow-y-auto pt-16 bg-transparent">
+          <div className="p-6 pb-24 lg:p-8 lg:pb-8 max-w-[1600px] mx-auto">
             {children}
           </div>
         </main>
+        <MobileNav />
       </div>
     </div>
   );

@@ -62,29 +62,9 @@ module.exports = {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
-        forest: {
-          900: "#102820",
-          800: "#173B2F",
-          700: "#1F5440",
-          600: "#2A6D51",
-          500: "#4A9E7C",
-          400: "#7ABF9E",
-          300: "#AADFCF",
-          200: "#D9F0E5",
-          100: "#F1F0E9",
+        glass: {
+          DEFAULT: "var(--glass-1)", raised: "var(--glass-2)", overlay: "var(--glass-3)",
         },
-        gold: {
-          DEFAULT: "#B59A69",
-          light: "#D4C29E",
-          dark: "#8F7A4D",
-        },
-        sage: {
-          DEFAULT: "#A7B9A3",
-          light: "#C9D6C3",
-          dark: "#7C8A77",
-        },
-        ivory: "#F7F6F0",
-        charcoal: "#202923",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -92,8 +72,9 @@ module.exports = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
-        serif: ["var(--font-dm-serif-display)", "DM Serif Display", "Georgia", "Cambria", "serif"],
+        sans: ["var(--font-sans)", "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
+        display: ["var(--font-display)", "Manrope", "sans-serif"],
+        mono: ["var(--font-mono)", "JetBrains Mono", "monospace"],
       },
       boxShadow: {
         "soft": "0 4px 20px -4px rgba(23, 59, 47, 0.08)",

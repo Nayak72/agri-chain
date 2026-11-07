@@ -9,41 +9,16 @@ services:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
-      - ./backend/scripts/mongo-init.sh:/docker-entrypoint-initdb.d/mongo-init.sh:ro
     environment:
       - MONGO_INITDB_DATABASE=agri_chain
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: >-
+        mongosh --quiet mongodb://localhost:27017/admin --eval
+        'try { rs.status().ok } catch (e) { rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27017"}]}) }'
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-    networks:
-      - agri-chain-network
-
-  mongo-init:
-    image: mongo:7.0
-    container_name: agri-chain-mongo-init
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    entrypoint: ["/bin/bash", "-c"]
-    command:
-      - |
-        echo "Waiting for MongoDB to be ready..."
-        sleep 5
-        echo "Initializing replica set..."
-        mongosh --host mongodb:27017 --eval '
-          rs.initiate({
-            _id: "rs0",
-            members: [{ _id: 0, host: "mongodb:27017" }]
-          })
-        '
-        echo "Replica set initialized. Waiting for primary..."
-        sleep 10
-        mongosh --host mongodb:27017 --eval '
-          rs.status()
-        '
     networks:
       - agri-chain-network
 
@@ -55,18 +30,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/agri_chain?replicaSet=rs0
+      - MONGODB_URI=mongodb://mongodb:27017/agri_chain?replicaSet=rs0&directConnection=true
       - DATABASE_NAME=agri_chain
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-change-in-production}
       - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
       - JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
       - CORS_ORIGINS=http://localhost:3000
       - UPLOAD_DIRECTORY=uploads
-      - SIMULATOR_ENABLED=true
+      - SIMULATOR_ENABLED=${SIMULATOR_ENABLED:-true}
       - LEDGER_CHAIN_ID=AGRCHAIN-GLOBAL-001
       - APP_ENV=development
     volumes:
-      - ./backend:/app
       - ./backend/uploads:/app/uploads
     depends_on:
       mongodb:
@@ -83,10 +57,6 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
     depends_on:
       - backend
     networks:

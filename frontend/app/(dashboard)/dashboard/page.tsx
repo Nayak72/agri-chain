@@ -35,6 +35,15 @@ interface DashboardMetrics {
   onTimeDeliveryPercentage: number;
 }
 
+const roleDashboard: Record<string, { title: string; action: string; href: string; description: string }> = {
+  ADMIN: { title: "System health and approvals", action: "Review users", href: "/users", description: "Keep approvals, active shipments, alerts and ledger integrity moving." },
+  FARMER: { title: "Harvest to market", action: "Register a batch", href: "/batches/new", description: "Track farms, harvest batches, stock and purchase orders." },
+  WAREHOUSE_MANAGER: { title: "Warehouse operations", action: "Review inventory", href: "/inventory", description: "Prioritize receiving, inspection, FEFO stock and expiry risk." },
+  TRANSPORTER: { title: "Fleet readiness", action: "View bookings", href: "/freight-bookings", description: "Turn open freight requests into quotes and active trips." },
+  DRIVER: { title: "Trip execution", action: "Record checkpoint", href: "/shipments", description: "Stay ahead of checkpoints, exceptions and simulated cold-chain readings." },
+  BUYER: { title: "Order fulfilment", action: "View orders", href: "/purchase-orders", description: "Follow purchase orders, deliveries and quality outcomes." },
+};
+
 function mapDashboardMetrics(api: DashboardMetricsAPI): DashboardMetrics {
   return {
     totalShipments: api.total_shipments ?? 0,
@@ -51,6 +60,7 @@ const COLORS = ["#173B2F", "#1F5440", "#B59A69", "#A7B9A3"];
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const roleContent = roleDashboard[user?.role ?? "BUYER"];
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalShipments: 0,
     activeShipments: 0,
@@ -117,7 +127,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Executive Dashboard"
+        title={roleContent.title}
         description={`Welcome back, ${user?.full_name || "User"}. Operational overview for ${user?.role?.toLowerCase().replace(/_/g, " ") || "account"}.`}
         actions={
           <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-soft">
@@ -128,6 +138,13 @@ export default function DashboardPage() {
           </Button>
         }
       />
+
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div><p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">Next best action</p><p className="mt-1 text-sm text-muted-foreground">{roleContent.description}</p></div>
+          <Button asChild variant="outline" className="shrink-0"><Link href={roleContent.href}>{roleContent.action}</Link></Button>
+        </CardContent>
+      </Card>
 
       {error && (
         <motion.div

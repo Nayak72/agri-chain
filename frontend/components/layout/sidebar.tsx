@@ -102,6 +102,7 @@ const navigationGroups: NavGroup[] = [
     label: "SYSTEM",
     items: [
       { name: "Users", href: "/users", icon: UserCog, roles: [USER_ROLES.ADMIN] },
+      { name: "Design system", href: "/design", icon: Factory, roles: [USER_ROLES.ADMIN] },
       { name: "Settings", href: "/settings", icon: Settings },
     ],
   },
@@ -149,7 +150,7 @@ export default function Sidebar() {
     <TooltipProvider>
       <aside
         className={cn(
-          "fixed left-0 top-0 h-screen border-r border-border bg-white/95 backdrop-blur-lg z-40 transition-all duration-300 ease-in-out",
+          "fixed left-0 top-0 h-screen border-r border-border glass-raised z-40 transition-all duration-300 ease-in-out hidden md:block",
           isCollapsed ? "w-16" : "w-72"
         )}
       >

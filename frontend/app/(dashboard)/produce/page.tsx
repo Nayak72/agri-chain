@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { apiClient } from "@/lib/api-client";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Search, Package, Leaf, Truck } from "lucide-react";
@@ -14,6 +13,7 @@ import { Skeleton, SkeletonTableRow, SkeletonCard } from "@/components/ui/skelet
 import Link from "next/link";
 import { Eye } from "lucide-react";
 import { AlertCircle } from "lucide-react";
+import { useProduceList } from "@/features/produce/hooks";
 
 interface ProduceItem {
   id: string;
@@ -26,26 +26,10 @@ interface ProduceItem {
 }
 
 export default function ProducePage() {
-  const [produce, setProduce] = useState<ProduceItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading: loading, error: queryError, refetch } = useProduceList({ page: 1, page_size: 100 });
+  const produce = (data?.items ?? []) as ProduceItem[];
+  const error = queryError ? "Failed to load produce catalogue. Please try again." : null;
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
-
-  useEffect(() => {
-    const fetchProduce = async () => {
-      try {
-        setLoading(true);
-        const { data } = await apiClient.get("/produce");
-        setProduce(data || []);
-        setError(null);
-      } catch (e) {
-        setError("Failed to load produce catalogue. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProduce();
-  }, []);
 
   const getCategoryIcon = (category: string) => {
     if (category === "FRUITS") return <Leaf className="w-5 h-5" />;
@@ -85,7 +69,7 @@ export default function ProducePage() {
           <div className="flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-destructive" />
             <p className="text-destructive">{error}</p>
-            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
               Retry
             </Button>
           </div>

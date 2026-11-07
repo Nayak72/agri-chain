@@ -8,9 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { apiClient } from "@/lib/api-client";
-import { setToken } from "@/lib/auth";
-import Cookies from "js-cookie";
+import { parseApiError } from "@/lib/api-client";
+import { useAuthContext } from "@/providers/AuthProvider";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +35,7 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+  const { register } = useAuthContext();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,18 +47,17 @@ export default function RegisterPage() {
       return;
     }
     try {
-      const { data } = await apiClient.post("/auth/register", {
+      const data = await register({
         email: formData.email,
         password: formData.password,
         full_name: formData.full_name,
         phone: formData.phone,
         role: formData.role,
       });
-      setToken(data.access_token);
-      Cookies.set("refresh_token", data.refresh_token, { expires: 7 });
-      router.push("/dashboard");
-    } catch (err: any) {
-      setError(err.response?.data?.detail || err.response?.data?.error || "Registration failed");
+      if (data.status === "PENDING_APPROVAL") router.push("/pending-approval");
+      else router.push("/dashboard");
+    } catch (err: unknown) {
+      setError(parseApiError(err).message);
     } finally {
       setLoading(false);
     }

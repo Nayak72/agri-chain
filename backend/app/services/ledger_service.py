@@ -3,6 +3,7 @@ import json
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from motor.motor_asyncio import AsyncIOMotorDatabase, AsyncIOMotorClientSession
+from pymongo import ReturnDocument
 from bson import ObjectId
 from app.core.config import get_settings
 from app.core.constants import LedgerEventType
@@ -78,9 +79,13 @@ async def append_ledger_block(
     payload: Dict[str, Any],
     session: AsyncIOMotorClientSession = None
 ) -> Dict[str, Any]:
-    head = await get_ledger_head(db, session=session)
-    previous_hash = head["last_hash"]
-    new_index = head["last_index"] + 1
+    head = await db.ledger_heads.find_one_and_update(
+        {"chain_id": CHAIN_ID},
+        {"$inc": {"last_index": 1}, "$setOnInsert": {"last_hash": GENESIS_HASH, "chain_id": CHAIN_ID}},
+        upsert=True, return_document=ReturnDocument.AFTER, session=session,
+    )
+    new_index = head["last_index"]
+    previous_hash = head.get("last_hash", GENESIS_HASH)
     
     block_id = f"{CHAIN_ID}-{new_index:06d}"
     
@@ -98,6 +103,7 @@ async def append_ledger_block(
         "actor_role": actor_role,
         "event_summary": event_summary,
         "payload_hash": payload_hash,
+        "payload_snapshot": payload,
         "previous_hash": previous_hash,
         "hash_algorithm": "SHA-256",
         "schema_version": "1.0",
@@ -105,20 +111,19 @@ async def append_ledger_block(
     
     block_data["hash"] = calculate_block_hash(block_data)
     
-    if session:
-        await db.ledger_blocks.insert_one(block_data, session=session)
-        await update_ledger_head(db, new_index, block_data["hash"], session)
-    else:
-        await db.ledger_blocks.insert_one(block_data)
-        await update_ledger_head(db, new_index, block_data["hash"])
+    await db.ledger_blocks.insert_one(block_data, session=session)
+    await update_ledger_head(db, new_index, block_data["hash"], session)
     
     logger.info(f"Ledger block {block_id} appended at index {new_index}")
     return block_data
 
 
 async def verify_ledger_integrity(db: AsyncIOMotorDatabase) -> Dict[str, Any]:
-    blocks = await db.ledger_blocks.find({"chain_id": CHAIN_ID}).sort("index", 1).to_list(None)
-    
+    cursor = db.ledger_blocks.find({"chain_id": CHAIN_ID}).sort("index", 1)
+    blocks = []
+    async for block in cursor:
+        blocks.append(block)
+
     if not blocks:
         return {
             "valid": True,
@@ -160,6 +165,12 @@ async def verify_ledger_integrity(db: AsyncIOMotorDatabase) -> Dict[str, Any]:
                 "error": "Hash mismatch - block data modified"
             })
             break
+
+        if "payload_snapshot" in block:
+            payload_hash = hashlib.sha256(canonical_json(block["payload_snapshot"]).encode("utf-8")).hexdigest()
+            if payload_hash != block.get("payload_hash"):
+                invalid_blocks.append({"index": block["index"], "error": "Payload snapshot hash mismatch"})
+                break
         
         expected_previous = block["hash"]
     
@@ -192,11 +203,14 @@ async def get_entity_history(
     entity_type: str,
     entity_id: str
 ) -> list:
-    blocks = await db.ledger_blocks.find({
+    cursor = db.ledger_blocks.find({
         "chain_id": CHAIN_ID,
         "entity_type": entity_type,
         "entity_id": entity_id
-    }).sort("index", 1).to_list(None)
+    }).sort("index", 1)
+    blocks = []
+    async for block in cursor:
+        blocks.append(block)
     
     return [{
         "index": b["index"],
@@ -218,11 +232,14 @@ async def verify_entity_history(
     # First verify the integrity of the full global chain
     global_integrity = await verify_ledger_integrity(db)
     
-    blocks = await db.ledger_blocks.find({
+    cursor = db.ledger_blocks.find({
         "chain_id": CHAIN_ID,
         "entity_type": entity_type,
         "entity_id": entity_id
-    }).sort("index", 1).to_list(None)
+    }).sort("index", 1)
+    blocks = []
+    async for block in cursor:
+        blocks.append(block)
     
     if not blocks:
         return {

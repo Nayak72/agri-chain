@@ -8,6 +8,7 @@ from app.db.mongodb import get_database
 from app.core.permissions import get_current_user, get_current_admin_user, Role
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.constants import ProduceCategory, ProduceType
+from app.schemas.common import Page
 
 router = APIRouter()
 
@@ -63,10 +64,13 @@ async def create_produce(
     return ProduceResponse(id=str(result.inserted_id), **produce_doc)
 
 
-@router.get("", response_model=List[ProduceResponse])
+@router.get("", response_model=Page[ProduceResponse])
 async def list_produce(
     category: Optional[ProduceCategory] = None,
     is_active: Optional[bool] = True,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    q: Optional[str] = Query(None, max_length=100),
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
@@ -75,9 +79,12 @@ async def list_produce(
         query["category"] = category
     if is_active is not None:
         query["is_active"] = is_active
-    
-    produce = await db.produce_catalogue.find(query).sort("name", 1).to_list(None)
-    return [ProduceResponse(id=str(p["_id"]), **p) for p in produce]
+    if q:
+        import re
+        query["$or"] = [{"name": {"$regex": re.escape(q), "$options": "i"}}, {"produce_type": {"$regex": re.escape(q.upper())}}]
+    total = await db.produce_catalogue.count_documents(query)
+    produce = await db.produce_catalogue.find(query).sort("name", 1).skip((page - 1) * page_size).limit(page_size).to_list(page_size)
+    return Page(items=[ProduceResponse(id=str(p["_id"]), **p) for p in produce], total=total, page=page, page_size=page_size, has_next=page * page_size < total)
 
 
 @router.get("/{produce_id}", response_model=ProduceResponse)
@@ -86,12 +93,8 @@ async def get_produce(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if ObjectId.is_valid(produce_id):
-        produce = await db.produce_catalogue.find_one({"_id": ObjectId(produce_id)})
-    else:
-        produce = await db.produce_catalogue.find_one({
-            "$or": [{"produce_type": produce_id.upper()}, {"name": produce_id}]
-        })
+    from app.repositories.produce_repository import ProduceRepository
+    produce = await ProduceRepository(db).get_by_any_id(produce_id)
     if not produce:
         raise NotFoundError("Produce", produce_id)
     
@@ -105,8 +108,10 @@ async def update_produce(
     current_user: dict = Depends(get_current_admin_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(produce_id):
-        raise ValidationError("Invalid produce ID")
+    from app.repositories.produce_repository import ProduceRepository
+    existing = await ProduceRepository(db).get_by_any_id(produce_id)
+    if not existing:
+        raise NotFoundError("Produce", produce_id)
     
     update_data = {k: v for k, v in produce_data.model_dump().items() if v is not None}
     if not update_data:
@@ -115,7 +120,7 @@ async def update_produce(
     update_data["updated_at"] = datetime.now(timezone.utc)
     
     result = await db.produce_catalogue.update_one(
-        {"_id": ObjectId(produce_id)},
+        {"_id": existing["_id"]},
         {"$set": update_data}
     )
     

@@ -8,14 +8,14 @@ const buttonVariants = (variant: string, size: string) => {
   const base = "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
 
   const variants: Record<string, string> = {
-    default: "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-medium hover:-translate-y-0.5 active:scale-95",
-    destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:shadow-medium hover:-translate-y-0.5 active:scale-95",
-    outline: "border border-input bg-transparent hover:bg-accent hover:text-accent-foreground hover:-translate-y-0.5 active:scale-95",
-    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:shadow-soft hover:-translate-y-0.5 active:scale-95",
-    ghost: "hover:bg-accent hover:text-accent-foreground hover:-translate-y-0.5 active:scale-95",
+    default: "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-medium active:scale-[0.98]",
+    destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:shadow-medium active:scale-[0.98]",
+    outline: "border border-input bg-transparent hover:bg-accent hover:text-accent-foreground active:scale-[0.98]",
+    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:shadow-soft active:scale-[0.98]",
+    ghost: "hover:bg-accent hover:text-accent-foreground active:scale-[0.98]",
     link: "text-primary underline-offset-4 hover:underline",
-    luxury: "bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium transition-all duration-300 hover:bg-primary/90 hover:shadow-premium hover:-translate-y-0.5 active:scale-95",
-    gold: "bg-warning text-warning-foreground hover:bg-warning/90 hover:shadow-medium hover:-translate-y-0.5 active:scale-95",
+    luxury: "bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium transition-all duration-300 hover:bg-primary/90 hover:shadow-premium active:scale-[0.98]",
+    gold: "bg-warning text-warning-foreground hover:bg-warning/90 hover:shadow-medium active:scale-[0.98]",
   };
 
   const sizes: Record<string, string> = {

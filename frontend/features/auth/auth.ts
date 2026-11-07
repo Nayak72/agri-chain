@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import { auth, getToken } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { User } from "@/types";
 
 export const authService = {
@@ -10,15 +10,16 @@ export const authService = {
     }
     return data;
   },
-  register: async (userData: any) => {
+  register: async (userData: Record<string, unknown>) => {
     const { data } = await apiClient.post("/auth/register", userData);
     if (data.access_token && data.refresh_token) {
       auth.setTokens(data.access_token, data.refresh_token);
     }
     return data;
   },
-  refresh: async (refreshToken: string) => {
-    const { data } = await apiClient.post("/auth/refresh", { refresh_token: refreshToken });
+  refresh: async (refreshToken?: string) => {
+    const token = refreshToken ?? auth.getRefreshToken();
+    const { data } = await apiClient.post("/auth/refresh", token ? { refresh_token: token } : {});
     if (data.access_token && data.refresh_token) {
       auth.setTokens(data.access_token, data.refresh_token);
     }

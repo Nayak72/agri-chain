@@ -28,6 +28,7 @@ class SensorSimulationSession:
         self._base_humidity = None
         self._time_start = datetime.now(timezone.utc)
         self.last_reading = None
+        self.rng = random.Random(session_id)
 
 
 class SensorSimulatorManager:
@@ -44,6 +45,10 @@ class SensorSimulatorManager:
         db: Any,
         produce_type: Optional[str] = "TOMATO"
     ) -> bool:
+        from app.core.config import get_settings
+        if not get_settings().simulator_enabled:
+            logger.info("Simulator is disabled by configuration")
+            return False
         async with self._lock:
             if shipment_id in self.sessions:
                 existing = self.sessions[shipment_id]
@@ -133,34 +138,34 @@ class SensorSimulatorManager:
         scenario = session.scenario
         
         if scenario == SensorScenario.NORMAL:
-            temp = base_temp + random.uniform(-0.5, 0.5)
-            humidity = base_hum + random.uniform(-2, 2)
+            temp = base_temp + session.rng.uniform(-0.5, 0.5)
+            humidity = base_hum + session.rng.uniform(-2, 2)
             status = SensorStatus.NORMAL
         
         elif scenario == SensorScenario.TEMP_EXCURSION:
-            temp = base_temp + random.uniform(3, 8)
-            humidity = base_hum + random.uniform(-2, 2)
+            temp = base_temp + session.rng.uniform(3, 8)
+            humidity = base_hum + session.rng.uniform(-2, 2)
             status = SensorStatus.CRITICAL if temp > temp_max else SensorStatus.WARNING
         
         elif scenario == SensorScenario.HUMIDITY_EXCURSION:
-            temp = base_temp + random.uniform(-0.5, 0.5)
-            humidity = base_hum + random.uniform(5, 15)
+            temp = base_temp + session.rng.uniform(-0.5, 0.5)
+            humidity = base_hum + session.rng.uniform(5, 15)
             status = SensorStatus.CRITICAL if humidity > hum_max else SensorStatus.WARNING
         
         elif scenario == SensorScenario.BOTH_EXCURSION:
-            temp = base_temp + random.uniform(3, 8)
-            humidity = base_hum + random.uniform(5, 15)
+            temp = base_temp + session.rng.uniform(3, 8)
+            humidity = base_hum + session.rng.uniform(5, 15)
             status = SensorStatus.CRITICAL
         
         elif scenario == SensorScenario.FLUCTUATION:
-            temp = base_temp + 5 * math.sin(elapsed / 100) + random.uniform(-1, 1)
-            humidity = base_hum + 5 * math.cos(elapsed / 100) + random.uniform(-2, 2)
+            temp = base_temp + 5 * math.sin(elapsed / 100) + session.rng.uniform(-1, 1)
+            humidity = base_hum + 5 * math.cos(elapsed / 100) + session.rng.uniform(-2, 2)
             status = SensorStatus.WARNING if abs(temp - base_temp) > 3 else SensorStatus.NORMAL
         
         elif scenario == SensorScenario.RECOVERY:
             recovery_progress = min(elapsed / 300, 1.0)
-            temp = base_temp + (5 * (1 - recovery_progress)) + random.uniform(-0.5, 0.5)
-            humidity = base_hum + (8 * (1 - recovery_progress)) + random.uniform(-2, 2)
+            temp = base_temp + (5 * (1 - recovery_progress)) + session.rng.uniform(-0.5, 0.5)
+            humidity = base_hum + (8 * (1 - recovery_progress)) + session.rng.uniform(-2, 2)
             status = SensorStatus.NORMAL if recovery_progress > 0.7 else SensorStatus.WARNING
         
         else:
@@ -188,7 +193,33 @@ class SensorSimulatorManager:
             "configured_humidity_min": hum_min,
             "configured_humidity_max": hum_max,
             "status": status,
+            "simulated": True,
         }
+
+    async def resume_running(self, db: Any) -> int:
+        """Resume persisted RUNNING sessions after a process restart."""
+        from app.core.config import get_settings
+        if not get_settings().simulator_enabled:
+            return 0
+        resumed = 0
+        async for document in db.sensor_sessions.find({"status": "RUNNING"}):
+            started = await self.start_simulation(
+                document["session_id"], document["shipment_id"],
+                SensorScenario(document.get("scenario", SensorScenario.NORMAL)),
+                int(document.get("interval_seconds", get_settings().simulator_default_interval_seconds)),
+                db, document.get("produce_type", "TOMATO"),
+            )
+            resumed += int(started)
+        return resumed
+
+    async def shutdown(self) -> None:
+        sessions = list(self.sessions.values())
+        for session in sessions:
+            session.stop()
+        tasks = [session.task for session in sessions if session.task and not session.task.done()]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self.sessions.clear()
     
     async def _simulation_loop(self, session: SensorSimulationSession, db: Any):
         while not session._stop_event.is_set():

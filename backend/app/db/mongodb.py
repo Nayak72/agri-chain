@@ -8,10 +8,11 @@ settings = get_settings()
 
 _client: AsyncIOMotorClient = None
 _database: AsyncIOMotorDatabase = None
+_supports_transactions = False
 
 
-async def connect_to_mongo() -> None:
-    global _client, _database
+async def connect_to_mongo() -> bool:
+    global _client, _database, _supports_transactions
     logger.info(f"Connecting to MongoDB at {settings.mongodb_uri}")
     _client = AsyncIOMotorClient(settings.mongodb_uri)
     _database = _client[settings.database_name]
@@ -20,14 +21,20 @@ async def connect_to_mongo() -> None:
         await _client.admin.command("ping")
         logger.info("MongoDB connection successful")
         
-        replica_set_status = await _client.admin.command("replSetGetStatus")
-        if replica_set_status.get("ok") == 1:
-            logger.info(f"Connected to replica set: {replica_set_status.get('set')}")
+        hello = await _client.admin.command("hello")
+        _supports_transactions = bool(hello.get("setName"))
+        if _supports_transactions:
+            logger.info("Connected to replica set: %s", hello.get("setName"))
         else:
-            logger.warning("Not connected to a replica set - transactions will not work")
+            logger.warning("MongoDB is standalone; transactions are disabled")
     except Exception as e:
         logger.error(f"MongoDB connection failed: {e}")
         raise
+    return _supports_transactions
+
+
+def supports_transactions() -> bool:
+    return _supports_transactions
 
 
 async def close_mongo_connection() -> None:

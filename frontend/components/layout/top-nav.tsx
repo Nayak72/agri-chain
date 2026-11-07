@@ -26,30 +26,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useTheme } from "next-themes";
+import { CommandMenu } from "@/components/shell/CommandMenu";
 
 export default function TopNav() {
   const { user, logout } = useAuth();
   const { mobileOpen, setMobileOpen } = useLayout();
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [theme, setTheme] = React.useState<"light" | "dark">("light");
-
-  React.useEffect(() => {
-    const stored = localStorage.getItem("theme") as "light" | "dark" | null;
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initial = stored || (prefersDark ? "dark" : "light");
-    setTheme(initial);
-    document.documentElement.classList.toggle("dark", initial === "dark");
-  }, []);
-
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
-    document.documentElement.classList.toggle("dark", newTheme === "dark");
-  };
+  const [commandOpen, setCommandOpen] = React.useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
+  const theme = resolvedTheme === "light" ? "light" : "dark";
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setCommandOpen(true);
   };
 
   const handleLogout = async () => {
@@ -86,8 +76,7 @@ export default function TopNav() {
   return (
     <TooltipProvider>
       <header
-        className="fixed top-0 right-0 h-16 border-b border-border bg-white/90 dark:bg-card/90 backdrop-blur-md z-30 transition-all duration-300"
-        style={{ left: "var(--sidebar-width, 256px)" }}
+        className="dashboard-topbar fixed top-0 right-0 h-16 border-b border-border glass-raised z-30 transition-all duration-300"
       >
         <div className="flex h-full w-full items-center justify-between px-6 gap-4">
           <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -119,7 +108,7 @@ export default function TopNav() {
               </SheetContent>
             </Sheet>
 
-            <form onSubmit={handleSearch} className="relative w-full md:w-80 lg:w-96 flex-1 max-w-md hidden sm:block">
+            <form onSubmit={handleSearch} onClick={() => setCommandOpen(true)} className="relative w-full md:w-80 lg:w-96 flex-1 max-w-md hidden sm:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <input
                 type="search"
@@ -128,14 +117,16 @@ export default function TopNav() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-9 w-full pl-9 pr-4 rounded-lg border border-input bg-background/50 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 aria-label="Global search"
+                readOnly
               />
+              <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">⌘K</kbd>
             </form>
           </div>
 
           <div className="flex items-center gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}>
+                <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}>
                   {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                 </Button>
               </TooltipTrigger>
@@ -144,10 +135,10 @@ export default function TopNav() {
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
-                  <Bell className="w-4 h-4" />
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="relative" aria-label="Notifications"><Bell className="w-4 h-4" /><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-warning" /></Button></DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-80 glass-overlay"><DropdownMenuLabel>Notifications</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem className="flex-col items-start gap-1 py-3"><span className="font-medium">Cold-chain alerts</span><span className="text-xs text-muted-foreground">Open this panel to review active telemetry alerts.</span></DropdownMenuItem><DropdownMenuItem asChild><Link href="/cold-chain" className="text-primary">View cold-chain monitoring</Link></DropdownMenuItem></DropdownMenuContent>
+                </DropdownMenu>
               </TooltipTrigger>
               <TooltipContent side="bottom">Notifications</TooltipContent>
             </Tooltip>
@@ -196,6 +187,7 @@ export default function TopNav() {
           </div>
         </div>
       </header>
+      <CommandMenu open={commandOpen} onOpenChange={setCommandOpen} />
     </TooltipProvider>
   );
 }

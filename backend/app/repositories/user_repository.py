@@ -1,15 +1,14 @@
+from app.repositories.base import BaseRepository
 from app.db.mongodb import get_database
-from bson import ObjectId
 from datetime import datetime, timezone
 
 
-class UserRepository:
+class UserRepository(BaseRepository):
     collection = "users"
+    business_key = "email"
 
-    @staticmethod
-    async def find_one(filters: dict):
-        db = get_database()
-        return await db[UserRepository.collection].find_one(filters)
+    async def get_by_any_id(self, id_or_business_id: str, session=None):
+        return await super().get_by_any_id(id_or_business_id, session=session)
 
     @staticmethod
     async def find_many(filters: dict = None, skip: int = 0, limit: int = 20, sort: list = None):

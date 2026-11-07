@@ -4,7 +4,7 @@ import pytest
 import asyncio
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
-from app.core.security import get_password_hash, verify_password, create_access_token, decode_token
+from app.core.security import get_password_hash, verify_password, create_access_token, create_refresh_token, decode_token
 from app.services.ledger_service import (
     canonical_json, calculate_block_hash, GENESIS_HASH, append_ledger_block,
     verify_ledger_integrity, verify_entity_history
@@ -24,6 +24,14 @@ class TestSecurity:
         assert payload is not None
         assert payload["sub"] == "user123"
         assert payload["role"] == "FARMER"
+
+    def test_refresh_token_is_typed_and_rotatable(self):
+        token = create_refresh_token({"sub": "user123", "role": "FARMER"})
+        payload = decode_token(token)
+        assert payload is not None
+        assert payload["type"] == "refresh"
+        assert payload["jti"]
+        assert payload["family_id"]
 
 
 class TestLedgerCanonicalization:

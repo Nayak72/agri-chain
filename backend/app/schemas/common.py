@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, Any
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Optional, List, Any, Generic, TypeVar
 from datetime import datetime
 from bson import ObjectId
 
@@ -25,10 +25,8 @@ class BaseSchema(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True,
+                              json_encoders={ObjectId: str})
 
 
 class PaginationParams(BaseModel):
@@ -41,6 +39,18 @@ class PaginatedResponse(BaseModel):
     total: int
     page: int
     page_size: int
+    has_next: bool = False
+
+
+T = TypeVar("T")
+
+
+class Page(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+    page: int
+    page_size: int
+    has_next: bool
 
 
 class ErrorResponse(BaseModel):

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { AmbientBackground } from "@/components/shell/AmbientBackground";
 
 export const metadata: Metadata = {
   title: "AgriChain",
@@ -15,6 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
+        <AmbientBackground />
         <Providers>
           {children}
         </Providers>

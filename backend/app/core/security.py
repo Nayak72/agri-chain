@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
+from uuid import uuid4
+import hashlib
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from app.core.config import get_settings
@@ -34,6 +36,8 @@ def create_refresh_token(data: Dict[str, Any], expires_delta: Optional[timedelta
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days)
+    to_encode.setdefault("jti", str(uuid4()))
+    to_encode.setdefault("family_id", str(uuid4()))
     to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
     return encoded_jwt
@@ -55,3 +59,7 @@ def create_token_pair(user_id: str, email: str, role: str) -> Dict[str, str]:
         "refresh_token": refresh_token,
         "token_type": "bearer"
     }
+
+
+def hash_refresh_jti(jti: str) -> str:
+    return hashlib.sha256(jti.encode("utf-8")).hexdigest()

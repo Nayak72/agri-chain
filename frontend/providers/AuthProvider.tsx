@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { User } from "@/types";
 import { authService } from "@/features/auth/auth";
 
@@ -9,7 +9,7 @@ interface AuthContextValue {
   loading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ user: User; access_token: string; refresh_token: string }>;
-  register: (userData: any) => Promise<{ user: User; access_token: string; refresh_token: string }>;
+  register: (userData: Record<string, unknown>) => Promise<{ user?: User; access_token?: string; refresh_token?: string; status?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -19,15 +19,17 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const initialized = useRef(false);
 
   const refreshUser = useCallback(async () => {
     try {
-      if (authService.isAuthenticated()) {
+      try {
         const u = await authService.me();
         setUser(u);
-      } else {
-        setUser(null);
+      } catch {
+        try {
+          const refreshed = await authService.refresh();
+          if (refreshed.user) setUser(refreshed.user);
+        } catch { setUser(null); }
       }
     } catch {
       setUser(null);
@@ -35,9 +37,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-
     const initAuth = async () => {
       setLoading(true);
       await refreshUser();
@@ -49,11 +48,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const data = await authService.login(email, password);
-    setUser(data.user);
+    setUser(data.user ?? null);
     return data;
   }, []);
 
-  const register = useCallback(async (userData: any) => {
+  const register = useCallback(async (userData: Record<string, unknown>) => {
     const data = await authService.register(userData);
     setUser(data.user);
     return data;

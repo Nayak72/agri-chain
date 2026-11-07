@@ -8,6 +8,7 @@ export interface User {
   is_approved: boolean;
   created_at: string;
   updated_at: string;
+  permissions?: string[];
 }
 
 export interface Farm {

@@ -32,6 +32,11 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     await _create_index_safe(db.users, "role")
     await _create_index_safe(db.users, "is_active")
     await _create_index_safe(db.users, "created_at")
+
+    await _create_index_safe(db.refresh_tokens, "jti_hash", unique=True)
+    await _create_index_safe(db.refresh_tokens, "user_id")
+    await _create_index_safe(db.refresh_tokens, "family_id")
+    await _create_index_safe(db.refresh_tokens, "expires_at", expireAfterSeconds=0)
     
     # Farms collection
     await _create_index_safe(db.farms, "farmer_id")
@@ -260,6 +265,27 @@ async def seed_initial_data(db: AsyncIOMotorDatabase) -> None:
     
     # Seed system settings
     await seed_system_settings(db)
+
+    from app.core.config import get_settings
+    from app.core.security import get_password_hash
+    settings = get_settings()
+    if settings.app_env == "development" and settings.admin_email and settings.admin_password:
+        from datetime import datetime, timezone
+        await db.users.update_one(
+            {"email": settings.admin_email},
+            {"$setOnInsert": {
+                "email": settings.admin_email,
+                "password_hash": get_password_hash(settings.admin_password),
+                "full_name": "AgriChain Administrator",
+                "phone": None,
+                "role": UserRole.ADMIN.value,
+                "is_active": True,
+                "is_approved": True,
+                "created_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+            }},
+            upsert=True,
+        )
     
     logger.info("Initial data seeded successfully")
 

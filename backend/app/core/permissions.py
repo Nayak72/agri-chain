@@ -1,12 +1,12 @@
 from enum import Enum
 from typing import Set, List
-from functools import wraps
-from fastapi import HTTPException, Depends
+from fastapi import Depends, HTTPException
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.security import decode_token
 from app.db.mongodb import get_database
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from app.core.exceptions import UnauthorizedError, ForbiddenError, AccountPendingApprovalError, AccountDisabledError
 
 security = HTTPBearer()
 
@@ -111,23 +111,15 @@ def has_permission(role: Role, permission: str) -> bool:
 
 
 def require_permission(permission: str):
-    def decorator(func):
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            current_user = kwargs.get("current_user")
-            if current_user:
-                role = current_user.get("role")
-                try:
-                    if role and not has_permission(Role(role), permission):
-                        raise HTTPException(
-                            status_code=403,
-                            detail=f"Permission denied: {permission} required for role {role}"
-                        )
-                except ValueError:
-                    raise HTTPException(status_code=403, detail="Invalid user role")
-            return await func(*args, **kwargs)
-        return wrapper
-    return decorator
+    async def permission_dependency(current_user: dict = Depends(get_current_user)) -> dict:
+        try:
+            role = Role(current_user["role"])
+        except (KeyError, ValueError):
+            raise ForbiddenError("Invalid user role")
+        if not has_permission(role, permission):
+            raise ForbiddenError(f"Permission denied: {permission} required for role {role.value}")
+        return current_user
+    return permission_dependency
 
 
 async def get_current_user(
@@ -135,27 +127,31 @@ async def get_current_user(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ) -> dict:
     payload = decode_token(credentials.credentials)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    if not payload or payload.get("type") != "access":
+        raise UnauthorizedError("Invalid access token")
     
     user_id = payload.get("sub")
     if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid token payload")
+        raise UnauthorizedError("Invalid token payload")
         
     if db is not None:
         try:
-            user = await db.users.find_one({"_id": ObjectId(user_id)})
-            if not user:
-                raise HTTPException(status_code=401, detail="User not found")
-            if not user.get("is_active", True):
-                raise HTTPException(status_code=401, detail="Account is deactivated")
-            if not user.get("is_approved", True):
-                raise HTTPException(status_code=403, detail="Account pending approval")
-        except HTTPException:
-            raise
-        except Exception:
-            pass
-            
+            object_id = ObjectId(user_id)
+        except Exception as exc:
+            raise UnauthorizedError("Invalid token subject") from exc
+        try:
+            user = await db.users.find_one({"_id": object_id})
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="User service unavailable") from exc
+        if not user:
+            raise UnauthorizedError("User not found")
+        if not user.get("is_active", True):
+            raise AccountDisabledError()
+        if not user.get("is_approved", True):
+            raise AccountPendingApprovalError()
+
+    if db is not None:
+        payload["role"] = user.get("role", payload.get("role"))
     return payload
 
 
