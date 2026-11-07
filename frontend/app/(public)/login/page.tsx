@@ -31,7 +31,7 @@ export default function LoginPage() {
       Cookies.set("refresh_token", data.refresh_token, { expires: 7 });
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.response?.data?.error || "Login failed");
+      setError(err.response?.data?.detail || err.response?.data?.error || "Login failed");
     } finally {
       setLoading(false);
     }

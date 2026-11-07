@@ -14,7 +14,7 @@ router = APIRouter()
 
 class WarehouseCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
-    manager_id: str
+    manager_id: Optional[str] = None
     address: str = Field(..., min_length=5, max_length=200)
     city: str = Field(..., min_length=2, max_length=100)
     state: str = Field(..., min_length=2, max_length=100)
@@ -65,22 +65,28 @@ class WarehouseResponse(BaseModel):
 @router.post("", response_model=WarehouseResponse)
 async def create_warehouse(
     warehouse_data: WarehouseCreate,
-    current_user: dict = Depends(get_current_admin_user),
+    current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(warehouse_data.manager_id):
+    if current_user["role"] not in [UserRole.ADMIN, UserRole.WAREHOUSE_MANAGER]:
+        raise ForbiddenError("Only warehouse managers or admins can create warehouses")
+    
+    manager_id = warehouse_data.manager_id or current_user["sub"]
+    if not ObjectId.is_valid(manager_id):
         raise ValidationError("Invalid manager ID")
     
-    manager = await db.users.find_one({"_id": ObjectId(warehouse_data.manager_id)})
-    if not manager or manager["role"] != UserRole.WAREHOUSE_MANAGER:
-        raise ValidationError("Manager must be a warehouse manager")
+    manager = await db.users.find_one({"_id": ObjectId(manager_id)})
+    if not manager:
+        raise ValidationError("Manager not found")
     
     existing = await db.warehouses.find_one({"name": warehouse_data.name})
     if existing:
         raise ValidationError("Warehouse name already exists")
     
+    data_dict = warehouse_data.model_dump()
+    data_dict["manager_id"] = manager_id
     warehouse_doc = {
-        **warehouse_data.model_dump(),
+        **data_dict,
         "is_active": True,
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
@@ -122,10 +128,10 @@ async def get_warehouse(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(warehouse_id):
-        raise ValidationError("Invalid warehouse ID")
-    
-    warehouse = await db.warehouses.find_one({"_id": ObjectId(warehouse_id)})
+    if ObjectId.is_valid(warehouse_id):
+        warehouse = await db.warehouses.find_one({"_id": ObjectId(warehouse_id)})
+    else:
+        warehouse = await db.warehouses.find_one({"name": warehouse_id})
     if not warehouse:
         raise NotFoundError("Warehouse", warehouse_id)
     

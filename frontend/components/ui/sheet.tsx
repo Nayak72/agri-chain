@@ -59,8 +59,8 @@ SheetTrigger.displayName = "SheetTrigger";
 
 const SheetContent = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode; className?: string }
->(({ className, children, ...props }, ref) => (
+  React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode; className?: string; side?: "top" | "bottom" | "left" | "right" | string }
+>(({ className, children, side, ...props }, ref) => (
   <div ref={ref} className={cn("flex h-full w-80 flex-col", className)} {...props}>
     {children}
   </div>

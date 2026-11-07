@@ -168,15 +168,27 @@ async def get_freight_analytics(
         if transporter:
             query["transporter_id"] = str(transporter["_id"])
     
+    # All quotations
     pipeline = [
         {"$match": query},
         {"$group": {
             "_id": None,
-            "total_cost": {"$sum": "$total_freight_charge_paise"},
+            "total_quoted": {"$sum": "$total_freight_charge_paise"},
             "count": {"$sum": 1},
         }}
     ]
     cost_result = await db.freight_quotations.aggregate(pipeline).to_list(1)
+    
+    # Accepted quotations = committed/actual freight expenditure
+    accepted_pipeline = [
+        {"$match": {**query, "status": "ACCEPTED"}},
+        {"$group": {
+            "_id": None,
+            "total_accepted": {"$sum": "$total_freight_charge_paise"},
+            "count": {"$sum": 1},
+        }}
+    ]
+    accepted_result = await db.freight_quotations.aggregate(accepted_pipeline).to_list(1)
     
     pipeline = [
         {"$match": query},
@@ -185,17 +197,40 @@ async def get_freight_analytics(
     ]
     transporter_costs = await db.freight_quotations.aggregate(pipeline).to_list(None)
     
-    total_cost = cost_result[0]["total_cost"] if cost_result else 0
+    # Route-wise costs from shipments
+    route_pipeline = [
+        {"$group": {
+            "_id": {"origin": "$pickup_city", "dest": "$destination_city"},
+            "count": {"$sum": 1},
+            "total_weight": {"$sum": "$total_cargo_weight_kg"}
+        }},
+        {"$sort": {"count": -1}},
+        {"$limit": 5}
+    ]
+    route_costs = await db.shipments.aggregate(route_pipeline).to_list(None)
+    
+    total_quoted = cost_result[0]["total_quoted"] if cost_result else 0
     quote_count = cost_result[0]["count"] if cost_result else 0
-    avg_cost = total_cost / quote_count if quote_count > 0 else 0
+    avg_quote = int(total_quoted / quote_count) if quote_count > 0 else 0
+    
+    total_expenditure = accepted_result[0]["total_accepted"] if accepted_result else 0
+    accepted_count = accepted_result[0]["count"] if accepted_result else 0
+    avg_freight = int(total_expenditure / accepted_count) if accepted_count > 0 else avg_quote
+    
+    # Delivered weight for cost per kg
+    weight_res = await db.delivery_reports.aggregate([
+        {"$group": {"_id": None, "total": {"$sum": "$delivered_quantity_kg"}}}
+    ]).to_list(1)
+    total_kg = weight_res[0]["total"] if weight_res else 0
+    cost_per_kg = round((total_expenditure / 100) / total_kg, 2) if total_kg > 0 else 0.0
     
     return {
-        "total_freight_expenditure_paise": total_cost,
-        "average_freight_cost_paise": round(avg_cost, 2),
-        "freight_cost_per_kg": 0.0,
-        "average_quotation_value_paise": round(avg_cost, 2),
+        "total_freight_expenditure_paise": total_expenditure,
+        "average_freight_cost_paise": avg_freight,
+        "freight_cost_per_kg": cost_per_kg,
+        "average_quotation_value_paise": avg_quote,
         "transporter_wise_cost": transporter_costs,
-        "route_wise_cost": [],
+        "route_wise_cost": [{"route": f"{r['_id']['origin']} → {r['_id']['dest']}", "shipments": r["count"], "weight_kg": r["total_weight"]} for r in route_costs if r.get("_id")],
     }
 
 
@@ -248,33 +283,50 @@ async def get_quality_analytics(
     if current_user["role"] == UserRole.FARMER:
         query["farmer_id"] = current_user["sub"]
     
-    total_dispatched = await db.shipments.count_documents({**query, "status": {"$in": [ShipmentStatus.DELIVERED, ShipmentStatus.PARTIALLY_DELIVERED]}})
+    # Calculate actual dispatched weight from shipments
+    shipment_weight_pipeline = [
+        {"$match": {**query, "status": {"$in": [ShipmentStatus.DELIVERED, ShipmentStatus.PARTIALLY_DELIVERED]}}},
+        {"$group": {"_id": None, "total_weight": {"$sum": "$total_cargo_weight_kg"}}}
+    ]
+    weight_res = await db.shipments.aggregate(shipment_weight_pipeline).to_list(1)
+    total_dispatched_kg = float(weight_res[0]["total_weight"]) if weight_res and weight_res[0].get("total_weight") else 0.0
     
-    pipeline = [
-        {"$match": query},
+    # Calculate delivery breakdown
+    delivery_pipeline = [
         {"$group": {
             "_id": None,
+            "delivered": {"$sum": "$delivered_quantity_kg"},
             "damaged": {"$sum": "$damaged_quantity_kg"},
-            "rejected": {"$sum": "$rejected_quantity_kg"},
+            "missing": {"$sum": "$missing_quantity_kg"},
         }}
     ]
-    quality_result = await db.produce_batches.aggregate(pipeline).to_list(1)
+    delivery_result = await db.delivery_reports.aggregate(delivery_pipeline).to_list(1)
     
-    damaged_qty = quality_result[0]["damaged"] if quality_result else 0
-    rejected_qty = quality_result[0]["rejected"] if quality_result else 0
+    if delivery_result:
+        delivered_qty = float(delivery_result[0]["delivered"])
+        damaged_qty = float(delivery_result[0]["damaged"])
+        rejected_qty = float(delivery_result[0]["missing"])
+        if total_dispatched_kg == 0.0:
+            total_dispatched_kg = delivered_qty + damaged_qty + rejected_qty
+        accepted_qty = delivered_qty
+    else:
+        damaged_qty = 0.0
+        rejected_qty = 0.0
+        accepted_qty = total_dispatched_kg
     
-    damage_rate = (damaged_qty / total_dispatched * 100) if total_dispatched > 0 else 0
-    rejection_rate = (rejected_qty / total_dispatched * 100) if total_dispatched > 0 else 0
+    damage_rate = (damaged_qty / total_dispatched_kg * 100) if total_dispatched_kg > 0 else 0.0
+    rejection_rate = (rejected_qty / total_dispatched_kg * 100) if total_dispatched_kg > 0 else 0.0
     
     total_alerts = await db.sensor_alerts.count_documents({"status": AlertStatus.ACTIVE})
     total_readings = await db.sensor_readings.count_documents({})
-    compliance = ((total_readings - total_alerts) / total_readings * 100) if total_readings > 0 else 100
+    normal_readings = await db.sensor_readings.count_documents({"status": SensorStatus.NORMAL})
+    compliance = (normal_readings / total_readings * 100) if total_readings > 0 else 100.0
     
     return {
-        "total_dispatched_quantity_kg": total_dispatched,
-        "accepted_quantity_kg": total_dispatched - damaged_qty - rejected_qty,
-        "damaged_quantity_kg": damaged_qty,
-        "rejected_quantity_kg": rejected_qty,
+        "total_dispatched_quantity_kg": round(total_dispatched_kg, 2),
+        "accepted_quantity_kg": round(accepted_qty, 2),
+        "damaged_quantity_kg": round(damaged_qty, 2),
+        "rejected_quantity_kg": round(rejected_qty, 2),
         "damage_rate_percentage": round(damage_rate, 2),
         "rejection_rate_percentage": round(rejection_rate, 2),
         "cold_chain_compliance_percentage": round(compliance, 2),

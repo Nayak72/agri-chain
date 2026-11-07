@@ -115,10 +115,10 @@ async def get_farm(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(farm_id):
-        raise ValidationError("Invalid farm ID")
-    
-    farm = await db.farms.find_one({"_id": ObjectId(farm_id)})
+    if ObjectId.is_valid(farm_id):
+        farm = await db.farms.find_one({"_id": ObjectId(farm_id)})
+    else:
+        farm = await db.farms.find_one({"name": farm_id})
     if not farm:
         raise NotFoundError("Farm", farm_id)
     

@@ -163,10 +163,10 @@ async def get_purchase_order(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(order_id):
-        raise ValidationError("Invalid order ID")
-    
-    order = await db.purchase_orders.find_one({"_id": ObjectId(order_id)})
+    if ObjectId.is_valid(order_id):
+        order = await db.purchase_orders.find_one({"_id": ObjectId(order_id)})
+    else:
+        order = await db.purchase_orders.find_one({"order_id": order_id})
     if not order:
         raise NotFoundError("Purchase Order", order_id)
     

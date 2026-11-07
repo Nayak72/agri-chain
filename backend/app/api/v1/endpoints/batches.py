@@ -180,10 +180,10 @@ async def get_batch(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(batch_id):
-        raise ValidationError("Invalid batch ID")
-    
-    batch = await db.produce_batches.find_one({"_id": ObjectId(batch_id)})
+    if ObjectId.is_valid(batch_id):
+        batch = await db.produce_batches.find_one({"_id": ObjectId(batch_id)})
+    else:
+        batch = await db.produce_batches.find_one({"batch_id": batch_id})
     if not batch:
         raise NotFoundError("Batch", batch_id)
     

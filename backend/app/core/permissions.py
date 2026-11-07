@@ -2,7 +2,10 @@ from enum import Enum
 from typing import Set, List
 from functools import wraps
 from fastapi import HTTPException, Depends
+from bson import ObjectId
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.security import decode_token
+from app.db.mongodb import get_database
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 security = HTTPBearer()
@@ -111,17 +114,48 @@ def require_permission(permission: str):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            # Permission is checked via get_current_user dependency in routes
-            # This decorator is a placeholder for future use
+            current_user = kwargs.get("current_user")
+            if current_user:
+                role = current_user.get("role")
+                try:
+                    if role and not has_permission(Role(role), permission):
+                        raise HTTPException(
+                            status_code=403,
+                            detail=f"Permission denied: {permission} required for role {role}"
+                        )
+                except ValueError:
+                    raise HTTPException(status_code=403, detail="Invalid user role")
             return await func(*args, **kwargs)
         return wrapper
     return decorator
 
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+) -> dict:
     payload = decode_token(credentials.credentials)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid token")
+    
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+        
+    if db is not None:
+        try:
+            user = await db.users.find_one({"_id": ObjectId(user_id)})
+            if not user:
+                raise HTTPException(status_code=401, detail="User not found")
+            if not user.get("is_active", True):
+                raise HTTPException(status_code=401, detail="Account is deactivated")
+            if not user.get("is_approved", True):
+                raise HTTPException(status_code=403, detail="Account pending approval")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+            
     return payload
 
 

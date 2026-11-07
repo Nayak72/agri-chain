@@ -21,7 +21,7 @@ router = APIRouter()
 
 
 class SensorSessionCreate(BaseModel):
-    shipment_id: str
+    shipment_id: Optional[str] = None
     scenario: SensorScenario = SensorScenario.NORMAL
     interval_seconds: int = Field(30, ge=5, le=3600)
 
@@ -81,15 +81,25 @@ async def start_simulation_endpoint(
         "updated_at": datetime.now(timezone.utc),
     }
     
-    await db.sensor_sessions.insert_one(session_doc)
+    result = await db.sensor_sessions.insert_one(session_doc)
     session_doc["_id"] = result.inserted_id
+    
+    # Try resolving produce type from shipment
+    produce_type = "TOMATO"
+    if shipment.get("batch_ids") and len(shipment["batch_ids"]) > 0:
+        first_b = shipment["batch_ids"][0]
+        batch_q = {"_id": ObjectId(first_b)} if ObjectId.is_valid(first_b) else {"batch_id": first_b}
+        batch = await db.produce_batches.find_one(batch_q)
+        if batch and batch.get("produce_type"):
+            produce_type = batch["produce_type"]
     
     await simulator_manager.start_simulation(
         session_id=session_id,
         shipment_id=shipment_id,
         scenario=session_data.scenario,
         interval_seconds=session_data.interval_seconds,
-        db=db
+        db=db,
+        produce_type=produce_type
     )
     
     return SensorSessionResponse(

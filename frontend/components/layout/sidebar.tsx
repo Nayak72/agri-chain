@@ -38,6 +38,7 @@ import {
   FileText,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useLayout } from "@/providers/LayoutProvider";
 import { USER_ROLES } from "@/lib/constants";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -118,9 +119,21 @@ function isActive(pathname: string, href: string): boolean {
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user } = useAuth();
-  const [isCollapsed, setIsCollapsed] = React.useState(false);
-  const [expandedGroups, setExpandedGroups] = React.useState<string[]>(["OVERVIEW", "AGRICULTURE", "COMMERCE", "TRANSPORTATION", "MONITORING", "SYSTEM"]);
+  const { user, logout: authLogout } = useAuth();
+  const { isCollapsed, setIsCollapsed } = useLayout();
+  const [expandedGroups, setExpandedGroups] = React.useState<string[]>([
+    "OVERVIEW",
+    "AGRICULTURE",
+    "COMMERCE",
+    "TRANSPORTATION",
+    "MONITORING",
+    "SYSTEM",
+  ]);
+
+  const handleLogout = async () => {
+    await authLogout();
+    window.location.href = "/login";
+  };
 
   const toggleGroup = (label: string) => {
     setExpandedGroups((prev) =>
@@ -273,13 +286,11 @@ export default function Sidebar() {
                 </div>
                 <Button
                   variant="outline"
-                  className="w-full justify-start gap-3"
-                  asChild
+                  className="w-full justify-start gap-3 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20"
+                  onClick={handleLogout}
                 >
-                  <a href="/login?logout=true">
-                    <LogOut className="w-4 h-4" />
-                    <span>Sign Out</span>
-                  </a>
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out</span>
                 </Button>
               </div>
             ) : (
@@ -288,16 +299,14 @@ export default function Sidebar() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="text-muted-foreground hover:text-primary"
-                    asChild
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={handleLogout}
                     aria-label="User menu"
                   >
-                    <a href="/login?logout=true">
-                      <LogOut className="w-5 h-5" />
-                    </a>
+                    <LogOut className="w-5 h-5" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="left" align="center">Sign Out</TooltipContent>
+                <TooltipContent side="right" align="center">Sign Out</TooltipContent>
               </Tooltip>
             )}
           </div>

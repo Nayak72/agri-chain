@@ -199,10 +199,10 @@ async def get_freight_quotation(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(quotation_id):
-        raise ValidationError("Invalid quotation ID")
-    
-    quotation = await db.freight_quotations.find_one({"_id": ObjectId(quotation_id)})
+    if ObjectId.is_valid(quotation_id):
+        quotation = await db.freight_quotations.find_one({"_id": ObjectId(quotation_id)})
+    else:
+        quotation = await db.freight_quotations.find_one({"quotation_id": quotation_id})
     if not quotation:
         raise NotFoundError("Freight Quotation", quotation_id)
     
@@ -220,10 +220,10 @@ async def accept_freight_quotation(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(quotation_id):
-        raise ValidationError("Invalid quotation ID")
-    
-    quotation = await db.freight_quotations.find_one({"_id": ObjectId(quotation_id)})
+    if ObjectId.is_valid(quotation_id):
+        quotation = await db.freight_quotations.find_one({"_id": ObjectId(quotation_id)})
+    else:
+        quotation = await db.freight_quotations.find_one({"quotation_id": quotation_id})
     if not quotation:
         raise NotFoundError("Freight Quotation", quotation_id)
     
@@ -242,22 +242,23 @@ async def accept_freight_quotation(
     else:
         raise ForbiddenError("Only buyer or seller can accept quotation")
     
+    qid = quotation["_id"]
     async with transaction_session() as session:
         await db.freight_quotations.update_one(
-            {"_id": ObjectId(quotation_id)},
+            {"_id": qid},
             {"$set": {"status": "ACCEPTED", "updated_at": datetime.now(timezone.utc)}},
             session=session
         )
         
         await db.freight_quotations.update_many(
-            {"booking_id": quotation["booking_id"], "_id": {"$ne": ObjectId(quotation_id)}},
+            {"booking_id": quotation["booking_id"], "_id": {"$ne": qid}},
             {"$set": {"status": "REJECTED", "updated_at": datetime.now(timezone.utc)}},
             session=session
         )
         
         await db.freight_bookings.update_one(
-            {"_id": ObjectId(quotation["booking_id"])},
-            {"$set": {"status": FreightBookingStatus.CONFIRMED, "accepted_quotation_id": quotation_id, "updated_at": datetime.now(timezone.utc)}},
+            {"_id": ObjectId(quotation["booking_id"]) if ObjectId.is_valid(quotation["booking_id"]) else quotation["booking_id"]},
+            {"$set": {"status": FreightBookingStatus.CONFIRMED, "accepted_quotation_id": str(qid), "updated_at": datetime.now(timezone.utc)}},
             session=session
         )
         
@@ -265,7 +266,7 @@ async def accept_freight_quotation(
             db,
             event_type=LedgerEventType.FREIGHT_QUOTATION_ACCEPTED,
             entity_type="FREIGHT_QUOTATION",
-            entity_id=quotation_id,
+            entity_id=str(qid),
             actor_id=current_user["sub"],
             actor_role=current_user["role"],
             event_summary=f"Freight quotation {quotation['quotation_id']} accepted for booking {booking['booking_id']}",

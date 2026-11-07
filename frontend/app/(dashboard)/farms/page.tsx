@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, TreePine, MapPin, Eye, MoreHorizontal } from "lucide-react";
+import { Plus, Search, TreePine, MapPin, Eye, MoreHorizontal, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -146,5 +146,3 @@ export default function FarmsPage() {
     </div>
   );
 }
-
-import { AlertCircle } from "lucide-react";

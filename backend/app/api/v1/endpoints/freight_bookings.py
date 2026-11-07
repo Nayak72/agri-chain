@@ -190,10 +190,10 @@ async def get_freight_booking(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(booking_id):
-        raise ValidationError("Invalid booking ID")
-    
-    booking = await db.freight_bookings.find_one({"_id": ObjectId(booking_id)})
+    if ObjectId.is_valid(booking_id):
+        booking = await db.freight_bookings.find_one({"_id": ObjectId(booking_id)})
+    else:
+        booking = await db.freight_bookings.find_one({"booking_id": booking_id})
     if not booking:
         raise NotFoundError("Freight Booking", booking_id)
     

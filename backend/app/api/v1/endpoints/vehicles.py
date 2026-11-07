@@ -15,7 +15,7 @@ router = APIRouter()
 
 
 class VehicleCreate(BaseModel):
-    transporter_id: str
+    transporter_id: Optional[str] = None
     registration_number: str = Field(..., pattern=r"^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}$")
     category: VehicleCategory
     vehicle_type: VehicleType
@@ -82,12 +82,18 @@ async def create_vehicle(
     if current_user["role"] not in [UserRole.TRANSPORTER, UserRole.ADMIN]:
         raise ForbiddenError("Only transporters can create vehicles")
     
-    if not ObjectId.is_valid(vehicle_data.transporter_id):
+    trans_id = vehicle_data.transporter_id
+    if not trans_id and current_user["role"] == UserRole.TRANSPORTER:
+        t_doc = await db.transporters.find_one({"user_id": current_user["sub"]})
+        if t_doc:
+            trans_id = str(t_doc["_id"])
+    
+    if not trans_id or not ObjectId.is_valid(trans_id):
         raise ValidationError("Invalid transporter ID")
     
-    transporter = await db.transporters.find_one({"_id": ObjectId(vehicle_data.transporter_id)})
+    transporter = await db.transporters.find_one({"_id": ObjectId(trans_id)})
     if not transporter:
-        raise NotFoundError("Transporter", vehicle_data.transporter_id)
+        raise NotFoundError("Transporter", trans_id)
     
     if current_user["role"] == UserRole.TRANSPORTER and transporter.get("user_id") != current_user["sub"]:
         raise ForbiddenError("Not authorized for this transporter")
@@ -106,7 +112,7 @@ async def create_vehicle(
     
     vehicle_doc = {
         "vehicle_id": vehicle_id,
-        "transporter_id": vehicle_data.transporter_id,
+        "transporter_id": trans_id,
         "registration_number": vehicle_data.registration_number,
         "category": vehicle_data.category,
         "vehicle_type": vehicle_data.vehicle_type,
@@ -169,10 +175,12 @@ async def get_vehicle(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(vehicle_id):
-        raise ValidationError("Invalid vehicle ID")
-    
-    vehicle = await db.vehicles.find_one({"_id": ObjectId(vehicle_id)})
+    if ObjectId.is_valid(vehicle_id):
+        vehicle = await db.vehicles.find_one({"_id": ObjectId(vehicle_id)})
+    else:
+        vehicle = await db.vehicles.find_one({
+            "$or": [{"vehicle_id": vehicle_id}, {"registration_number": vehicle_id}]
+        })
     if not vehicle:
         raise NotFoundError("Vehicle", vehicle_id)
     

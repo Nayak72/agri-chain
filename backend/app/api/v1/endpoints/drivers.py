@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 class DriverCreate(BaseModel):
-    transporter_id: str
+    transporter_id: Optional[str] = None
     name: str = Field(..., min_length=2, max_length=100)
     phone: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")
     email: Optional[str] = Field(None, pattern=r"^[^@]+@[^@]+\.[^@]+$")
@@ -75,12 +75,18 @@ async def create_driver(
     if current_user["role"] not in [UserRole.TRANSPORTER, UserRole.ADMIN]:
         raise ForbiddenError("Only transporters can create drivers")
     
-    if not ObjectId.is_valid(driver_data.transporter_id):
+    trans_id = driver_data.transporter_id
+    if not trans_id and current_user["role"] == UserRole.TRANSPORTER:
+        t_doc = await db.transporters.find_one({"user_id": current_user["sub"]})
+        if t_doc:
+            trans_id = str(t_doc["_id"])
+    
+    if not trans_id or not ObjectId.is_valid(trans_id):
         raise ValidationError("Invalid transporter ID")
     
-    transporter = await db.transporters.find_one({"_id": ObjectId(driver_data.transporter_id)})
+    transporter = await db.transporters.find_one({"_id": ObjectId(trans_id)})
     if not transporter:
-        raise NotFoundError("Transporter", driver_data.transporter_id)
+        raise NotFoundError("Transporter", trans_id)
     
     if current_user["role"] == UserRole.TRANSPORTER and transporter.get("user_id") != current_user["sub"]:
         raise ForbiddenError("Not authorized for this transporter")
@@ -97,7 +103,7 @@ async def create_driver(
     
     driver_doc = {
         "driver_id": driver_id,
-        "transporter_id": driver_data.transporter_id,
+        "transporter_id": trans_id,
         "name": driver_data.name,
         "phone": driver_data.phone,
         "email": driver_data.email,
@@ -152,10 +158,10 @@ async def get_driver(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(driver_id):
-        raise ValidationError("Invalid driver ID")
-    
-    driver = await db.drivers.find_one({"_id": ObjectId(driver_id)})
+    if ObjectId.is_valid(driver_id):
+        driver = await db.drivers.find_one({"_id": ObjectId(driver_id)})
+    else:
+        driver = await db.drivers.find_one({"driver_id": driver_id})
     if not driver:
         raise NotFoundError("Driver", driver_id)
     

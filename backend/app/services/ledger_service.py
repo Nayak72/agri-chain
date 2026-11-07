@@ -42,8 +42,11 @@ def calculate_block_hash(block_data: Dict[str, Any]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-async def get_ledger_head(db: AsyncIOMotorDatabase) -> Dict[str, Any]:
-    head = await db.ledger_heads.find_one({"chain_id": CHAIN_ID})
+async def get_ledger_head(db: AsyncIOMotorDatabase, session: AsyncIOMotorClientSession = None) -> Dict[str, Any]:
+    if session:
+        head = await db.ledger_heads.find_one({"chain_id": CHAIN_ID}, session=session)
+    else:
+        head = await db.ledger_heads.find_one({"chain_id": CHAIN_ID})
     if not head:
         return {"chain_id": CHAIN_ID, "last_index": 0, "last_hash": GENESIS_HASH}
     return head
@@ -75,7 +78,7 @@ async def append_ledger_block(
     payload: Dict[str, Any],
     session: AsyncIOMotorClientSession = None
 ) -> Dict[str, Any]:
-    head = await get_ledger_head(db)
+    head = await get_ledger_head(db, session=session)
     previous_hash = head["last_hash"]
     new_index = head["last_index"] + 1
     
@@ -212,6 +215,9 @@ async def verify_entity_history(
     entity_type: str,
     entity_id: str
 ) -> Dict[str, Any]:
+    # First verify the integrity of the full global chain
+    global_integrity = await verify_ledger_integrity(db)
+    
     blocks = await db.ledger_blocks.find({
         "chain_id": CHAIN_ID,
         "entity_type": entity_type,
@@ -224,38 +230,51 @@ async def verify_entity_history(
             "entity_type": entity_type,
             "entity_id": entity_id,
             "blocks_checked": 0,
+            "global_chain_valid": global_integrity["valid"],
             "message": "No ledger entries for this entity"
         }
     
-    prev_hash = GENESIS_HASH
+    # Verify each entity block's content hash and its link to the previous global block
+    invalid_blocks = []
     for block in blocks:
-        if block["previous_hash"] != prev_hash:
-            return {
-                "valid": False,
-                "entity_type": entity_type,
-                "entity_id": entity_id,
-                "blocks_checked": 0,
-                "error": f"Chain broken at block {block['index']}: previous hash mismatch",
-                "first_invalid_block": block["index"]
-            }
-        
+        # Check recalculation of content hash
         recalculated = calculate_block_hash(block)
         if block["hash"] != recalculated:
-            return {
-                "valid": False,
-                "entity_type": entity_type,
-                "entity_id": entity_id,
-                "blocks_checked": 0,
-                "error": f"Block {block['index']} data modified",
-                "first_invalid_block": block["index"]
-            }
+            invalid_blocks.append({
+                "index": block["index"],
+                "block_id": block["block_id"],
+                "error": "Block data has been modified (hash mismatch)"
+            })
+            continue
         
-        prev_hash = block["hash"]
+        # Verify block's link into the global chain
+        if block["index"] > 1:
+            preceding_block = await db.ledger_blocks.find_one({
+                "chain_id": CHAIN_ID,
+                "index": block["index"] - 1
+            })
+            if not preceding_block or preceding_block["hash"] != block["previous_hash"]:
+                invalid_blocks.append({
+                    "index": block["index"],
+                    "block_id": block["block_id"],
+                    "error": "Previous hash link in global chain is broken"
+                })
+        elif block["index"] == 1:
+            if block["previous_hash"] != GENESIS_HASH:
+                invalid_blocks.append({
+                    "index": block["index"],
+                    "block_id": block["block_id"],
+                    "error": "Genesis block does not link to GENESIS_HASH"
+                })
+    
+    is_valid = global_integrity["valid"] and len(invalid_blocks) == 0
     
     return {
-        "valid": True,
+        "valid": is_valid,
         "entity_type": entity_type,
         "entity_id": entity_id,
         "blocks_checked": len(blocks),
-        "message": f"Entity history verified: {len(blocks)} blocks"
+        "global_chain_valid": global_integrity["valid"],
+        "invalid_blocks": invalid_blocks,
+        "message": f"Entity history verified: {len(blocks)} blocks ({'VALID' if is_valid else 'COMPROMISED'})"
     }

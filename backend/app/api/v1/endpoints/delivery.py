@@ -33,17 +33,83 @@ class DeliveryReportResponse(BaseModel):
     id: str
     report_id: str
     shipment_id: str
+    shipment_public_id: Optional[str] = None
     delivered_quantity_kg: float
     damaged_quantity_kg: float
     missing_quantity_kg: float
     received_by: str
     received_at: datetime
-    delivery_photos: List[str]
-    receiver_signature: Optional[str]
-    notes: Optional[str]
+    delivery_photos: List[str] = []
+    receiver_signature: Optional[str] = None
+    notes: Optional[str] = None
     status: DeliveryStatus
     created_at: datetime
     updated_at: datetime
+
+
+class DeliveryReportListResponse(BaseModel):
+    items: List[DeliveryReportResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+@router.get("/reports", response_model=DeliveryReportListResponse)
+async def list_delivery_reports(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: Optional[DeliveryStatus] = None,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    query = {}
+    
+    # Role-based filtering
+    if current_user["role"] == UserRole.DRIVER:
+        shipments = await db.shipments.find({"driver_id": current_user["sub"]}, {"_id": 1}).to_list(None)
+        shipment_ids = [str(s["_id"]) for s in shipments]
+        query["shipment_id"] = {"$in": shipment_ids}
+    elif current_user["role"] == UserRole.BUYER:
+        shipments = await db.shipments.find({"buyer_id": current_user["sub"]}, {"_id": 1}).to_list(None)
+        shipment_ids = [str(s["_id"]) for s in shipments]
+        query["shipment_id"] = {"$in": shipment_ids}
+    elif current_user["role"] == UserRole.TRANSPORTER:
+        transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
+        if transporter:
+            shipments = await db.shipments.find({"transporter_id": str(transporter["_id"])}, {"_id": 1}).to_list(None)
+            shipment_ids = [str(s["_id"]) for s in shipments]
+            query["shipment_id"] = {"$in": shipment_ids}
+        else:
+            query["shipment_id"] = {"$in": []}
+    elif current_user["role"] == UserRole.FARMER:
+        shipments = await db.shipments.find({"farmer_id": current_user["sub"]}, {"_id": 1}).to_list(None)
+        shipment_ids = [str(s["_id"]) for s in shipments]
+        query["shipment_id"] = {"$in": shipment_ids}
+    
+    if status:
+        query["status"] = status
+    
+    total = await db.delivery_reports.count_documents(query)
+    reports = await db.delivery_reports.find(query).sort("created_at", -1).skip((page - 1) * page_size).limit(page_size).to_list(page_size)
+    
+    # Enrich with shipment public identifiers
+    items = []
+    for r in reports:
+        doc = dict(r)
+        doc["id"] = str(doc.pop("_id"))
+        # lookup shipment_id public identifier if possible
+        if ObjectId.is_valid(doc.get("shipment_id", "")):
+            sh = await db.shipments.find_one({"_id": ObjectId(doc["shipment_id"])}, {"shipment_id": 1})
+            if sh:
+                doc["shipment_public_id"] = sh.get("shipment_id")
+        items.append(DeliveryReportResponse(**doc))
+    
+    return DeliveryReportListResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size
+    )
 
 
 @router.post("/shipments/{shipment_id}/delivery-report", response_model=DeliveryReportResponse)
@@ -56,12 +122,14 @@ async def create_delivery_report(
     if current_user["role"] not in [UserRole.DRIVER, UserRole.TRANSPORTER, UserRole.BUYER]:
         raise ForbiddenError("Only driver, transporter, or buyer can create delivery reports")
     
-    if not ObjectId.is_valid(shipment_id):
-        raise ValidationError("Invalid shipment ID")
-    
-    shipment = await db.shipments.find_one({"_id": ObjectId(shipment_id)})
+    if ObjectId.is_valid(shipment_id):
+        shipment = await db.shipments.find_one({"_id": ObjectId(shipment_id)})
+    else:
+        shipment = await db.shipments.find_one({"shipment_id": shipment_id})
     if not shipment:
         raise NotFoundError("Shipment", shipment_id)
+    
+    canonical_shipment_id = str(shipment["_id"])
     
     if current_user["role"] == UserRole.DRIVER and shipment["driver_id"] != current_user["sub"]:
         raise ForbiddenError("Not authorized")
@@ -72,7 +140,7 @@ async def create_delivery_report(
     if current_user["role"] == UserRole.BUYER and shipment["buyer_id"] != current_user["sub"]:
         raise ForbiddenError("Not authorized")
     
-    existing = await db.delivery_reports.find_one({"shipment_id": shipment_id})
+    existing = await db.delivery_reports.find_one({"shipment_id": canonical_shipment_id})
     if existing:
         raise ValidationError("Delivery report already exists for this shipment")
     
@@ -80,7 +148,7 @@ async def create_delivery_report(
     
     report_doc = {
         "report_id": report_id,
-        "shipment_id": shipment_id,
+        "shipment_id": canonical_shipment_id,
         "delivered_quantity_kg": report_data.delivered_quantity_kg,
         "damaged_quantity_kg": report_data.damaged_quantity_kg,
         "missing_quantity_kg": report_data.missing_quantity_kg,
@@ -106,7 +174,7 @@ async def create_delivery_report(
             new_status = ShipmentStatus.DELIVERY_REJECTED
         
         await db.shipments.update_one(
-            {"_id": ObjectId(shipment_id)},
+            {"_id": shipment["_id"]},
             {"$set": {"status": new_status, "actual_arrival_time": report_data.received_at, "updated_at": datetime.now(timezone.utc)}},
             session=session
         )
@@ -115,7 +183,7 @@ async def create_delivery_report(
             db,
             event_type=LedgerEventType.DELIVERY_RECORDED,
             entity_type="SHIPMENT",
-            entity_id=shipment_id,
+            entity_id=canonical_shipment_id,
             actor_id=current_user["sub"],
             actor_role=current_user["role"],
             event_summary=f"Delivery recorded for shipment {shipment['shipment_id']} - {report_data.delivered_quantity_kg}kg delivered",
@@ -129,6 +197,27 @@ async def create_delivery_report(
         )
     
     return DeliveryReportResponse(id=str(report_doc["_id"]), **report_doc)
+
+
+@router.get("/reports/{report_id}", response_model=DeliveryReportResponse)
+async def get_delivery_report_by_id(
+    report_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    if ObjectId.is_valid(report_id):
+        report = await db.delivery_reports.find_one({"_id": ObjectId(report_id)})
+    else:
+        report = await db.delivery_reports.find_one({"report_id": report_id})
+    if not report:
+        raise NotFoundError("Delivery Report", report_id)
+    doc = dict(report)
+    doc["id"] = str(doc.pop("_id"))
+    if ObjectId.is_valid(doc.get("shipment_id", "")):
+        sh = await db.shipments.find_one({"_id": ObjectId(doc["shipment_id"])}, {"shipment_id": 1})
+        if sh:
+            doc["shipment_public_id"] = sh.get("shipment_id")
+    return DeliveryReportResponse(**doc)
 
 
 @router.get("/shipments/{shipment_id}/delivery-report", response_model=DeliveryReportResponse)
@@ -171,12 +260,14 @@ async def confirm_delivery(
     if current_user["role"] != UserRole.BUYER:
         raise ForbiddenError("Only buyer can confirm delivery")
     
-    if not ObjectId.is_valid(shipment_id):
-        raise ValidationError("Invalid shipment ID")
-    
-    shipment = await db.shipments.find_one({"_id": ObjectId(shipment_id)})
+    if ObjectId.is_valid(shipment_id):
+        shipment = await db.shipments.find_one({"_id": ObjectId(shipment_id)})
+    else:
+        shipment = await db.shipments.find_one({"shipment_id": shipment_id})
     if not shipment:
         raise NotFoundError("Shipment", shipment_id)
+    
+    canonical_shipment_id = str(shipment["_id"])
     
     if shipment["buyer_id"] != current_user["sub"]:
         raise ForbiddenError("Not authorized")
@@ -216,12 +307,14 @@ async def reject_delivery(
     if current_user["role"] != UserRole.BUYER:
         raise ForbiddenError("Only buyer can reject delivery")
     
-    if not ObjectId.is_valid(shipment_id):
-        raise ValidationError("Invalid shipment ID")
-    
-    shipment = await db.shipments.find_one({"_id": ObjectId(shipment_id)})
+    if ObjectId.is_valid(shipment_id):
+        shipment = await db.shipments.find_one({"_id": ObjectId(shipment_id)})
+    else:
+        shipment = await db.shipments.find_one({"shipment_id": shipment_id})
     if not shipment:
         raise NotFoundError("Shipment", shipment_id)
+    
+    canonical_shipment_id = str(shipment["_id"])
     
     if shipment["buyer_id"] != current_user["sub"]:
         raise ForbiddenError("Not authorized")
@@ -254,12 +347,14 @@ async def partial_delivery(
     if current_user["role"] != UserRole.BUYER:
         raise ForbiddenError("Only buyer can confirm partial delivery")
     
-    if not ObjectId.is_valid(shipment_id):
-        raise ValidationError("Invalid shipment ID")
-    
-    shipment = await db.shipments.find_one({"_id": ObjectId(shipment_id)})
+    if ObjectId.is_valid(shipment_id):
+        shipment = await db.shipments.find_one({"_id": ObjectId(shipment_id)})
+    else:
+        shipment = await db.shipments.find_one({"shipment_id": shipment_id})
     if not shipment:
         raise NotFoundError("Shipment", shipment_id)
+    
+    canonical_shipment_id = str(shipment["_id"])
     
     if shipment["buyer_id"] != current_user["sub"]:
         raise ForbiddenError("Not authorized")

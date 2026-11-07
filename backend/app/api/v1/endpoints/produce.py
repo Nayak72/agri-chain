@@ -86,10 +86,12 @@ async def get_produce(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(produce_id):
-        raise ValidationError("Invalid produce ID")
-    
-    produce = await db.produce_catalogue.find_one({"_id": ObjectId(produce_id)})
+    if ObjectId.is_valid(produce_id):
+        produce = await db.produce_catalogue.find_one({"_id": ObjectId(produce_id)})
+    else:
+        produce = await db.produce_catalogue.find_one({
+            "$or": [{"produce_type": produce_id.upper()}, {"name": produce_id}]
+        })
     if not produce:
         raise NotFoundError("Produce", produce_id)
     

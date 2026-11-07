@@ -288,10 +288,10 @@ async def get_shipment(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(shipment_id):
-        raise ValidationError("Invalid shipment ID")
-    
-    shipment = await db.shipments.find_one({"_id": ObjectId(shipment_id)})
+    if ObjectId.is_valid(shipment_id):
+        shipment = await db.shipments.find_one({"_id": ObjectId(shipment_id)})
+    else:
+        shipment = await db.shipments.find_one({"shipment_id": shipment_id})
     if not shipment:
         raise NotFoundError("Shipment", shipment_id)
     

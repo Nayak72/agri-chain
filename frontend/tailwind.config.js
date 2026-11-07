@@ -92,8 +92,8 @@ module.exports = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["var(--font-inter)"],
-        serif: ["var(--font-dm-serif-display)"],
+        sans: ["var(--font-inter)", "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
+        serif: ["var(--font-dm-serif-display)", "DM Serif Display", "Georgia", "Cambria", "serif"],
       },
       boxShadow: {
         "soft": "0 4px 20px -4px rgba(23, 59, 47, 0.08)",

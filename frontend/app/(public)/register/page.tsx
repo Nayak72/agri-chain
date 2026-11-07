@@ -58,7 +58,7 @@ export default function RegisterPage() {
       Cookies.set("refresh_token", data.refresh_token, { expires: 7 });
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.response?.data?.error || "Registration failed");
+      setError(err.response?.data?.detail || err.response?.data?.error || "Registration failed");
     } finally {
       setLoading(false);
     }

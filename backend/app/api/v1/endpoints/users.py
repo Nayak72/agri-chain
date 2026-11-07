@@ -161,3 +161,23 @@ async def suspend_user(
         raise NotFoundError("User", user_id)
     
     return {"message": "User suspended successfully"}
+
+
+@router.post("/{user_id}/activate")
+async def activate_user(
+    user_id: str,
+    current_user: dict = Depends(get_current_admin_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    if not ObjectId.is_valid(user_id):
+        raise ValidationError("Invalid user ID")
+    
+    result = await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"is_active": True, "updated_at": datetime.now(timezone.utc)}}
+    )
+    
+    if result.matched_count == 0:
+        raise NotFoundError("User", user_id)
+    
+    return {"message": "User activated successfully"}

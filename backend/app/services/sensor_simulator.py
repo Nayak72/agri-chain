@@ -12,11 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 class SensorSimulationSession:
-    def __init__(self, session_id: str, shipment_id: str, scenario: SensorScenario, interval_seconds: int):
+    def __init__(self, session_id: str, shipment_id: str, scenario: SensorScenario, interval_seconds: int, produce_type: Optional[str] = "TOMATO"):
         self.session_id = session_id
         self.shipment_id = shipment_id
         self.scenario = scenario
         self.interval_seconds = interval_seconds
+        self.produce_type = produce_type or "TOMATO"
         self.status = "RUNNING"
         self.reading_count = 0
         self.task: Optional[asyncio.Task] = None
@@ -40,7 +41,8 @@ class SensorSimulatorManager:
         shipment_id: str,
         scenario: SensorScenario,
         interval_seconds: int,
-        db: Any
+        db: Any,
+        produce_type: Optional[str] = "TOMATO"
     ) -> bool:
         async with self._lock:
             if shipment_id in self.sessions:
@@ -54,6 +56,7 @@ class SensorSimulatorManager:
                 shipment_id=shipment_id,
                 scenario=scenario,
                 interval_seconds=interval_seconds,
+                produce_type=produce_type,
             )
             self.sessions[shipment_id] = session
             session.task = asyncio.create_task(self._simulation_loop(session, db))
@@ -112,7 +115,13 @@ class SensorSimulatorManager:
     def _generate_reading(self, session: SensorSimulationSession) -> dict:
         elapsed = (datetime.now(timezone.utc) - session._time_start).total_seconds()
         
-        profile = PRODUCE_HANDLING_PROFILES.get(ProduceType.TOMATO, {})
+        # Resolve handling profile based on session produce type
+        try:
+            produce_type_enum = ProduceType(session.produce_type)
+            profile = PRODUCE_HANDLING_PROFILES.get(produce_type_enum, PRODUCE_HANDLING_PROFILES.get(ProduceType.TOMATO, {}))
+        except (ValueError, KeyError):
+            profile = PRODUCE_HANDLING_PROFILES.get(ProduceType.TOMATO, {})
+            
         temp_min = profile.get("min_temp_c", 7)
         temp_max = profile.get("max_temp_c", 13)
         hum_min = profile.get("min_humidity_pct", 85)
