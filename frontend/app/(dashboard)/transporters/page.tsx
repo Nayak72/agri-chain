@@ -51,9 +51,9 @@ export default function TransportersPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6" className="p-8 text-center text-muted-foreground">Loading...</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Loading...</td></tr>
             ) : transporters.length === 0 ? (
-              <tr><td colSpan="6" className="p-8 text-center text-muted-foreground">No transporters found.</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No transporters found.</td></tr>
             ) : (
               transporters.map((t) => (
                 <tr key={t.transporter_id} className="border-b border-border/40 hover:bg-white/40 transition-colors">

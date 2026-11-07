@@ -2,20 +2,50 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { X } from "lucide-react";
 
 const Sheet = React.forwardRef<
   HTMLDivElement,
-  React.ComponentPropsWithoutRef<typeof ScrollArea> & {
+  React.ComponentPropsWithoutRef<typeof SheetPrimitive.Root> & {
     children?: React.ReactNode;
     className?: string;
   }
 >(({ className, children, ...props }, ref) => (
-  <ScrollArea className={cn("fixed right-0 top-0 z-50 h-full w-full overflow-hidden bg-white/90 backdrop-blur-md shadow-medium transition-transform duration-300 ease-in-out", className)} {...props} ref={ref}>
-    <div className="flex h-full flex-col">{children}</div>
-  </ScrollArea>
+  <SheetPrimitive.Root {...props}>
+    <SheetPrimitive.Trigger asChild>
+      <Button variant="ghost" size="icon" aria-label="Open menu">
+        <Menu className="w-5 h-5" />
+      </Button>
+    </SheetPrimitive.Trigger>
+    <SheetPrimitive.Portal>
+      <SheetPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+      <SheetPrimitive.Content
+        ref={ref}
+        className={cn(
+          "fixed right-0 top-0 z-50 h-full w-80 flex flex-col bg-white border-l border-border shadow-premium data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
+          className
+        )}
+      >
+        <div className="flex h-full flex-col">
+          <div className="flex items-center justify-between p-4 border-b border-border">
+            <h2 className="text-lg font-serif font-semibold">Menu</h2>
+            <SheetPrimitive.Close asChild>
+              <Button variant="ghost" size="icon" aria-label="Close menu">
+                <X className="w-5 h-5" />
+              </Button>
+            </SheetPrimitive.Close>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">{children}</div>
+        </div>
+      </SheetPrimitive.Content>
+    </SheetPrimitive.Portal>
+  </SheetPrimitive.Root>
 ));
 Sheet.displayName = "Sheet";
+
+import * as SheetPrimitive from "@radix-ui/react-dialog";
+import { Button } from "@/components/ui/button";
+import { Menu } from "lucide-react";
 
 const SheetTrigger = React.forwardRef<
   HTMLButtonElement,
@@ -101,5 +131,3 @@ const SheetSeparator = React.forwardRef<
 SheetSeparator.displayName = "SheetSeparator";
 
 export { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetFooter, SheetTitle, SheetDescription, SheetSeparator };
-
-import { Button } from "@/components/ui/button";

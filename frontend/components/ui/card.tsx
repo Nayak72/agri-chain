@@ -5,17 +5,27 @@ import { cn } from "@/lib/utils";
 
 const Card = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "rounded-xl border border-border bg-card text-card-foreground shadow-soft",
-      className
-    )}
-    {...props}
-  />
-));
+  React.HTMLAttributes<HTMLDivElement> & {
+    variant?: "default" | "elevated" | "glass" | "metric" | "highlight" | "interactive" | "chart";
+  }
+>(({ className, variant = "default", ...props }, ref) => {
+  const variants: Record<string, string> = {
+    default: "rounded-xl border border-border/60 bg-card text-card-foreground shadow-soft transition-all duration-300 hover:shadow-medium hover:border-border/80",
+    elevated: "rounded-xl border border-border/40 bg-card text-card-foreground shadow-medium transition-all duration-300",
+    glass: "rounded-xl border border-white/50 bg-white/70 backdrop-blur-md text-card-foreground shadow-soft transition-all duration-300",
+    metric: "rounded-xl border border-border/60 bg-card text-card-foreground shadow-soft p-6 transition-all duration-300 hover:shadow-medium hover:border-border/80",
+    highlight: "rounded-xl border border-primary/20 bg-primary/5 text-card-foreground shadow-soft transition-all duration-300",
+    interactive: "rounded-xl border border-border/60 bg-card text-card-foreground shadow-soft transition-all duration-300 hover:shadow-medium hover:border-border/80 cursor-pointer",
+    chart: "rounded-xl border border-border/60 bg-card text-card-foreground shadow-soft p-6",
+  };
+  return (
+    <div
+      ref={ref}
+      className={cn(variants[variant] || variants.default, className)}
+      {...props}
+    />
+  );
+});
 Card.displayName = "Card";
 
 const CardHeader = React.forwardRef<
@@ -32,7 +42,7 @@ const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h3
     ref={ref}
-    className={cn("text-2xl font-serif font-semibold leading-none tracking-tight", className)}
+    className={cn("text-xl font-serif font-semibold leading-none tracking-tight", className)}
     {...props}
   />
 ));

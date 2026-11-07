@@ -51,9 +51,9 @@ export default function WarehousesPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6" className="p-8 text-center text-muted-foreground">Loading...</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Loading...</td></tr>
             ) : warehouses.length === 0 ? (
-              <tr><td colSpan="6" className="p-8 text-center text-muted-foreground">No warehouses found.</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No warehouses found.</td></tr>
             ) : (
               warehouses.map((w) => (
                 <tr key={w.id} className="border-b border-border/40 hover:bg-white/40 transition-colors">

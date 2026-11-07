@@ -63,9 +63,9 @@ export default function PurchaseOrdersPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="7" className="p-8 text-center text-muted-foreground">Loading orders...</td></tr>
+              <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">Loading orders...</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan="7" className="p-8 text-center text-muted-foreground">No orders found.</td></tr>
+              <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">No orders found.</td></tr>
             ) : (
               orders.map((o) => (
                 <tr key={o.order_id} className="border-b border-border/40 hover:bg-white/40 transition-colors">

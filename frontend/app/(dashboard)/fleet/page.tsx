@@ -79,9 +79,9 @@ export default function FleetPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6" className="p-8 text-center text-muted-foreground">Loading...</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Loading...</td></tr>
             ) : vehicles.length === 0 ? (
-              <tr><td colSpan="6" className="p-8 text-center text-muted-foreground">No vehicles found.</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No vehicles found.</td></tr>
             ) : (
               vehicles.map((v) => (
                 <tr key={v.vehicle_id} className="border-b border-border/40 hover:bg-white/40 transition-colors">

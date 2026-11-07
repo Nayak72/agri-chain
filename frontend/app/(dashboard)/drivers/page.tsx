@@ -51,9 +51,9 @@ export default function DriversPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6" className="p-8 text-center text-muted-foreground">Loading...</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Loading...</td></tr>
             ) : drivers.length === 0 ? (
-              <tr><td colSpan="6" className="p-8 text-center text-muted-foreground">No drivers found.</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No drivers found.</td></tr>
             ) : (
               drivers.map((d) => (
                 <tr key={d.driver_id} className="border-b border-border/40 hover:bg-white/40 transition-colors">

@@ -5,12 +5,19 @@ import { cn } from "@/lib/utils";
 
 const Table = React.forwardRef<
   HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="relative overflow-x-auto rounded-md border border-border">
+  React.HTMLAttributes<HTMLTableElement> & {
+    variant?: "default" | "striped" | "bordered" | "compact";
+  }
+>(({ className, variant = "default", ...props }, ref) => (
+  <div className={cn("relative overflow-x-auto", className)}>
     <table
       ref={ref}
-      className={cn("w-full text-sm text-left", className)}
+      className={cn(
+        "w-full text-sm text-left border-collapse",
+        variant === "bordered" && "border border-border",
+        variant === "compact" && "text-xs",
+        className
+      )}
       {...props}
     />
   </div>
@@ -21,7 +28,7 @@ const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
+  <thead ref={ref} className={cn("[&_tr]:border-b border-border", className)} {...props} />
 ));
 TableHeader.displayName = "TableHeader";
 
@@ -37,18 +44,23 @@ const TableFooter = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <tfoot ref={ref} className={cn("[&_tr]:border-b border-t", className)} {...props} />
+  <tfoot ref={ref} className={cn("[&_tr]:border-b border-t border-border", className)} {...props} />
 ));
 TableFooter.displayName = "TableFooter";
 
 const TableRow = React.forwardRef<
   HTMLTableRowElement,
-  React.HTMLAttributes<HTMLTableRowElement>
->(({ className, ...props }, ref) => (
+  React.HTMLAttributes<HTMLTableRowElement> & {
+    selectable?: boolean;
+    selected?: boolean;
+  }
+>(({ className, selectable, selected, ...props }, ref) => (
   <tr
     ref={ref}
     className={cn(
-      "border-b border-border/50 transition-colors hover:bg-accent/50 data-[state=selected]:bg-accent",
+      "border-b border-border/40 transition-colors",
+      selectable && "cursor-pointer hover:bg-accent/30",
+      selected && "bg-accent/50",
       className
     )}
     {...props}
@@ -63,7 +75,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-11 px-4 text-left align-middle font-medium text-muted-foreground",
+      "h-11 px-4 text-left align-middle font-medium text-muted-foreground uppercase tracking-wider text-xs bg-secondary/50 border-b border-border",
       className
     )}
     {...props}
@@ -77,7 +89,7 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn("p-4 align-middle", className)}
+    className={cn("px-4 py-3 align-middle border-b border-border/40", className)}
     {...props}
   />
 ));

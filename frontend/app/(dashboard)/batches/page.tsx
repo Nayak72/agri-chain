@@ -55,11 +55,11 @@ export default function BatchesPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="8" className="p-8 text-center text-muted-foreground">Loading batches...</td>
+                  <td colSpan={8} className="p-8 text-center text-muted-foreground">Loading batches...</td>
                 </tr>
               ) : batches.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="p-8 text-center text-muted-foreground">No batches found.</td>
+                  <td colSpan={8} className="p-8 text-center text-muted-foreground">No batches found.</td>
                 </tr>
               ) : (
                 batches.map((batch) => (

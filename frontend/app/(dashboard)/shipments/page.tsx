@@ -2,95 +2,182 @@
 
 import { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api-client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, Truck, Activity, Clock, Package } from "lucide-react";
+import { Plus, Search, Truck, Activity, Package, MapPin, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { PageHeader } from "@/components/layout/page-header";
+import { StaggerContainer, StaggerItem } from "@/components/motion";
+import { motion } from "framer-motion";
+import { Skeleton, SkeletonTableRow } from "@/components/ui/skeleton";
+import Link from "next/link";
+import { Eye, MoreHorizontal } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+import { AlertCircle } from "lucide-react";
+
+interface Shipment {
+  id: string;
+  shipment_id: string;
+  pickup_city: string;
+  destination_city: string;
+  status: string;
+  total_cargo_weight_kg: number;
+  vehicle_id?: string;
+  driver_id?: string;
+  created_at: string;
+}
+
+const statusConfig: Record<string, { variant: "default" | "success" | "warning" | "destructive" | "info" | "secondary"; label: string }> = {
+  DELIVERED: { variant: "success", label: "Delivered" },
+  IN_TRANSIT: { variant: "info", label: "In Transit" },
+  DISPATCHED: { variant: "default", label: "Dispatched" },
+  LOADED: { variant: "default", label: "Loaded" },
+  LOADING: { variant: "secondary", label: "Loading" },
+  DELAYED: { variant: "warning", label: "Delayed" },
+  CANCELLED: { variant: "destructive", label: "Cancelled" },
+  BOOKING_CONFIRMED: { variant: "info", label: "Booking Confirmed" },
+  VEHICLE_ASSIGNED: { variant: "secondary", label: "Vehicle Assigned" },
+  DRIVER_ASSIGNED: { variant: "secondary", label: "Driver Assigned" },
+  AT_CHECKPOINT: { variant: "info", label: "At Checkpoint" },
+  ARRIVED_AT_DESTINATION: { variant: "info", label: "Arrived" },
+  OUT_FOR_DELIVERY: { variant: "default", label: "Out for Delivery" },
+  PARTIALLY_DELIVERED: { variant: "warning", label: "Partially Delivered" },
+  DELIVERY_REJECTED: { variant: "destructive", label: "Delivery Rejected" },
+  BOOKING_REQUESTED: { variant: "secondary", label: "Booking Requested" },
+  QUOTATION_PENDING: { variant: "warning", label: "Quotation Pending" },
+};
 
 export default function ShipmentsPage() {
-  const [shipments, setShipments] = useState<any[]>([]);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const fetchShipments = async () => {
+      try {
+        setLoading(true);
+        const { data } = await apiClient.get("/shipments");
+        setShipments(data || []);
+        setError(null);
+      } catch (e) {
+        setError("Failed to load shipments. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchShipments();
   }, []);
 
-  async function fetchShipments() {
-    try {
-      const { data } = await apiClient.get("/shipments");
-      setShipments(data);
-    } catch (e) {
-      setShipments([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const statusColors: Record<string, string> = {
-    DELIVERED: "bg-green-100 text-green-700",
-    IN_TRANSIT: "bg-blue-100 text-blue-700",
-    DISPATCHED: "bg-indigo-100 text-indigo-700",
-    LOADED: "bg-purple-100 text-purple-700",
-    DELAYED: "bg-amber-100 text-amber-700",
-    CANCELLED: "bg-red-100 text-red-700",
-    LOADING: "bg-gray-100 text-gray-700",
-  };
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-charcoal">Shipments</h1>
-          <p className="text-muted-foreground">Track the movement of agricultural produce through the supply chain.</p>
-        </div>
-        <Button className="bg-forest-800 text-white">
-          <Plus className="w-4 h-4 mr-2" /> New Shipment
-        </Button>
-      </div>
+      <PageHeader
+        title="Shipments"
+        description="Track the movement of agricultural produce through the supply chain."
+        actions={
+          <Button asChild>
+            <Link href="/shipments/new">
+              <Plus className="w-4 h-4 mr-2" />
+              New Shipment
+            </Link>
+          </Button>
+        }
+      />
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm text-left border-collapse">
-          <thead>
-            <tr className="border-b border-border bg-secondary/50">
-              <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Shipment ID</th>
-              <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Route</th>
-              <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-              <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Weight (kg)</th>
-              <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Vehicle</th>
-              <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Driver</th>
-              <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan="7" className="p-8 text-center text-muted-foreground">Loading shipments...</td></tr>
-            ) : shipments.length === 0 ? (
-              <tr><td colSpan="7" className="p-8 text-center text-muted-foreground">No shipments found.</td></tr>
-            ) : (
-              shipments.map((s) => (
-                <tr key={s.shipment_id} className="border-b border-border/40 hover:bg-white/40 transition-colors">
-                  <td className="px-4 py-4 font-medium text-charcoal">{s.shipment_id}</td>
-                  <td className="px-4 py-4 text-muted-foreground">
-                    {s.pickup_city} → {s.destination_city}
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[s.status] || "bg-gray-100 text-gray-700"}`}>
-                      {s.status.replace(/_/g, " ")}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 text-muted-foreground">{s.total_cargo_weight_kg}</td>
-                  <td className="px-4 py-4 text-muted-foreground">{s.vehicle_id || "—"}</td>
-                  <td className="px-4 py-4 text-muted-foreground">{s.driver_id || "—"}</td>
-                  <td className="px-4 py-4">
-                    <Button size="sm" variant="outline" asChild>
-                      <a href={`/shipments/${s.shipment_id}`}>View Details</a>
-                    </Button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-lg border border-destructive/20 bg-destructive/5 p-4"
+        >
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-destructive" />
+            <p className="text-destructive">{error}</p>
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-6">
+              <StaggerContainer>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <StaggerItem key={i} delay={i * 0.03}>
+                    <SkeletonTableRow columns={7} />
+                  </StaggerItem>
+                ))}
+              </StaggerContainer>
+            </div>
+          ) : shipments.length === 0 ? (
+            <div className="p-12 text-center">
+              <Truck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">No shipments found</h3>
+              <p className="text-muted-foreground mb-6">Create your first shipment to get started.</p>
+              <Button asChild>
+                <Link href="/shipments/new">
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Shipment
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Shipment ID</TableHead>
+                    <TableHead>Route</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Weight (kg)</TableHead>
+                    <TableHead>Vehicle</TableHead>
+                    <TableHead>Driver</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shipments.map((shipment) => {
+                    const status = statusConfig[shipment.status] || { variant: "secondary", label: shipment.status.replace(/_/g, " ") };
+                    return (
+                      <TableRow key={shipment.shipment_id}>
+                        <TableCell className="font-mono font-medium text-foreground">{shipment.shipment_id}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {shipment.pickup_city} → {shipment.destination_city}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={status.variant}>{status.label}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{shipment.total_cargo_weight_kg.toLocaleString()}</TableCell>
+                        <TableCell className="text-muted-foreground font-mono text-xs">{shipment.vehicle_id || "—"}</TableCell>
+                        <TableCell className="text-muted-foreground font-mono text-xs">{shipment.driver_id || "—"}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link href={`/shipments/${shipment.shipment_id}`}>
+                                <Eye className="w-4 h-4" />
+                                <span className="sr-only">View {shipment.shipment_id}</span>
+                              </Link>
+                            </Button>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

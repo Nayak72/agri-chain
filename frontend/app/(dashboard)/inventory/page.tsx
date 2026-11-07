@@ -59,9 +59,9 @@ export default function InventoryPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6" className="p-8 text-center text-muted-foreground">Loading...</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Loading...</td></tr>
             ) : inventory.length === 0 ? (
-              <tr><td colSpan="6" className="p-8 text-center text-muted-foreground">No inventory found.</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No inventory found.</td></tr>
             ) : (
               inventory.map((item) => (
                 <tr key={item.id} className="border-b border-border/40 hover:bg-white/40 transition-colors">

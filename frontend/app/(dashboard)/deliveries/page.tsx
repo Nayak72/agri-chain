@@ -58,9 +58,9 @@ export default function DeliveriesPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6" className="p-8 text-center text-muted-foreground">Loading...</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Loading...</td></tr>
             ) : deliveries.length === 0 ? (
-              <tr><td colSpan="6" className="p-8 text-center text-muted-foreground">No deliveries found.</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No deliveries found.</td></tr>
             ) : (
               deliveries.map((d) => (
                 <tr key={d.report_id} className="border-b border-border/40 hover:bg-white/40 transition-colors">
