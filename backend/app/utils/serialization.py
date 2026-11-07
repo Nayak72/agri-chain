@@ -1,8 +1,9 @@
 import json
-from datetime import datetime
-from bson import ObjectId
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
+
+from bson import ObjectId
 
 
 def serialize_doc(doc: dict) -> dict:

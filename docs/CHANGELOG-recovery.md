@@ -22,9 +22,9 @@
 
 ### Assumptions and remaining work
 
-- Existing endpoint-by-endpoint migration, refresh-token persistence/rotation, full RBAC dependency migration, list envelopes, Unit of Work, TanStack Query migration, design-system component inventory, and E2E/contrast gates remain for subsequent passes.
+- At the time of this initial foundation entry, endpoint-by-endpoint migration, refresh-token persistence/rotation, full RBAC dependency migration, list envelopes, Unit of Work, TanStack Query migration, design-system component inventory, and E2E/contrast gates remained for subsequent passes. Later entries below record the work completed in those areas and the remaining gaps.
 - Branch creation was attempted but the workspace `.git` directory is read-only; changes are currently on the checked-out branch.
-- The checked-in frontend lockfile still contains the pre-existing `eslint-config-next` 16 vs package manifest 14 mismatch; the environment’s npm registry access did not complete a clean lockfile regeneration. The next dependency pass must regenerate it under Node 20.
+- The frontend lockfile was regenerated to match the Next.js 14 dependency manifest; `npm ci --ignore-scripts` now passes.
 - Google `next/font` was not enabled because the build environment cannot fetch Google font assets; CSS font variables and system fallbacks are in place until fonts are vendored or network access is available.
 
 ## Phase 1 — auth and contracts — 2026-11-07
@@ -81,9 +81,9 @@
 - Removed button hover-lift behavior, switched the shell theme toggle to `next-themes`, and made sidebar/topbar layout responsive below 768px.
 - Added route-level error, not-found, global-error, and forbidden pages plus additional security headers.
 
-### Remaining Phase 4–6 gaps
+### Remaining Phase 4–6 gaps at the time of this entry
 
-- Full role-specific dashboard redesign, command menu, notifications popover, mobile bottom tabs, DataTable migration, visual screenshots and axe scans remain.
+- The initial foundation pass had not yet added the role-specific dashboard actions, command menu, notifications popover, mobile bottom tabs, or DataTable primitives. Those items were added in the later Shell interaction and Screen foundation slices below.
 - Live Mongo replica-set E2E golden-path testing and performance/contrast CI remain unavailable without the full stack.
 
 ### Phase 4–6 foundation verification
@@ -128,6 +128,7 @@
 
 - Full endpoint-by-endpoint repository/service/RBAC migration is not complete: 19 endpoint modules still contain direct `db.` calls, 84 hard ObjectId checks remain, and the permission dependency factory is not yet used by every protected route.
 - Frontend lint remains red on 94 existing `any` usages; the rule remains enabled to prevent regression.
+- Backend Ruff remains red on legacy style/type/import findings (1,033 findings in the current audit); the CI gate remains enabled so this debt cannot regress silently.
 - Live Mongo replica-set transactions, Playwright golden-path tests, axe scans, screenshot checks, and Docker health checks were not run because Docker/Mongo infrastructure is unavailable in this environment.
 - Full list-contract migration, refresh-session UI, all feature hooks/forms, ledger UI verification, and performance budgets still need live-stack validation.
 
@@ -142,9 +143,16 @@
 - `npm test -- --runInBand`: 2 suites and 2 tests passed.
 - Production build with lint disabled: passed with 36 routes.
 
-### Phase 2 foundation verification
+### Phase 2 foundation verification (superseded measurement)
 
 - `pytest -q`: 24 passed.
 - Frontend `npm run typecheck`: passed.
 - `pip check` and `git diff --check`: passed.
-- Remaining migration debt is measurable: 19 endpoint modules still contain direct `db.` calls, 86 hard `ObjectId.is_valid` checks remain, and only one endpoint module currently uses the permission dependency factory.
+- This earlier measurement recorded 19 endpoint modules with direct `db.` calls, 86 hard `ObjectId.is_valid` checks, and one endpoint module using the permission dependency factory. The later final hardening measurement below is the current count.
+
+## Final phase reconciliation — 2026-11-07
+
+- Phase 0–1 foundations are implemented and locally verified where the environment permits.
+- Phase 2–6 foundations and selected production slices are implemented: repository/UoW seams, typed pagination, TanStack Query infrastructure, responsive shell, design primitives, role-aware dashboard actions, error pages, simulator recovery, ledger hardening, contrast checks, and CI definitions.
+- Local verification is green for backend tests, dependency consistency, frontend typecheck, frontend unit tests, contrast checks, production build, and whitespace validation.
+- The remaining work is not silently treated as complete: endpoint-by-endpoint repository/service/RBAC migration, removal of the remaining frontend `any` usage, and full-stack integration/visual validation still require additional implementation or unavailable Mongo/Docker/browser infrastructure.

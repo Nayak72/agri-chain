@@ -106,8 +106,7 @@ agri-chain/
 ├── backend/                  # FastAPI
 │   ├── app/
 │   ├── scripts/
-│   │   ├── seed_demo.py      # Demo data seeding
-│   │   └── mongo-init.sh     # MongoDB replica set init
+│   │   └── seed_demo.py      # Demo data seeding
 │   ├── tests/
 │   ├── requirements.txt
 │   └── .env.example
@@ -122,8 +121,8 @@ agri-chain/
 
 ### Prerequisites
 - Docker and Docker Compose
-- Node.js 18+
-- Python 3.11+
+- Node.js 20+
+- Python 3.12+
 
 ### 1. Clone and Configure
 
@@ -138,13 +137,14 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
 ```
 
-### 2. Start MongoDB (Replica Set)
+### 2. Start MongoDB
 
 ```bash
-docker-compose up mongodb mongo-init -d
+docker-compose up mongodb -d
 ```
 
-Wait for MongoDB replica set to initialize (check logs: `docker-compose logs mongo-init`).
+The development compose setup uses a standalone MongoDB connection. Configure a
+MongoDB replica set in `backend/.env` when running transaction-backed workflows.
 
 ### 3. Backend Setup
 
