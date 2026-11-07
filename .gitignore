@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.yarn/
+.yarn-integrity
+.npm/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+.turbo/
+.vercel/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Uploads
+uploads/
+
+# Testing
+coverage/
+*.lcov
+.pytest_cache/
+.tox/
+
+# Docker
+.dockerignore
+
+# Misc
+*.zip
+*.tar.gz
+.agri-chain/

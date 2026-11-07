@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <!-- Required meta tags -->
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+        <!-- Bootstrap CSS -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet"
+            integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">
+    
+        <!-- Blockchain -->
+        <script src="https://code.jquery.com/jquery-3.4.1.js"
+            integrity="sha256-WpOohJOqMqqyKL9FccASB9O0KwACQJpFTUBLTYOVvVU=" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js@1.2.6/dist/web3.min.js"></script>
+        <script type="text/javascript" src="common.js"></script>
+        <script type="text/javascript" src="sellerscript.js"></script>
+    
+        <title>Supply Chain</title>
+          <!-- Required meta tags -->
+ <!--  <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+     Bootstrap CSS 
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">
+
+
+     Blockchain 
+    <script src="https://code.jquery.com/jquery-3.4.1.js"
+        integrity="sha256-WpOohJOqMqqyKL9FccASB9O0KwACQJpFTUBLTYOVvVU=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js@1.2.6/dist/web3.min.js"></script>
+    <script type="text/javascript" src="common.js"></script>-->
+    <script type="text/javascript" src="productscript.js"></script>
+
+    <title>Supply Chain</title>
+    </head>
+    
+    <body>
+       
+        <!-- Navbar -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#">Supply Chain | Seller</a>
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0"></ul>
+                    <div class="d-flex">
+                       <!-- <a href="/index.html">
+                            <button class="btn btn-outline-light">buyer</button>
+                        </a>-->
+                    </div>
+                </div>
+            </div>
+        </nav>
+    
+        <!-- main layout -->
+        <div class="container mt-5">
+            <div class="row">
+                <div class="col-8">
+                    <div class="row" id="_regdiv">
+                        <h4>Register</h4>
+                        <div>
+                            <div>
+                                <label for="exampleInputEmail1" class="form-label">Your name</label>
+                                <input type="text" class="form-control" id="_regname">
+                            </div>
+    
+                            <button type="submit" class="btn btn-primary" id="_regbutton">Register</button>
+                        </div>
+                    </div>
+                    
+                    <!-- ... -->
+    
+    <div class="row mt-5">
+        <h4>Your product(s) <span class="badge rounded-pill bg-dark" id="_totalproduct"></span></h4>
+    
+        <table class="table1" id="_myproduct_table">
+            <thead>
+                <tr>
+                    <th scope="col">ID</th>
+                    <th scope="col"> Product Name</th>
+                    <th scope="col"> Manufacturer Name</th>
+                    <th scope="col">Price</th>
+                    <th scope="col">Quantity</th>
+                    <th scope="col">Manufacturer Address</th>
+
+                   <!-- <th scope="col">Actions</th>-->
+                </tr>
+            </thead>
+            <tbody>
+                <!-- products will be displayed here -->
+            </tbody>
+        </table>
+    
+    </div>
+    
+    <!-- ... -->
+    
+                </div>
+                
+                <div class="col-4">
+                    <div class="row mt-5">
+                        <h4>Add product</h4>
+                        <form id="test" method="POST">
+                        <div>
+                            <div class="mb-3">
+                                <label for="exampleInputEmail1" class="form-label" id="_nameidlabel">Name</label>
+                                <input type="text" class="form-control" id="_pname" name="_pname">
+                            </div>
+                            <div class="mb-3">
+                                <label for="exampleInputPassword1" class="form-label" id="_pricelabel">Price</label>
+                                <input type="number" class="form-control" id="_price" name="_price">
+                            </div>
+                            <div class="mb-3" id="_quantitylabel">
+                                <label for="exampleInputPassword1" class="form-label">Quantity</label>
+                                <input type="number" class="form-control" id="_pquantity" name="_pquantity">
+                            </div>
+                            <div class="mb-3" >
+                                <label for="exampleInputPassword1" class="form-label">Manufacturer address</label>
+                                <input type="text" class="form-control" id="_maddress" name="_maddress">
+                            </div>
+                    
+                            <button type="submit" class="btn btn-primary" id="_addbtn" name="_addbtn">Add</button>
+                          <!-- <button type="submit" class="btn btn-primary" id="_updatebtn">Update</button>--> 
+                        </div>
+                        </form>
+                    </div>
+                </div>
+          
+                <div class="row mt-5">
+                    <div id="_blockDetails"></div>
+                    <h4>Tracking details <span class="badge rounded-pill bg-dark" id="_total_order"></span></h4>
+    
+                    <table class="table2" id="_order_table">
+                        <thead>
+                            <tr>
+                               
+                                <th scope="col">Product ID</th>
+                                <th scope="col">Quantity</th>
+                                <th scope="col">distrybuter Name</th>
+                                <th scope="col">Delivery address</th>
+                               <!-- <th scope="col">Status</th>-->
+                            </tr>
+                        </thead>
+                        <tbody>
+                             <tr>
+                               <!--  <th></th>
+                                
+                                <td></td>
+                        
+                                <td>
+                                   <button type="button" class="btn btn-primary btn-sm" onclick="delivered(1)">Delivered</button>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="reject(1)">Reject</button>
+                                </td>-->
+                            </tr> 
+                        </tbody>
+                    </table>
+                </div>
+    
+                
+            </div>
+        </div>
+    
+    
+    
+        <!-- Optional JavaScript; choose one of the two! -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW"
+            crossorigin="anonymous"></script>
+    
+            <script>
+                document.getElementById('test').addEventListener('submit', function(event) {
+                         event.preventDefault();
+                         
+                         // Get form values
+                         const pname = document.getElementById('_pname').value;
+                         const price = document.getElementById('_price').value;
+                         const mname=document.getElementById('_regname').value;
+                         const pquantity = document.getElementById('_pquantity').value;
+                         const maddress = document.getElementById('_maddress').value;
+             
+                         console.log('Form values:', { pname, price,mname, pquantity,maddress }); // Debug statement
+                         
+                         // Create a new row
+                         const table1 = document.getElementById('_myproduct_table').getElementsByTagName('tbody')[0];
+                         const table3 = document.getElementById('_product_table').getElementsByTagName('tbody')[0];
+                         const newRow = table1.insertRow();
+                         const newRow1 = table3.insertRow();
+             
+             
+                         // Insert cells
+                         const cell1 = newRow.insertCell(0);
+                         const cell2 = newRow.insertCell(1);
+                         const cell3 = newRow.insertCell(2);
+                         const cell4 = newRow.insertCell(3);
+                         const cell5 =newRow.insertCell(4); 
+                         const cell6 = newRow.insertCell(5);
+                         const cell10 = newRow1.insertCell(0);
+                         const cell20 = newRow1.insertCell(1);
+                         const cell30 = newRow1.insertCell(2);
+                         const cell40 = newRow1.insertCell(3);
+                         const cell50 = newRow1.insertCell(4);
+             
+                         // Fill cells with values
+                         cell1.innerHTML = table.rows.length; // Product ID (row number)
+                     cell2.innerHTML = pname;
+                     cell3.innerHTML = mname;
+                     cell4.innerHTML = price;
+                     cell5.innerHTML=pquantity;
+                     cell6.innerHTML=maddress;
+             
+                         cell10.innerHTML = table3.rows.length; // Product ID (row number)
+                         cell20.innerHTML = pname;
+                         cell30.innerHTML = price;
+                         cell40.innerHTML = pquantity;
+                         cell50.innerHTML = maddress;
+                        
+                         
+                         console.log('New row added:', newRow); // Debug statement
+                         console.log('new product addded',newRow1);
+                         // Reset form
+                         $("#_regdiv").show();
+                         document.getElementById('test').reset();
+                     });
+                     
+             document.getElementById('test').addEventListener('submit', function(event) {
+                 event.preventDefault();
+                 
+                 // Get form values
+                 const pname = document.getElementById('_pname').value;
+                 const price = document.getElementById('_price').value;
+                 const pquantity = document.getElementById('_pquantity').value;
+                 const maddress = document.getElementById('_maddress').value;
+         
+                 // Store form values in localStorage
+                 localStorage.setItem('_pname', pname);
+                 localStorage.setItem('_price', price);
+                 localStorage.setItem('_pquantity', pquantity);
+                 localStorage.setItem('_maddress', maddress);
+         
+                 // Reset form
+                 document.getElementById('test').reset();
+                 
+                 // Redirect to index.html
+                // window.location.href = "index.html";
+             });
+         
+         
+               
+             
+             </script>
+    
+    
+
+
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Supply Chain | Products</a>
+
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0"></ul>
+                <div class="d-flex">
+                <!--   <a href="/seller.html">
+                        <button class="btn btn-outline-light">Seller</button>
+                    </a>-->
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- main layout -->
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-8">
+                <h2>Product(s) <span class="badge rounded-pill bg-dark" id="_products_table"></span></h2>
+                <form id="test" method="POST">
+                <table class="table3" id="_product_table">
+                    <thead>
+                        <tr>
+                            <th scope="col">ID</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">Price</th>
+                            <th scope="col">Quantity</th>
+                            <th scope="col">manufacturer address</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                       
+                    </tbody>
+                </table>
+                </form>
+            </div>
+            <div class="col-4">
+                <div class="row">
+                    <h4>Status Update</h4>
+                <form id="retailorder" method="POST">
+                    <div>
+                        <div class="mb-3">
+                            <label for="exampleInputEmail1" class="form-label">Product ID</label>
+                            <input type="number" class="form-control" id="_pid">
+                        </div>
+                        <div class="mb-3">
+                            <label for="exampleInputPassword1" class="form-label">Quantity</label>
+                            <input type="text" class="form-control" id="_quantity">
+                        </div>
+                        <div class="mb-3">
+                            <label for="exampleInputPassword1" class="form-label">Your Name</label>
+                            <input type="text" class="form-control" id="_cname">
+                        </div>
+                        <div class="mb-3">
+                            <label for="exampleInputPassword1" class="form-label">Address</label>
+                            <input type="text" class="form-control" id="_caddress">
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="_orderbtn">submit</button>
+                    </div>
+                </form>
+                </div>
+                <div class="row  mt-5">
+                  <!--  <h4>Track <span class="badge rounded-pill bg-dark" id="_track"></span></h4>
+
+                    <table class="table table-light" id="_order_table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Order ID</th>
+                                <th scope="col">Delivery address</th>
+                                <th scope="col">Status</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            <tr>
+                            <th scope="row">1</th>
+                            <td>Thornton</td>
+                            <td>Mark</td>
+                          </tr>
+
+                        </tbody>
+                    </table> -->
+
+                </div> 
+            </div>
+        </div>
+    </div>
+    <!-- Optional JavaScript; choose one of the two! -->
+
+    <!-- Option 1: Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW"
+        crossorigin="anonymous"></script>
+<!--
+        <script>
+       
+    window.addEventListener('load', () => {
+        // Retrieve values from localStorage
+        const pname = localStorage.getItem('_pname');
+        const price = localStorage.getItem('_price');
+        const pquantity = localStorage.getItem('_pquantity');
+
+        // Display values in console (for debugging)
+        console.log('Retrieved from localStorage:', { pname, price, pquantity });
+
+        // Set values in the table
+        document.getElementById('_pname').textContent = pname;
+        document.getElementById('_price').textContent = price;
+        document.getElementById('_pquantity').textContent = pquantity;
+
+        // Add new row to product table
+        const table = document.getElementById('_order_table').getElementsByTagName('tbody')[0];
+        const newRow = table.insertRow();
+        const cell1 = newRow.insertCell(0);
+        const cell2 = newRow.insertCell(1);
+        const cell3 = newRow.insertCell(2);
+        const cell4 = newRow.insertCell(3);
+
+        cell1.innerHTML = table.rows.length; // Product ID (row number)
+        cell2.innerHTML = pname;
+        cell3.innerHTML = price;
+        cell4.innerHTML = pquantity;
+
+        console.log('New row added:', newRow); // Debug statement
+
+        // Clear localStorage after use (optional)
+      //  localStorage.removeItem('_pname');
+       // localStorage.removeItem('_price');
+       // localStorage.removeItem('_pquantity');
+    });
+
+        </script>-->
+        <script>
+            document.getElementById('retailorder').addEventListener('submit', function(event) {
+                     event.preventDefault();
+                     
+                     // Get form values
+                     const pid = document.getElementById('_pid').value;
+                     const quantity = document.getElementById('_quantity').value;
+                     const cname = document.getElementById('_cname').value;
+                     const caddress = document.getElementById('_caddress').value;
+         
+                     console.log('Form values:', { pid, quantity,cname,caddress });
+                     const table2 = document.getElementById('_order_table').getElementsByTagName('tbody')[0];
+                     const newRow2 = table2.insertRow();
+                     const cell11 = newRow2.insertCell(0);
+                    const cell21 = newRow2.insertCell(1);
+                    const cell31 = newRow2.insertCell(2);
+                    const cell41 = newRow2.insertCell(3);
+                    const cell51 = newRow2.insertCell(4);
+                    cell11.innerHTML=table2.rows.length;
+                    cell21.innerHTML= pid;
+                    cell31.innerHTML=quantity;
+                    cell41.innerHTML=cname;
+                    cell51.innerHTML=caddress;
+                    console.log('new row added:',newRow2);
+                    $("#_regdiv").show();
+                    document.getElementById('retailorder').reset();
+                    });
+                    </script>
+    
+    <!-- Option 2: Separate Popper and Bootstrap JS -->
+    <!--
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js" integrity="sha384-q2kxQ16AaE6UbzuKqyBE9/u/KzioAlnx2maXQHiDX9d4/zp8Ok3f+M7DPm+Ib6IU" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.min.js" integrity="sha384-pQQkAEnwaBkjpqZ8RU1fF1AKtTcHJwFl3pblpTlHXybJjHpMYo79HY3hIi4NKxyj" crossorigin="anonymous"></script>
+    -->
+</body>
+
+</html>
