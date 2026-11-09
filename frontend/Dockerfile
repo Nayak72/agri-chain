@@ -1,44 +1,34 @@
-FROM node:20-alpine AS base
+# ---- Build stage ----
+FROM node:20-alpine AS builder
 
-# Install dependencies only when needed
-FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm ci
+# Install dependencies first (leverages Docker layer cache)
+COPY package.json ./
+RUN npm install --legacy-peer-deps
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Copy source and build
 COPY . .
-
-ENV NEXT_TELEMETRY_DISABLED 1
-
 RUN npm run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
-WORKDIR /app
+# ---- Production stage ----
+FROM nginx:alpine AS runner
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+# Remove default nginx config
+RUN rm /etc/nginx/conf.d/default.conf
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Copy our nginx config
+COPY nginx.conf /etc/nginx/conf.d/agrichain.conf
 
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+# Copy built SPA
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-USER nextjs
-
+# Expose port
 EXPOSE 3000
 
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:3000/ | grep -q "AgriChain" || exit 1
 
-CMD ["npm", "start"]
+CMD ["nginx", "-g", "daemon off;"]
 
