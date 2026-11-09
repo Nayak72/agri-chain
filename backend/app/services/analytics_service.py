@@ -144,7 +144,7 @@ class AnalyticsService:
         total_alerts = await db.sensor_alerts.count_documents({"status": "ACTIVE"})
         total_readings = await db.sensor_readings.count_documents({})
         normal_readings = await db.sensor_readings.count_documents({"status": "NORMAL"})
-        compliance = (normal_readings / total_readings * 100) if total_readings > 0 else 100.0
+        compliance = (normal_readings / total_readings * 100) if total_readings > 0 else None
         
         return {
             "total_dispatched_quantity_kg": round(total_dispatched_kg, 2),
@@ -153,7 +153,7 @@ class AnalyticsService:
             "rejected_quantity_kg": round(rejected_qty, 2),
             "damage_rate_percentage": round(damage_rate, 2),
             "rejection_rate_percentage": round(rejection_rate, 2),
-            "cold_chain_compliance_percentage": round(compliance, 2),
+            "cold_chain_compliance_percentage": round(compliance, 2) if compliance is not None else None,
             "temperature_excursion_count": total_alerts,
             "total_excursion_duration_hours": 0.0,
         }
@@ -165,13 +165,13 @@ class AnalyticsService:
         normal_readings = await db.sensor_readings.count_documents({"status": "NORMAL"})
         warning_readings = await db.sensor_readings.count_documents({"status": "WARNING"})
         critical_readings = await db.sensor_readings.count_documents({"status": "CRITICAL"})
-        compliance = (normal_readings / total_readings * 100) if total_readings > 0 else 100
+        compliance = (normal_readings / total_readings * 100) if total_readings > 0 else None
         return {
             "total_readings": total_readings,
             "normal_readings": normal_readings,
             "warning_readings": warning_readings,
             "critical_readings": critical_readings,
-            "compliance_percentage": round(compliance, 2),
+            "compliance_percentage": round(compliance, 2) if compliance is not None else None,
             "active_alerts": await db.sensor_alerts.count_documents({"status": "ACTIVE"}),
             "resolved_alerts": await db.sensor_alerts.count_documents({"status": "RESOLVED"}),
         }

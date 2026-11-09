@@ -81,8 +81,8 @@ async def create_warehouse_receipt(
     if not batch:
         raise NotFoundError("Batch", receipt_data.batch_id)
     
-    if receipt_data.accepted_weight_kg + receipt_data.damaged_weight_kg + receipt_data.rejected_weight_kg > receipt_data.received_weight_kg:
-        raise ValidationError("Sum of accepted, damaged, rejected exceeds received weight")
+    if abs(receipt_data.received_weight_kg - (receipt_data.accepted_weight_kg + receipt_data.damaged_weight_kg + receipt_data.rejected_weight_kg)) > 0.01:
+        raise ValidationError("Received weight must exactly equal sum of accepted, damaged, and rejected weights")
     
     import uuid
     receipt_id = f"WR-{warehouse_id[:8]}-{uuid.uuid4().hex[:8].upper()}"
@@ -165,6 +165,33 @@ async def create_warehouse_receipt(
         )
     
     return WarehouseReceiptResponse(id=str(receipt_doc["_id"]), **receipt_doc)
+
+
+@router.get("/receipts", response_model=List[WarehouseReceiptResponse])
+async def list_warehouse_receipts(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    warehouse_id: Optional[str] = None,
+    batch_id: Optional[str] = None,
+    status: Optional[WarehouseReceiptStatus] = None,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    query = {}
+    if current_user["role"] == UserRole.WAREHOUSE_MANAGER:
+        warehouse = await db.warehouses.find_one({"manager_id": current_user["sub"]})
+        if warehouse:
+            query["warehouse_id"] = str(warehouse["_id"])
+    elif warehouse_id:
+        query["warehouse_id"] = warehouse_id
+    
+    if batch_id:
+        query["batch_id"] = batch_id
+    if status:
+        query["status"] = status
+    
+    receipts = await db.warehouse_receipts.find(query).sort("created_at", -1).skip((page - 1) * page_size).limit(page_size).to_list(page_size)
+    return [WarehouseReceiptResponse(id=str(r["_id"]), **r) for r in receipts]
 
 
 class QualityInspectionCreate(BaseModel):
@@ -281,6 +308,25 @@ async def create_quality_inspection(
         )
     
     return QualityInspectionResponse(id=str(inspection_doc["_id"]), **inspection_doc)
+
+
+@router.get("/quality-inspections", response_model=List[QualityInspectionResponse])
+async def list_quality_inspections(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    receipt_id: Optional[str] = None,
+    batch_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    query = {}
+    if receipt_id:
+        query["receipt_id"] = receipt_id
+    if batch_id:
+        query["batch_id"] = batch_id
+    
+    inspections = await db.quality_inspections.find(query).sort("created_at", -1).skip((page - 1) * page_size).limit(page_size).to_list(page_size)
+    return [QualityInspectionResponse(id=str(i["_id"]), **i) for i in inspections]
 
 
 class InventoryItemResponse(BaseModel):

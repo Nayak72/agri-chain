@@ -134,7 +134,7 @@ export default function DriverDetailPage() {
           </div>
 
           <div className="pt-4 border-t border-slate-800 mt-6 text-[10px] font-mono text-slate-600">
-            Carrier Verified Driver Dossier // Blockchain Ledger Synchronized
+            Carrier Verified Driver Dossier // Cryptographic Audit Ledger Synchronized
           </div>
         </div>
       </div>

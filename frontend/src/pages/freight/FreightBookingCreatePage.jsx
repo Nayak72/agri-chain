@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { freightBookingsApi } from '../../api/commerce.api'
+import { useQuery } from '@tanstack/react-query'
+import { ArrowLeft, Truck, AlertTriangle, Layers, Calendar, Thermometer, ShieldCheck } from 'lucide-react'
+import { freightBookingsApi, ordersApi } from '../../api/commerce.api'
+import { batchesApi } from '../../api/agriculture.api'
 
 export default function FreightBookingCreatePage() {
   const navigate = useNavigate()
@@ -11,16 +14,30 @@ export default function FreightBookingCreatePage() {
   // Prefill if navigated from Purchase Order
   const poState = location.state || {}
 
+  // Fetch accepted purchase orders
+  const { data: poData } = useQuery({
+    queryKey: ['accepted-purchase-orders'],
+    queryFn: () => ordersApi.list({ status: 'ACCEPTED' }).then(res => res.data),
+  })
+  const acceptedOrders = Array.isArray(poData) ? poData : poData?.items || []
+
+  // Fetch batches
+  const { data: batchesData } = useQuery({
+    queryKey: ['batches-for-booking'],
+    queryFn: () => batchesApi.list().then(res => res.data),
+  })
+  const batches = Array.isArray(batchesData) ? batchesData : batchesData?.items || []
+
   const [form, setForm] = useState({
-    purchase_order_id: poState.purchaseOrderId || 'PO-DEMO-001',
-    batch_ids: poState.batchId ? [poState.batchId] : ['BATCH-DEMO-01'],
-    cargo_quantity_kg: poState.cargoWeightKg ? String(poState.cargoWeightKg) : '2000',
-    total_cargo_weight_kg: poState.cargoWeightKg ? String(poState.cargoWeightKg) : '2000',
+    purchase_order_id: poState.purchaseOrderId || '',
+    batch_ids: poState.batchId ? [poState.batchId] : [],
+    cargo_quantity_kg: poState.cargoWeightKg ? String(poState.cargoWeightKg) : '',
+    total_cargo_weight_kg: poState.cargoWeightKg ? String(poState.cargoWeightKg) : '',
     package_count: '100',
-    pickup_address: poState.pickupAddress || 'Farm Gate Central, Sector 4, Nashik',
+    pickup_address: poState.pickupAddress || '',
     pickup_city: 'Nashik',
     pickup_state: 'Maharashtra',
-    destination_address: poState.deliveryAddress || 'APMC Terminal Market, Vashi, Navi Mumbai',
+    destination_address: poState.deliveryAddress || '',
     destination_city: 'Navi Mumbai',
     destination_state: 'Maharashtra',
     requested_pickup_date: new Date().toISOString().split('T')[0],
@@ -33,6 +50,35 @@ export default function FreightBookingCreatePage() {
     special_handling_instructions: 'Strict cold-chain compliance. No exposure to direct sunlight during loading.',
   })
 
+  // Handle PO selection
+  const handlePoSelect = (poId) => {
+    if (!poId) {
+      setForm(prev => ({ ...prev, purchase_order_id: '' }))
+      return
+    }
+    const selectedPo = acceptedOrders.find(po => (po.id || po._id) === poId || po.order_id === poId)
+    if (selectedPo) {
+      const canonicalPoId = selectedPo.id || selectedPo._id
+      const linkedBatchIds = selectedPo.batch_id ? [selectedPo.batch_id] : (batches[0] ? [batches[0].id || batches[0]._id] : [])
+      setForm(prev => ({
+        ...prev,
+        purchase_order_id: canonicalPoId,
+        batch_ids: linkedBatchIds,
+        cargo_quantity_kg: String(selectedPo.requested_quantity_kg || prev.cargo_quantity_kg || 2000),
+        total_cargo_weight_kg: String(selectedPo.requested_quantity_kg || prev.total_cargo_weight_kg || 2000),
+        pickup_address: selectedPo.pickup_address || prev.pickup_address,
+        destination_address: selectedPo.delivery_address || prev.destination_address,
+      }))
+    }
+  }
+
+  // Pre-select if initial PO state is provided
+  useEffect(() => {
+    if (poState.purchaseOrderId && acceptedOrders.length > 0) {
+      handlePoSelect(poState.purchaseOrderId)
+    }
+  }, [poState.purchaseOrderId, acceptedOrders])
+
   const handleChange = (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
     setForm({ ...form, [e.target.name]: value })
@@ -41,6 +87,17 @@ export default function FreightBookingCreatePage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+
+    if (!form.purchase_order_id) {
+      setError('Please select an accepted Purchase Order to book freight against.')
+      return
+    }
+
+    if (!form.batch_ids || form.batch_ids.length === 0) {
+      setError('Please assign at least one produce batch for custodial tracking.')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -84,9 +141,7 @@ export default function FreightBookingCreatePage() {
         onClick={() => navigate('/freight-bookings')}
         className="text-xs font-mono text-cyan-400 hover:text-cyan-300 mb-6 flex items-center gap-2 transition-colors"
       >
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
+        <ArrowLeft className="w-3.5 h-3.5" />
         BOOKINGS_DISPATCH
       </button>
 
@@ -103,9 +158,7 @@ export default function FreightBookingCreatePage() {
 
         {error && (
           <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-start gap-3">
-            <svg className="w-5 h-5 shrink-0 mt-0.5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-red-400" />
             <span>{error}</span>
           </div>
         )}
@@ -114,33 +167,39 @@ export default function FreightBookingCreatePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Purchase Order Reference ID *
+                Select Accepted Purchase Order *
               </label>
-              <input
-                type="text"
-                name="purchase_order_id"
+              <select
                 required
                 value={form.purchase_order_id}
-                onChange={handleChange}
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-              />
+                onChange={(e) => handlePoSelect(e.target.value)}
+                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+              >
+                <option value="">Select accepted order...</option>
+                {acceptedOrders.map(po => (
+                  <option key={po.id || po._id} value={po.id || po._id}>
+                    {po.order_id} — {po.produce_type} ({po.requested_quantity_kg} kg)
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Preferred Vehicle Category *
+                Assigned Produce Batch *
               </label>
               <select
-                name="preferred_vehicle_category"
-                value={form.preferred_vehicle_category}
-                onChange={handleChange}
+                required
+                value={form.batch_ids[0] || ''}
+                onChange={(e) => setForm({ ...form, batch_ids: [e.target.value] })}
                 className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
               >
-                <option value="REEFER_14FT">Refrigerated Truck (14ft / 3.5 Ton)</option>
-                <option value="REEFER_20FT">Refrigerated Truck (20ft / 7 Ton)</option>
-                <option value="REEFER_32FT">Refrigerated Trailer (32ft / 15 Ton)</option>
-                <option value="OPEN_TRUCK">Open Tarpaulin Truck (General Cargo)</option>
-                <option value="CLOSED_CONTAINER">Closed Metal Container</option>
+                <option value="">Select produce batch...</option>
+                {batches.map(b => (
+                  <option key={b.id || b._id} value={b.id || b._id}>
+                    {b.batch_id} — {b.produce_type} ({b.harvest_location || 'Field Origin'})
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -179,6 +238,26 @@ export default function FreightBookingCreatePage() {
 
             <div className="space-y-2">
               <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
+                Preferred Vehicle Category *
+              </label>
+              <select
+                name="preferred_vehicle_category"
+                value={form.preferred_vehicle_category}
+                onChange={handleChange}
+                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+              >
+                <option value="REEFER_14FT">Refrigerated Truck (14ft / 3.5 Ton)</option>
+                <option value="REEFER_20FT">Refrigerated Truck (20ft / 7 Ton)</option>
+                <option value="REEFER_32FT">Refrigerated Trailer (32ft / 15 Ton)</option>
+                <option value="OPEN_TRUCK">Open Tarpaulin Truck (General Cargo)</option>
+                <option value="CLOSED_CONTAINER">Closed Metal Container</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
                 Pickup Date *
               </label>
               <input
@@ -186,6 +265,20 @@ export default function FreightBookingCreatePage() {
                 required
                 name="requested_pickup_date"
                 value={form.requested_pickup_date}
+                onChange={handleChange}
+                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
+                Required Delivery Date *
+              </label>
+              <input
+                type="date"
+                required
+                name="required_delivery_date"
+                value={form.required_delivery_date}
                 onChange={handleChange}
                 className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
               />
@@ -268,62 +361,83 @@ export default function FreightBookingCreatePage() {
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                name="refrigeration_required"
-                checked={form.refrigeration_required}
-                onChange={handleChange}
-                className="w-4 h-4 rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0"
-              />
-              <span className="text-xs font-mono font-semibold text-slate-200">
-                Active Cold-Chain Refrigeration Required During Transit
-              </span>
-            </label>
+          {/* Cold Chain Specs */}
+          <div className="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/20 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Thermometer className="w-4 h-4 text-cyan-400" />
+                <span className="text-xs font-mono font-bold text-cyan-400 uppercase">
+                  Refrigerated Cargo Requirements
+                </span>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="refrigeration_required"
+                  checked={form.refrigeration_required}
+                  onChange={handleChange}
+                  className="rounded border-slate-700 text-cyan-500 focus:ring-0"
+                />
+                <span className="text-xs font-mono text-slate-300">Active Reefer Mandatory</span>
+              </label>
+            </div>
 
             {form.refrigeration_required && (
-              <div className="grid grid-cols-2 gap-4 pt-2">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-slate-400 uppercase">Min Temp Threshold (°C)</label>
+                  <label className="text-[10px] font-mono text-slate-400 uppercase">Min Temperature (°C)</label>
                   <input
                     type="number"
                     step="0.5"
                     name="temperature_min"
                     value={form.temperature_min}
                     onChange={handleChange}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 font-mono"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-slate-400 uppercase">Max Temp Threshold (°C)</label>
+                  <label className="text-[10px] font-mono text-slate-400 uppercase">Max Temperature (°C)</label>
                   <input
                     type="number"
                     step="0.5"
                     name="temperature_max"
                     value={form.temperature_max}
                     onChange={handleChange}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 font-mono"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
                   />
                 </div>
               </div>
             )}
           </div>
 
-          <div className="flex gap-4 pt-4">
+          <div className="space-y-2">
+            <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
+              Handling & Stacking Instructions
+            </label>
+            <textarea
+              name="special_handling_instructions"
+              rows={2}
+              value={form.special_handling_instructions}
+              onChange={handleChange}
+              placeholder="e.g. Palletized crates only. Avoid direct midday sun during transshipment."
+              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono resize-none"
+            />
+          </div>
+
+          <div className="pt-4 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => navigate('/freight-bookings')}
-              className="flex-1 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium text-sm transition-all"
+              className="px-6 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium text-sm transition-all"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-bold text-sm shadow-lg shadow-cyan-900/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
             >
-              {loading ? 'Publishing Dispatch...' : 'Post Freight Booking Request'}
+              {loading ? 'Submitting...' : 'Post Freight Booking Request'}
             </button>
           </div>
         </form>
@@ -331,4 +445,3 @@ export default function FreightBookingCreatePage() {
     </div>
   )
 }
-

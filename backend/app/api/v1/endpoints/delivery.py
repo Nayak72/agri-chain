@@ -119,8 +119,8 @@ async def create_delivery_report(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if current_user["role"] not in [UserRole.DRIVER, UserRole.TRANSPORTER, UserRole.BUYER]:
-        raise ForbiddenError("Only driver, transporter, or buyer can create delivery reports")
+    if current_user["role"] not in [UserRole.DRIVER, UserRole.TRANSPORTER]:
+        raise ForbiddenError("Only assigned driver or transporter can submit delivery reports")
     
     if ObjectId.is_valid(shipment_id):
         shipment = await db.shipments.find_one({"_id": ObjectId(shipment_id)})
@@ -272,7 +272,9 @@ async def confirm_delivery(
     if shipment["buyer_id"] != current_user["sub"]:
         raise ForbiddenError("Not authorized")
     
-    report = await db.delivery_reports.find_one({"shipment_id": shipment_id})
+    report = await db.delivery_reports.find_one({
+        "$or": [{"shipment_id": canonical_shipment_id}, {"shipment_id": shipment.get("shipment_id")}]
+    })
     if not report:
         raise ValidationError("No delivery report found")
     
@@ -280,7 +282,7 @@ async def confirm_delivery(
         raise ValidationError(f"Cannot confirm delivery at status {shipment['status']}")
     
     await db.shipments.update_one(
-        {"_id": ObjectId(shipment_id)},
+        {"_id": shipment["_id"]},
         {"$set": {"status": ShipmentStatus.DELIVERED, "updated_at": datetime.now(timezone.utc)}}
     )
     
@@ -288,7 +290,7 @@ async def confirm_delivery(
         db,
         event_type=LedgerEventType.DELIVERY_CONFIRMED,
         entity_type="SHIPMENT",
-        entity_id=shipment_id,
+        entity_id=canonical_shipment_id,
         actor_id=current_user["sub"],
         actor_role=current_user["role"],
         event_summary=f"Delivery confirmed by buyer for shipment {shipment['shipment_id']}",
@@ -320,7 +322,7 @@ async def reject_delivery(
         raise ForbiddenError("Not authorized")
     
     await db.shipments.update_one(
-        {"_id": ObjectId(shipment_id)},
+        {"_id": shipment["_id"]},
         {"$set": {"status": ShipmentStatus.DELIVERY_REJECTED, "updated_at": datetime.now(timezone.utc)}}
     )
     
@@ -328,7 +330,7 @@ async def reject_delivery(
         db,
         event_type=LedgerEventType.DELIVERY_REJECTED,
         entity_type="SHIPMENT",
-        entity_id=shipment_id,
+        entity_id=canonical_shipment_id,
         actor_id=current_user["sub"],
         actor_role=current_user["role"],
         event_summary=f"Delivery rejected by buyer for shipment {shipment['shipment_id']}",
@@ -360,7 +362,7 @@ async def partial_delivery(
         raise ForbiddenError("Not authorized")
     
     await db.shipments.update_one(
-        {"_id": ObjectId(shipment_id)},
+        {"_id": shipment["_id"]},
         {"$set": {"status": ShipmentStatus.PARTIALLY_DELIVERED, "updated_at": datetime.now(timezone.utc)}}
     )
     
@@ -368,7 +370,7 @@ async def partial_delivery(
         db,
         event_type=LedgerEventType.PARTIAL_DELIVERY_CONFIRMED,
         entity_type="SHIPMENT",
-        entity_id=shipment_id,
+        entity_id=canonical_shipment_id,
         actor_id=current_user["sub"],
         actor_role=current_user["role"],
         event_summary=f"Partial delivery confirmed by buyer for shipment {shipment['shipment_id']}",

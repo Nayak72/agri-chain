@@ -171,36 +171,39 @@ export default function LedgerPage() {
       </div>
 
       {/* Verification Results Banner */}
-      {verifyResult && (
-        <div
-          className={`rounded-xl border p-4 text-sm font-mono flex items-start gap-3 transition-all ${
-            verifyResult.is_valid
-              ? 'border-emerald-500/40 bg-emerald-950/20 text-emerald-300'
-              : 'border-red-500/40 bg-red-950/20 text-red-300'
-          }`}
-        >
-          {verifyResult.is_valid ? (
-            <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
-          ) : (
-            <ShieldAlert className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-          )}
-          <div className="space-y-1">
-            <div className="font-bold flex items-center gap-2">
-              {verifyResult.is_valid
-                ? 'LEDGER INTEGRITY VERIFIED (PASS)'
-                : 'INTEGRITY BREACH DETECTED (FAIL)'}
-              <span className="text-xs text-slate-400 font-normal">
-                Checked at {new Date().toLocaleTimeString()}
-              </span>
+      {verifyResult && (() => {
+        const isChainValid = Boolean(verifyResult.valid ?? verifyResult.is_valid ?? false)
+        return (
+          <div
+            className={`rounded-xl border p-4 text-sm font-mono flex items-start gap-3 transition-all ${
+              isChainValid
+                ? 'border-emerald-500/40 bg-emerald-950/20 text-emerald-300'
+                : 'border-red-500/40 bg-red-950/20 text-red-300'
+            }`}
+          >
+            {isChainValid ? (
+              <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+            ) : (
+              <ShieldAlert className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+            )}
+            <div className="space-y-1">
+              <div className="font-bold flex items-center gap-2">
+                {isChainValid
+                  ? 'LEDGER INTEGRITY VERIFIED (PASS)'
+                  : 'INTEGRITY BREACH DETECTED (FAIL)'}
+                <span className="text-xs text-slate-400 font-normal">
+                  Checked at {new Date().toLocaleTimeString()}
+                </span>
+              </div>
+              <p className="text-xs">
+                {isChainValid
+                  ? `All ${verifyResult.verified_blocks ?? verifyResult.total_blocks ?? verifyResult.blocks_checked ?? blocks.length} block headers, payloads, and hash pointers verified back to genesis.`
+                  : verifyResult.error || verifyResult.message || 'Cryptographic pointer mismatch discovered in chain.'}
+              </p>
             </div>
-            <p className="text-xs">
-              {verifyResult.is_valid
-                ? `All ${verifyResult.blocks_checked ?? blocks.length} block headers, payloads, and hash pointers verified back to genesis.`
-                : verifyResult.error || 'Cryptographic pointer mismatch discovered in chain.'}
-            </p>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

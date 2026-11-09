@@ -59,29 +59,34 @@ export function getInitials(name) {
 }
 
 // Role display helpers
+import { ROLES, normalizeRole } from '../constants/roles'
+export { ROLES, normalizeRole }
+
 export const ROLE_LABELS = {
-  admin: 'Administrator',
-  farmer: 'Farmer',
-  warehouse_manager: 'Warehouse Manager',
-  transporter: 'Transporter',
-  driver: 'Driver',
-  buyer: 'Buyer',
+  ADMIN: 'Administrator',
+  FARMER: 'Farmer',
+  WAREHOUSE_MANAGER: 'Warehouse Manager',
+  TRANSPORTER: 'Transporter',
+  DRIVER: 'Driver',
+  BUYER: 'Buyer',
 }
 
 export function getRoleLabel(role) {
-  return ROLE_LABELS[role] || role || 'Unknown'
+  const norm = normalizeRole(role)
+  return ROLE_LABELS[norm] || role || 'Unknown'
 }
 
 export function getRoleColor(role) {
+  const norm = normalizeRole(role)
   const colors = {
-    admin: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
-    farmer: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-    warehouse_manager: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
-    transporter: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-    driver: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
-    buyer: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+    ADMIN: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
+    FARMER: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+    WAREHOUSE_MANAGER: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+    TRANSPORTER: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+    DRIVER: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
+    BUYER: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
   }
-  return colors[role] || 'text-slate-400 bg-slate-500/10 border-slate-500/20'
+  return colors[norm] || 'text-slate-400 bg-slate-500/10 border-slate-500/20'
 }
 
 // Status badge colors for shipments/orders

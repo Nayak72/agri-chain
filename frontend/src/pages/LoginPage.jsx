@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import AmbientBackground from '../components/layout/AmbientBackground'
 
@@ -86,10 +86,9 @@ export default function LoginPage() {
 
   const fillDemoAccount = (account) => {
     setEmail(account.email)
-    setPassword(account.password)
+    setPassword('')
     setFormError('')
     setTouched({ email: false, password: false })
-    setShowDevPanel(false)
   }
 
   return (
@@ -118,7 +117,7 @@ export default function LoginPage() {
             </div>
 
             <p className="text-lg text-slate-400 max-w-lg leading-relaxed">
-              End-to-end agricultural supply chain management with blockchain-inspired traceability, cold-chain monitoring, and intelligent freight operations.
+              End-to-end agricultural supply chain management with cryptographic audit ledger traceability, cold-chain monitoring, and intelligent freight operations.
             </p>
 
             <div className="grid grid-cols-2 gap-4">
@@ -251,6 +250,13 @@ export default function LoginPage() {
                     </span>
                     <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
                   </button>
+
+                  <div className="mt-4 text-center">
+                    <span className="text-xs text-slate-500">Don't have an account? </span>
+                    <Link to="/register" className="text-xs text-cyan-400 hover:text-cyan-300 font-medium transition-colors">
+                      Register now
+                    </Link>
+                  </div>
                 </form>
 
                 {/* Dev demo accounts (DEV only) */}
@@ -262,23 +268,28 @@ export default function LoginPage() {
                         onClick={() => setShowDevPanel(!showDevPanel)}
                         className="text-xs font-mono text-amber-500/70 hover:text-amber-400 uppercase tracking-wider border border-amber-500/20 px-2 py-0.5 rounded transition-colors"
                       >
-                        DEV: Quick Fill
+                        DEV: Quick Select ({showDevPanel ? 'Hide' : 'Show'})
                       </button>
                       <div className="h-px flex-1 bg-slate-800" />
                     </div>
 
                     {showDevPanel && (
-                      <div className="grid grid-cols-2 gap-2">
-                        {devAccounts.map((acc) => (
-                          <button
-                            key={acc.email}
-                            onClick={() => fillDemoAccount(acc)}
-                            className="text-left p-2.5 rounded-lg bg-slate-900/80 border border-slate-700/50 hover:border-amber-500/40 hover:bg-amber-500/5 transition-all group"
-                          >
-                            <div className="text-xs font-semibold text-slate-300 group-hover:text-amber-300 capitalize">{acc.label}</div>
-                            <div className="text-[10px] font-mono text-slate-600 mt-0.5 truncate">{acc.email}</div>
-                          </button>
-                        ))}
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          {devAccounts.map((acc) => (
+                            <button
+                              key={acc.email}
+                              onClick={() => fillDemoAccount(acc)}
+                              className="text-left p-2 rounded-lg bg-slate-900/80 border border-slate-700/50 hover:border-amber-500/40 hover:bg-amber-500/5 transition-all group"
+                            >
+                              <div className="text-xs font-semibold text-slate-300 group-hover:text-amber-300">{acc.label}</div>
+                              <div className="text-[10px] font-mono text-slate-600 mt-0.5 truncate">{acc.email}</div>
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-[10px] font-mono text-slate-500 text-center">
+                          Seed passwords follow standard pattern: Role123! (e.g. Admin123!)
+                        </p>
                       </div>
                     )}
                   </div>

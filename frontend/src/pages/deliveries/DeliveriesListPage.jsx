@@ -63,7 +63,7 @@ export default function DeliveriesListPage() {
     mutationFn: (shipmentId) => deliveryApi.confirmDelivery(shipmentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['delivery-reports'] })
-      setFormSuccess('Delivery confirmed and hash locked on blockchain ledger!')
+      setFormSuccess('Delivery confirmed and hash locked on cryptographic audit ledger!')
     },
     onError: (err) => {
       const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Confirmation failed.'

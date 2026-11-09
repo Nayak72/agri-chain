@@ -173,7 +173,7 @@ async def create_shipment(
         "expected_arrival_time": None,
         "actual_dispatch_time": None,
         "actual_arrival_time": None,
-        "status": ShipmentStatus.BOOKING_CONFIRMED,
+        "status": ShipmentStatus.DRIVER_ASSIGNED,
         "exception_flags": [],
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),

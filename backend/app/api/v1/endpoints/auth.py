@@ -104,7 +104,7 @@ async def register(user_data: UserRegister, response: Response, db: AsyncIOMotor
     if user_data.role == UserRole.ADMIN:
         raise ValidationError("Cannot register as admin. Contact system administrator.")
     
-    is_approved = user_data.role != UserRole.TRANSPORTER
+    is_approved = user_data.role in [UserRole.FARMER, UserRole.BUYER]
     
     hashed_password = get_password_hash(user_data.password)
     
@@ -190,6 +190,8 @@ async def refresh_token(response: Response, raw_request: Request, request: Refre
     user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
     if not user or not user.get("is_active", True):
         raise UnauthorizedError("User not found or inactive")
+    if not user.get("is_approved", True):
+        raise AccountPendingApprovalError()
     
     tokens = create_token_pair(str(user["_id"]), user["email"], user["role"])
     

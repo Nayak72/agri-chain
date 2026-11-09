@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { normalizeRole } from '../constants/roles'
 
 export default function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading, isAuthenticated } = useAuth()
@@ -18,14 +19,28 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     )
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (allowedRoles && !allowedRoles.includes(user?.role)) {
+  // Account approval check
+  if (user.is_approved === false) {
+    return <Navigate to="/pending-approval" replace />
+  }
+
+  // Account active check
+  if (user.is_active === false) {
     return <Navigate to="/forbidden" replace />
+  }
+
+  // Role check using canonical uppercase normalization
+  if (allowedRoles && allowedRoles.length > 0) {
+    const userRole = normalizeRole(user.role)
+    const normalizedAllowed = allowedRoles.map(r => normalizeRole(r))
+    if (!normalizedAllowed.includes(userRole)) {
+      return <Navigate to="/forbidden" replace />
+    }
   }
 
   return children
 }
-

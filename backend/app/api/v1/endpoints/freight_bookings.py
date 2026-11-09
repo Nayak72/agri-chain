@@ -171,9 +171,19 @@ async def list_freight_bookings(
         po_ids = [str(po["_id"]) for po in pos]
         query["purchase_order_id"] = {"$in": po_ids}
     elif current_user["role"] == UserRole.TRANSPORTER:
-        query["status"] = {"$in": [FreightBookingStatus.REQUESTED, FreightBookingStatus.QUOTATION_PENDING]}
+        transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
+        t_id = str(transporter["_id"]) if transporter else None
+        if status == FreightBookingStatus.CONFIRMED:
+            my_quotes = await db.freight_quotations.find({"transporter_id": t_id, "status": "ACCEPTED"}).to_list(None) if t_id else []
+            my_quote_ids = [str(q["_id"]) for q in my_quotes]
+            query["status"] = FreightBookingStatus.CONFIRMED
+            query["accepted_quotation_id"] = {"$in": my_quote_ids}
+        elif status:
+            query["status"] = status
+        else:
+            query["status"] = {"$in": [FreightBookingStatus.REQUESTED, FreightBookingStatus.QUOTATION_PENDING]}
     
-    if status:
+    if status and current_user["role"] != UserRole.TRANSPORTER:
         query["status"] = status
     if purchase_order_id:
         if not ObjectId.is_valid(purchase_order_id):

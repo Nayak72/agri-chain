@@ -1,18 +1,19 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { authApi } from '../api/auth.api'
 import { tokenStore } from '../api/client'
+import { ROLES, normalizeRole } from '../constants/roles'
 
 const AuthContext = createContext(null)
 
-// Demo accounts available only in development
+// Development-only account email presets (NO passwords stored in frontend code)
 const DEV_ACCOUNTS = import.meta.env.DEV
   ? [
-      { label: 'Admin', email: 'admin@agrichain.com', password: 'Admin@123', role: 'admin' },
-      { label: 'Farmer', email: 'farmer1@agrichain.com', password: 'Farmer@123', role: 'farmer' },
-      { label: 'Warehouse Mgr', email: 'wm1@agrichain.com', password: 'Warehouse@123', role: 'warehouse_manager' },
-      { label: 'Transporter', email: 'transporter1@agrichain.com', password: 'Transport@123', role: 'transporter' },
-      { label: 'Driver', email: 'driver1@agrichain.com', password: 'Driver@123', role: 'driver' },
-      { label: 'Buyer', email: 'buyer1@agrichain.com', password: 'Buyer@123', role: 'buyer' },
+      { label: 'Admin', email: 'admin@agrichain.com', role: ROLES.ADMIN },
+      { label: 'Farmer', email: 'farmer1@agrichain.com', role: ROLES.FARMER },
+      { label: 'Warehouse Mgr', email: 'warehouse1@agrichain.com', role: ROLES.WAREHOUSE_MANAGER },
+      { label: 'Transporter', email: 'transporter1@agrichain.com', role: ROLES.TRANSPORTER },
+      { label: 'Driver', email: 'driver1@agrichain.com', role: ROLES.DRIVER },
+      { label: 'Buyer', email: 'buyer1@agrichain.com', role: ROLES.BUYER },
     ]
   : []
 
@@ -52,7 +53,7 @@ export function AuthProvider({ children }) {
         setUser(meRes.data)
         scheduleRefresh()
       } catch {
-        // No valid session - that's completely expected when not logged in
+        // No valid session - expected when unauthenticated
         if (!isMounted) return
         tokenStore.clear()
         setUser(null)
@@ -77,12 +78,36 @@ export function AuthProvider({ children }) {
       const meRes = await authApi.me()
       setUser(meRes.data)
       scheduleRefresh()
-      return { success: true }
+      return { success: true, user: meRes.data }
     } catch (err) {
       const message =
         err.response?.data?.detail ||
         err.response?.data?.message ||
         'Invalid credentials. Please try again.'
+      setError(message)
+      return { success: false, error: message }
+    }
+  }, [scheduleRefresh])
+
+  const register = useCallback(async (registrationData) => {
+    setError(null)
+    try {
+      const res = await authApi.register(registrationData)
+      // If auto-approved (FARMER / BUYER), tokens are returned
+      if (res.data.access_token) {
+        tokenStore.set(res.data.access_token)
+        const meRes = await authApi.me()
+        setUser(meRes.data)
+        scheduleRefresh()
+        return { success: true, status: 'APPROVED', user: meRes.data }
+      }
+      // If pending approval (TRANSPORTER / WAREHOUSE_MANAGER / DRIVER)
+      return { success: true, status: res.data.status || 'PENDING_APPROVAL', user: res.data.user }
+    } catch (err) {
+      const message =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        'Registration failed. Please check your information.'
       setError(message)
       return { success: false, error: message }
     }
@@ -101,11 +126,16 @@ export function AuthProvider({ children }) {
   }, [])
 
   const hasRole = useCallback(
-    (...roles) => user && roles.includes(user.role),
+    (...roles) => {
+      if (!user?.role) return false
+      const currentRole = normalizeRole(user.role)
+      const targetRoles = roles.map(r => normalizeRole(r))
+      return targetRoles.includes(currentRole)
+    },
     [user]
   )
 
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = normalizeRole(user?.role) === ROLES.ADMIN
 
   return (
     <AuthContext.Provider
@@ -114,6 +144,7 @@ export function AuthProvider({ children }) {
         loading,
         error,
         login,
+        register,
         logout,
         hasRole,
         isAdmin,
@@ -133,4 +164,3 @@ export function useAuth() {
 }
 
 export default AuthContext
-

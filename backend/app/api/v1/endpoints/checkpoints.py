@@ -40,11 +40,11 @@ class CheckpointResponse(BaseModel):
     city: str
     state: str
     sequence: int
-    actual_arrival: Optional[datetime]
-    actual_departure: Optional[datetime]
+    actual_arrival: Optional[datetime] = None
+    actual_departure: Optional[datetime] = None
     status: str
-    notes: Optional[str]
-    recorded_by: Optional[str]
+    notes: Optional[str] = None
+    recorded_by: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -88,6 +88,8 @@ async def create_checkpoint(
         "city": checkpoint_data.city,
         "state": checkpoint_data.state,
         "sequence": checkpoint_data.sequence,
+        "actual_arrival": None,
+        "actual_departure": None,
         "status": "PENDING",
         "notes": checkpoint_data.notes,
         "recorded_by": current_user["sub"],

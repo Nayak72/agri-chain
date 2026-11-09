@@ -1,17 +1,35 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { shipmentsApi } from '../../api/commerce.api'
+import {
+  ArrowLeft,
+  Truck,
+  MapPin,
+  Calendar,
+  Clock,
+  Thermometer,
+  ShieldCheck,
+  CheckCircle2,
+  AlertTriangle,
+  Plus,
+  Scale,
+  Package,
+  Layers,
+  Lock,
+  ChevronRight
+} from 'lucide-react'
+import { shipmentsApi, checkpointsApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
+import { ROLES, normalizeRole } from '../../constants/roles'
 import { formatWeight, formatDate, formatDateTime, getStatusColor, formatStatus } from '../../utils'
 
 const TIMELINE_STAGES = [
   { key: 'BOOKING_CONFIRMED', label: 'Booking Confirmed', desc: 'Freight quotation accepted and dispatch authorized' },
-  { key: 'VEHICLE_ASSIGNED', label: 'Vehicle Assigned', desc: 'Refrigerated or commercial fleet asset bound' },
-  { key: 'DRIVER_ASSIGNED', label: 'Driver Assigned', desc: 'Certified commercial operator allocated' },
+  { key: 'DRIVER_ASSIGNED', label: 'Driver & Fleet Bound', desc: 'Commercial fleet asset and driver assigned' },
   { key: 'LOADING', label: 'Cargo Loading', desc: 'Batch payload verified and loaded at origin' },
-  { key: 'DISPATCHED', label: 'Dispatched', desc: 'Outbound departure logged on blockchain ledger' },
-  { key: 'IN_TRANSIT', label: 'In Transit', desc: 'Active cold-chain telemetry and GPS tracking active' },
+  { key: 'LOADED', label: 'Cargo Loaded', desc: 'Scale weight verified and manifests signed' },
+  { key: 'DISPATCHED', label: 'Dispatched', desc: 'Outbound departure logged on cryptographic audit ledger' },
+  { key: 'IN_TRANSIT', label: 'In Transit', desc: 'Active cold-chain telemetry and corridor checkpoint tracking active' },
   { key: 'CHECKPOINT_REACHED', label: 'Checkpoint Logged', desc: 'En route corridor checkpoint verification' },
   { key: 'DELIVERED', label: 'Delivered Hub', desc: 'Destination delivery inspection and sign-off' },
 ]
@@ -21,14 +39,36 @@ export default function ShipmentDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const userRole = normalizeRole(user?.role)
+
   const [actionError, setActionError] = useState('')
   const [showLoadModal, setShowLoadModal] = useState(false)
   const [actualWeight, setActualWeight] = useState('')
+  const [actualPackageCount, setActualPackageCount] = useState('100')
+
+  // Checkpoint Modal
+  const [showCheckpointModal, setShowCheckpointModal] = useState(false)
+  const [checkpointForm, setCheckpointForm] = useState({
+    name: '',
+    city: '',
+    state: '',
+    notes: '',
+  })
 
   const { data: shipment, isLoading, error } = useQuery({
     queryKey: ['shipment', id],
     queryFn: () => shipmentsApi.get(id).then(res => res.data),
   })
+
+  const sId = shipment?.id || shipment?._id || id
+
+  // Checkpoints query
+  const { data: checkpointsData, isLoading: checkpointsLoading } = useQuery({
+    queryKey: ['shipment-checkpoints', sId],
+    queryFn: () => checkpointsApi.list({ shipment_id: sId }).then(res => res.data),
+    enabled: !!sId,
+  })
+  const checkpoints = Array.isArray(checkpointsData) ? checkpointsData : checkpointsData?.items || []
 
   // Dispatch mutation
   const dispatchMutation = useMutation({
@@ -57,11 +97,52 @@ export default function ShipmentDetailPage() {
     },
   })
 
+  // Create Checkpoint mutation
+  const createCheckpointMutation = useMutation({
+    mutationFn: (data) => checkpointsApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shipment-checkpoints', sId] })
+      setShowCheckpointModal(false)
+      setCheckpointForm({ name: '', city: '', state: '', notes: '' })
+      setActionError('')
+    },
+    onError: (err) => {
+      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Checkpoint creation failed.'
+      setActionError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    },
+  })
+
+  // Update Checkpoint mutation (e.g. Arrived or Departed)
+  const updateCheckpointMutation = useMutation({
+    mutationFn: ({ cpId, data }) => checkpointsApi.update(cpId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shipment-checkpoints', sId] })
+    },
+  })
+
   const handleLoadSubmit = (e) => {
     e.preventDefault()
     loadMutation.mutate({
       actual_weight_kg: parseFloat(actualWeight),
-      batch_quantities: {},
+      actual_package_count: parseInt(actualPackageCount, 10),
+      batch_quantities: [],
+    })
+  }
+
+  const handleCheckpointSubmit = (e) => {
+    e.preventDefault()
+    if (!checkpointForm.name.trim() || !checkpointForm.city.trim() || !checkpointForm.state.trim()) {
+      setActionError('Please provide milestone name, city, and state.')
+      return
+    }
+
+    createCheckpointMutation.mutate({
+      shipment_id: sId,
+      name: checkpointForm.name.trim(),
+      city: checkpointForm.city.trim(),
+      state: checkpointForm.state.trim(),
+      sequence: checkpoints.length + 1,
+      notes: checkpointForm.notes ? checkpointForm.notes.trim() : undefined,
     })
   }
 
@@ -90,27 +171,26 @@ export default function ShipmentDetailPage() {
     )
   }
 
-  const sId = shipment.id || shipment._id || id
   const statusColor = getStatusColor(shipment.status)
 
   // Determine timeline progress
   const currentStatusIndex = TIMELINE_STAGES.findIndex(s => s.key === shipment.status)
-  const activeIdx = currentStatusIndex !== -1 ? currentStatusIndex : 0
+  const activeIdx = currentStatusIndex !== -1 ? currentStatusIndex : 1
+
+  const isOperator = [ROLES.DRIVER, ROLES.TRANSPORTER, ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER].includes(userRole)
 
   return (
-    <div className="max-w-6xl mx-auto px-4 lg:px-8 py-10 animate-fade-in-up">
+    <div className="max-w-6xl mx-auto px-4 lg:px-8 py-10 animate-fade-in-up space-y-6">
       <button
         onClick={() => navigate('/shipments')}
-        className="text-xs font-mono text-cyan-400 hover:text-cyan-300 mb-6 flex items-center gap-2 transition-colors"
+        className="text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-2 transition-colors"
       >
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
+        <ArrowLeft className="w-3.5 h-3.5" />
         SHIPMENTS_CONSIGNMENTS
       </button>
 
       {/* Header Deck */}
-      <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-8 mb-6 relative overflow-hidden shadow-2xl">
+      <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-8 relative overflow-hidden shadow-2xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
@@ -123,7 +203,7 @@ export default function ShipmentDetailPage() {
             </div>
             <h1 className="text-3xl font-bold font-mono text-white tracking-tight">{shipment.shipment_id || sId}</h1>
             <p className="text-slate-400 text-sm mt-1">
-              Route: <span className="text-white font-semibold">{shipment.pickup_city}</span> → <span className="text-white font-semibold">{shipment.destination_city}</span>
+              Corridor Route: <span className="text-white font-semibold">{shipment.pickup_city}</span> ({shipment.pickup_state}) → <span className="text-white font-semibold">{shipment.destination_city}</span> ({shipment.destination_state})
             </p>
           </div>
 
@@ -133,17 +213,16 @@ export default function ShipmentDetailPage() {
               onClick={() => navigate('/cold-chain', { state: { shipmentId: sId } })}
               className="px-4 py-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-400 font-mono text-xs font-bold transition-all flex items-center gap-2"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
+              <Thermometer className="w-4 h-4" />
               Cold-Chain Telemetry
             </button>
 
             {/* Loading Action */}
-            {['DRIVER_ASSIGNED', 'BOOKING_CONFIRMED', 'VEHICLE_ASSIGNED'].includes(shipment.status) && (
+            {['DRIVER_ASSIGNED', 'LOADING'].includes(shipment.status) && (
               <button
                 onClick={() => {
                   setActualWeight(String(shipment.total_cargo_weight_kg || 2000))
+                  setActualPackageCount(String(shipment.package_count || 100))
                   setShowLoadModal(true)
                 }}
                 className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs font-bold transition-all"
@@ -153,7 +232,7 @@ export default function ShipmentDetailPage() {
             )}
 
             {/* Dispatch Action */}
-            {['LOADING', 'LOADED'].includes(shipment.status) && (
+            {['LOADED'].includes(shipment.status) && (
               <button
                 onClick={() => dispatchMutation.mutate()}
                 disabled={dispatchMutation.isPending}
@@ -184,52 +263,115 @@ export default function ShipmentDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Connected Vertical Timeline */}
-        <div className="lg:col-span-2 bg-[#0b1121] border border-slate-800 rounded-3xl p-8 shadow-2xl">
-          <div className="mb-6 flex justify-between items-center">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-              Connected Consignment Timeline
-            </h2>
-            <span className="text-xs font-mono text-slate-500">Stage {activeIdx + 1} of {TIMELINE_STAGES.length}</span>
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-8 shadow-2xl">
+            <div className="mb-6 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                Connected Consignment Timeline
+              </h2>
+              <span className="text-xs font-mono text-slate-500">Stage {activeIdx + 1} of {TIMELINE_STAGES.length}</span>
+            </div>
+
+            <div className="relative pl-6 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
+              {TIMELINE_STAGES.map((stage, idx) => {
+                const isPast = idx < activeIdx
+                const isCurrent = idx === activeIdx
+
+                return (
+                  <div key={stage.key} className="relative flex items-start gap-4">
+                    {/* Indicator Dot */}
+                    <div className={`absolute -left-6 top-1 w-6 h-6 rounded-full flex items-center justify-center border text-xs transition-all ${
+                      isPast
+                        ? 'bg-emerald-500 border-emerald-400 text-slate-950 font-bold'
+                        : isCurrent
+                        ? 'bg-cyan-500 border-cyan-300 text-slate-950 font-bold shadow-[0_0_12px_rgba(6,182,212,0.8)]'
+                        : 'bg-slate-900 border-slate-700 text-slate-600'
+                    }`}>
+                      {isPast ? '✓' : idx + 1}
+                    </div>
+
+                    <div className="pl-4">
+                      <div className="flex items-center gap-3">
+                        <h3 className={`text-sm font-mono font-bold ${
+                          isCurrent ? 'text-cyan-400' : isPast ? 'text-white' : 'text-slate-600'
+                        }`}>
+                          {stage.label}
+                        </h3>
+                        {isCurrent && (
+                          <span className="px-2 py-0.5 rounded text-[9px] font-mono uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 animate-pulse">
+                            Active Stage
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5 font-mono">{stage.desc}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
-          <div className="relative pl-6 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
-            {TIMELINE_STAGES.map((stage, idx) => {
-              const isPast = idx < activeIdx
-              const isCurrent = idx === activeIdx
-              const isFuture = idx > activeIdx
+          {/* Corridor Route Checkpoints Card */}
+          <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-base font-bold text-white">Corridor Milestones & Checkpoints</h3>
+              </div>
 
-              return (
-                <div key={stage.key} className="relative flex items-start gap-4">
-                  {/* Indicator Dot */}
-                  <div className={`absolute -left-6 top-1 w-6 h-6 rounded-full flex items-center justify-center border transition-all ${
-                    isPast
-                      ? 'bg-emerald-500 border-emerald-400 text-slate-950 font-bold'
-                      : isCurrent
-                      ? 'bg-cyan-500 border-cyan-300 text-slate-950 font-bold shadow-[0_0_12px_rgba(6,182,212,0.8)]'
-                      : 'bg-slate-900 border-slate-700 text-slate-600'
-                  }`}>
-                    {isPast ? '✓' : idx + 1}
-                  </div>
+              {isOperator && (
+                <button
+                  onClick={() => setShowCheckpointModal(true)}
+                  className="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Log Checkpoint
+                </button>
+              )}
+            </div>
 
-                  <div className="pl-4">
-                    <div className="flex items-center gap-3">
-                      <h3 className={`text-sm font-mono font-bold ${
-                        isCurrent ? 'text-cyan-400' : isPast ? 'text-white' : 'text-slate-600'
-                      }`}>
-                        {stage.label}
-                      </h3>
-                      {isCurrent && (
-                        <span className="px-2 py-0.5 rounded text-[9px] font-mono uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 animate-pulse">
-                          Active Stage
+            {checkpointsLoading ? (
+              <div className="py-6 text-center text-xs font-mono text-slate-500 animate-pulse">
+                Querying corridor milestones...
+              </div>
+            ) : checkpoints.length === 0 ? (
+              <div className="py-8 text-center text-xs font-mono text-slate-500">
+                No checkpoints logged along this corridor yet. Drivers and operators log checkpoints at tollways and transit hubs.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-800/60 font-mono text-xs">
+                {checkpoints.map((cp) => (
+                  <div key={cp.id || cp._id} className="py-3 flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white">#{cp.sequence} {cp.name}</span>
+                        <span className="text-[10px] text-cyan-400">({cp.city}, {cp.state})</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                          cp.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {cp.status}
                         </span>
+                      </div>
+                      {cp.notes && <p className="text-[11px] text-slate-400 mt-0.5">{cp.notes}</p>}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {isOperator && cp.status !== 'COMPLETED' && (
+                        <button
+                          onClick={() => updateCheckpointMutation.mutate({
+                            cpId: cp.id || cp._id,
+                            data: { actual_arrival: new Date().toISOString(), status: 'COMPLETED' }
+                          })}
+                          className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-cyan-300"
+                        >
+                          Mark Arrived
+                        </button>
                       )}
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5 font-mono">{stage.desc}</p>
                   </div>
-                </div>
-              )
-            })}
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -284,7 +426,7 @@ export default function ShipmentDetailPage() {
           <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl">
             <h3 className="text-lg font-bold text-white mb-1">Verify Cargo Loading</h3>
             <p className="text-xs text-slate-400 font-mono mb-4">
-              Enter verified gross scale weight at loading bay origin.
+              Enter verified gross scale weight and package count at loading bay origin.
             </p>
 
             <form onSubmit={handleLoadSubmit} className="space-y-4 font-mono text-xs">
@@ -296,6 +438,18 @@ export default function ShipmentDetailPage() {
                   required
                   value={actualWeight}
                   onChange={(e) => setActualWeight(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 uppercase">Actual Package Count *</label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={actualPackageCount}
+                  onChange={(e) => setActualPackageCount(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
                 />
               </div>
@@ -320,7 +474,85 @@ export default function ShipmentDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Corridor Checkpoint Modal */}
+      {showCheckpointModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-1">Log Route Checkpoint</h3>
+            <p className="text-xs text-slate-400 font-mono mb-4">
+              Record physical milestone transit along corridor route.
+            </p>
+
+            <form onSubmit={handleCheckpointSubmit} className="space-y-4 font-mono text-xs">
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 uppercase">Checkpoint / Tollway Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Igatpuri Ghath Checkpoint"
+                  value={checkpointForm.name}
+                  onChange={(e) => setCheckpointForm({ ...checkpointForm, name: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 uppercase">City *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Igatpuri"
+                    value={checkpointForm.city}
+                    onChange={(e) => setCheckpointForm({ ...checkpointForm, city: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 uppercase">State *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Maharashtra"
+                    value={checkpointForm.state}
+                    onChange={(e) => setCheckpointForm({ ...checkpointForm, state: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 uppercase">Notes</label>
+                <input
+                  type="text"
+                  placeholder="Vehicle inspected, seals intact"
+                  value={checkpointForm.notes}
+                  onChange={(e) => setCheckpointForm({ ...checkpointForm, notes: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCheckpointModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createCheckpointMutation.isPending}
+                  className="flex-1 py-2.5 rounded-xl bg-cyan-500 text-slate-950 font-bold disabled:opacity-50"
+                >
+                  {createCheckpointMutation.isPending ? 'Logging...' : 'Save Checkpoint'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-

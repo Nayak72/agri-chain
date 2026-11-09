@@ -404,7 +404,9 @@ export default function AnalyticsPage() {
             <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
               <div className="text-xs font-mono uppercase text-slate-400 mb-1">Cold-Chain Compliance</div>
               <div className="text-2xl font-bold font-mono text-emerald-400">
-                {qualityData?.cold_chain_compliance_percentage ?? 100}%
+                {qualityData?.cold_chain_compliance_percentage != null
+                  ? `${qualityData.cold_chain_compliance_percentage}%`
+                  : 'N/A — No sensor readings'}
               </div>
               <div className="text-xs text-slate-400 mt-1">Readings within safety limits</div>
             </div>

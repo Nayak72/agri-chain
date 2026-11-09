@@ -197,10 +197,11 @@ async def accept_purchase_order(
     if order["status"] != PurchaseOrderStatus.PLACED and order["status"] != PurchaseOrderStatus.DRAFT:
         raise ValidationError(f"Order cannot be accepted from status {order['status']}")
     
-    if order["batch_id"]:
-        batch = await db.produce_batches.find_one({"_id": ObjectId(order["batch_id"])})
+    batch_id = order.get("batch_id")
+    if batch_id:
+        batch = await db.produce_batches.find_one({"_id": ObjectId(batch_id)})
         if not batch:
-            raise NotFoundError("Batch", order["batch_id"])
+            raise NotFoundError("Batch", batch_id)
         if batch["available_quantity_kg"] < order["requested_quantity_kg"]:
             raise ValidationError("Insufficient available quantity in batch")
     
@@ -211,15 +212,15 @@ async def accept_purchase_order(
             session=session
         )
         
-        if order["batch_id"]:
+        if batch_id:
             await db.produce_batches.update_one(
-                {"_id": ObjectId(order["batch_id"])},
+                {"_id": ObjectId(batch_id)},
                 {"$inc": {"reserved_quantity_kg": order["requested_quantity_kg"], "available_quantity_kg": -order["requested_quantity_kg"]}, "$set": {"updated_at": datetime.now(timezone.utc)}},
                 session=session
             )
             
             await db.inventory_items.update_one(
-                {"batch_id": order["batch_id"]},
+                {"batch_id": batch_id},
                 {"$inc": {"reserved_quantity_kg": order["requested_quantity_kg"], "quantity_kg": -order["requested_quantity_kg"]}, "$set": {"updated_at": datetime.now(timezone.utc), "status": "RESERVED"}},
                 session=session
             )

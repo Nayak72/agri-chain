@@ -51,7 +51,7 @@ class QualityMetrics(BaseModel):
     rejected_quantity_kg: float
     damage_rate_percentage: float
     rejection_rate_percentage: float
-    cold_chain_compliance_percentage: float
+    cold_chain_compliance_percentage: Optional[float] = None
     temperature_excursion_count: int
     total_excursion_duration_hours: float
 
@@ -320,7 +320,7 @@ async def get_quality_analytics(
     total_alerts = await db.sensor_alerts.count_documents({"status": AlertStatus.ACTIVE})
     total_readings = await db.sensor_readings.count_documents({})
     normal_readings = await db.sensor_readings.count_documents({"status": SensorStatus.NORMAL})
-    compliance = (normal_readings / total_readings * 100) if total_readings > 0 else 100.0
+    compliance = (normal_readings / total_readings * 100) if total_readings > 0 else None
     
     return {
         "total_dispatched_quantity_kg": round(total_dispatched_kg, 2),
@@ -329,7 +329,7 @@ async def get_quality_analytics(
         "rejected_quantity_kg": round(rejected_qty, 2),
         "damage_rate_percentage": round(damage_rate, 2),
         "rejection_rate_percentage": round(rejection_rate, 2),
-        "cold_chain_compliance_percentage": round(compliance, 2),
+        "cold_chain_compliance_percentage": round(compliance, 2) if compliance is not None else None,
         "temperature_excursion_count": total_alerts,
         "total_excursion_duration_hours": 0.0,
     }
@@ -345,14 +345,14 @@ async def get_cold_chain_analytics(
     warning_readings = await db.sensor_readings.count_documents({"status": SensorStatus.WARNING})
     critical_readings = await db.sensor_readings.count_documents({"status": SensorStatus.CRITICAL})
     
-    compliance = (normal_readings / total_readings * 100) if total_readings > 0 else 100
+    compliance = (normal_readings / total_readings * 100) if total_readings > 0 else None
     
     return {
         "total_readings": total_readings,
         "normal_readings": normal_readings,
         "warning_readings": warning_readings,
         "critical_readings": critical_readings,
-        "compliance_percentage": round(compliance, 2),
+        "compliance_percentage": round(compliance, 2) if compliance is not None else None,
         "active_alerts": await db.sensor_alerts.count_documents({"status": AlertStatus.ACTIVE}),
         "resolved_alerts": await db.sensor_alerts.count_documents({"status": AlertStatus.RESOLVED}),
     }

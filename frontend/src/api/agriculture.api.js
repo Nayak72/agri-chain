@@ -32,5 +32,9 @@ export const inventoryApi = {
   list: (params) => apiClient.get('/inventory', { params }),
   movements: (params) => apiClient.get('/inventory/movements', { params }),
   createMovement: (data) => apiClient.post('/inventory/movements', data),
+  receipts: (params) => apiClient.get('/inventory/receipts', { params }),
+  createReceipt: (warehouseId, data) => apiClient.post(`/inventory/warehouses/${warehouseId}/receipts`, data),
+  inspections: (params) => apiClient.get('/inventory/quality-inspections', { params }),
+  createInspection: (data) => apiClient.post('/inventory/quality-inspections', data),
 }
 

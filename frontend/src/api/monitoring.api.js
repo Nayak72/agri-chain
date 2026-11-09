@@ -27,10 +27,16 @@ export const deliveryApi = {
   reports: (params) => apiClient.get('/delivery/reports', { params }),
   getReport: (shipmentId) =>
     apiClient.get(`/delivery/shipments/${shipmentId}/delivery-report`),
+  getReportById: (reportId) =>
+    apiClient.get(`/delivery/reports/${reportId}`),
   createReport: (shipmentId, data) =>
     apiClient.post(`/delivery/shipments/${shipmentId}/delivery-report`, data),
   confirmDelivery: (shipmentId) =>
     apiClient.post(`/delivery/shipments/${shipmentId}/confirm-delivery`),
+  rejectDelivery: (shipmentId) =>
+    apiClient.post(`/delivery/shipments/${shipmentId}/reject-delivery`),
+  partialDelivery: (shipmentId) =>
+    apiClient.post(`/delivery/shipments/${shipmentId}/partial-delivery`),
 }
 
 export const ledgerApi = {

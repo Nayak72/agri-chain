@@ -4,6 +4,9 @@ export const authApi = {
   login: (email, password) =>
     authClient.post('/auth/login', { email, password }),
 
+  register: (data) =>
+    authClient.post('/auth/register', data),
+
   refresh: () =>
     authClient.post('/auth/refresh'),
 

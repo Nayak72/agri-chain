@@ -4,14 +4,16 @@ import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppShell from './components/layout/AppShell'
 
-// Pages
+// Public Pages
+import LandingPage from './pages/public/LandingPage'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/public/RegisterPage'
+import PendingApprovalPage from './pages/public/PendingApprovalPage'
 import DashboardPage from './pages/DashboardPage'
 import ForbiddenPage from './pages/ForbiddenPage'
 import NotFoundPage from './pages/NotFoundPage'
-import PlaceholderPage from './pages/PlaceholderPage'
 
-// Agricultural Modules (Milestone 2)
+// Agricultural Modules
 import FarmsListPage from './pages/farms/FarmsListPage'
 import FarmCreatePage from './pages/farms/FarmCreatePage'
 import FarmDetailPage from './pages/farms/FarmDetailPage'
@@ -30,7 +32,7 @@ import WarehouseDetailPage from './pages/warehouses/WarehouseDetailPage'
 
 import InventoryPage from './pages/inventory/InventoryPage'
 
-// Commercial, Freight & Transportation (Milestone 3)
+// Commercial, Freight & Transportation
 import OrdersListPage from './pages/orders/OrdersListPage'
 import OrderCreatePage from './pages/orders/OrderCreatePage'
 import OrderDetailPage from './pages/orders/OrderDetailPage'
@@ -54,15 +56,20 @@ import ShipmentCreatePage from './pages/shipments/ShipmentCreatePage'
 import ShipmentDetailPage from './pages/shipments/ShipmentDetailPage'
 
 import DeliveriesListPage from './pages/deliveries/DeliveriesListPage'
+import DeliveryDetailPage from './pages/deliveries/DeliveryDetailPage'
 
-// Monitoring & Analytics (Milestone 4)
+// Monitoring & Analytics
 import ColdChainPage from './pages/monitoring/ColdChainPage'
 import LedgerPage from './pages/monitoring/LedgerPage'
 import AnalyticsPage from './pages/monitoring/AnalyticsPage'
 
-// Admin & Governance (Milestone 5)
+// Admin & Governance
 import UsersPage from './pages/admin/UsersPage'
+import UserDetailPage from './pages/admin/UserDetailPage'
 import SettingsPage from './pages/admin/SettingsPage'
+
+// Role constants
+import { ROLES, ALL_ROLES, ADMIN_ONLY, AGRI_ROLES, COMMERCE_ROLES, TRANSPORT_ROLES } from './constants/roles'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -74,13 +81,6 @@ const queryClient = new QueryClient({
   },
 })
 
-// Role constants
-const ALL_ROLES = ['admin', 'farmer', 'warehouse_manager', 'transporter', 'driver', 'buyer']
-const ADMIN_ONLY = ['admin']
-const AGRI_ROLES = ['admin', 'farmer', 'warehouse_manager']
-const COMMERCE_ROLES = ['admin', 'buyer', 'farmer']
-const TRANSPORT_ROLES = ['admin', 'transporter', 'driver']
-
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -88,8 +88,10 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             {/* Public */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/pending-approval" element={<PendingApprovalPage />} />
 
             {/* Protected shell */}
             <Route
@@ -104,145 +106,145 @@ export default function App() {
 
               {/* Agriculture */}
               <Route path="/farms" element={
-                <ProtectedRoute allowedRoles={['admin', 'farmer']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER]}>
                   <FarmsListPage />
                 </ProtectedRoute>
               } />
               <Route path="/farms/new" element={
-                <ProtectedRoute allowedRoles={['admin', 'farmer']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER]}>
                   <FarmCreatePage />
                 </ProtectedRoute>
               } />
               <Route path="/farms/:id" element={
-                <ProtectedRoute allowedRoles={['admin', 'farmer']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER]}>
                   <FarmDetailPage />
                 </ProtectedRoute>
               } />
 
               <Route path="/produce" element={
-                <ProtectedRoute allowedRoles={['admin', 'farmer', 'warehouse_manager', 'buyer']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER, ROLES.WAREHOUSE_MANAGER, ROLES.BUYER]}>
                   <ProduceListPage />
                 </ProtectedRoute>
               } />
               <Route path="/produce/new" element={
-                <ProtectedRoute allowedRoles={['admin', 'farmer']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER]}>
                   <ProduceCreatePage />
                 </ProtectedRoute>
               } />
               <Route path="/produce/:id" element={
-                <ProtectedRoute allowedRoles={['admin', 'farmer', 'warehouse_manager', 'buyer']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER, ROLES.WAREHOUSE_MANAGER, ROLES.BUYER]}>
                   <ProduceDetailPage />
                 </ProtectedRoute>
               } />
 
               <Route path="/batches" element={
-                <ProtectedRoute allowedRoles={['admin', 'farmer', 'warehouse_manager']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER, ROLES.WAREHOUSE_MANAGER]}>
                   <BatchesListPage />
                 </ProtectedRoute>
               } />
               <Route path="/batches/new" element={
-                <ProtectedRoute allowedRoles={['admin', 'farmer']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER]}>
                   <BatchCreatePage />
                 </ProtectedRoute>
               } />
               <Route path="/batches/:id" element={
-                <ProtectedRoute allowedRoles={['admin', 'farmer', 'warehouse_manager']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER, ROLES.WAREHOUSE_MANAGER]}>
                   <BatchDetailPage />
                 </ProtectedRoute>
               } />
 
               {/* Warehouses & Inventory */}
               <Route path="/warehouses" element={
-                <ProtectedRoute allowedRoles={['admin', 'warehouse_manager']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER]}>
                   <WarehousesListPage />
                 </ProtectedRoute>
               } />
               <Route path="/warehouses/new" element={
-                <ProtectedRoute allowedRoles={['admin', 'warehouse_manager']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER]}>
                   <WarehouseCreatePage />
                 </ProtectedRoute>
               } />
               <Route path="/warehouses/:id" element={
-                <ProtectedRoute allowedRoles={['admin', 'warehouse_manager']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER]}>
                   <WarehouseDetailPage />
                 </ProtectedRoute>
               } />
 
               <Route path="/inventory" element={
-                <ProtectedRoute allowedRoles={['admin', 'warehouse_manager']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER]}>
                   <InventoryPage />
                 </ProtectedRoute>
               } />
 
               {/* Commercial */}
               <Route path="/purchase-orders" element={
-                <ProtectedRoute allowedRoles={['admin', 'buyer', 'farmer']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.BUYER, ROLES.FARMER]}>
                   <OrdersListPage />
                 </ProtectedRoute>
               } />
               <Route path="/purchase-orders/new" element={
-                <ProtectedRoute allowedRoles={['admin', 'buyer']}>
+                <ProtectedRoute allowedRoles={[ROLES.BUYER]}>
                   <OrderCreatePage />
                 </ProtectedRoute>
               } />
               <Route path="/purchase-orders/:id" element={
-                <ProtectedRoute allowedRoles={['admin', 'buyer', 'farmer']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.BUYER, ROLES.FARMER]}>
                   <OrderDetailPage />
                 </ProtectedRoute>
               } />
 
               <Route path="/freight-bookings" element={
-                <ProtectedRoute allowedRoles={['admin', 'buyer', 'farmer']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.BUYER, ROLES.FARMER]}>
                   <FreightBookingsListPage />
                 </ProtectedRoute>
               } />
               <Route path="/freight-bookings/new" element={
-                <ProtectedRoute allowedRoles={['admin', 'buyer', 'farmer']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.BUYER, ROLES.FARMER]}>
                   <FreightBookingCreatePage />
                 </ProtectedRoute>
               } />
               <Route path="/freight-bookings/:id" element={
-                <ProtectedRoute allowedRoles={['admin', 'buyer', 'farmer', 'transporter']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.BUYER, ROLES.FARMER, ROLES.TRANSPORTER]}>
                   <FreightBookingDetailPage />
                 </ProtectedRoute>
               } />
 
               <Route path="/freight-quotes" element={
-                <ProtectedRoute allowedRoles={['admin', 'transporter']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TRANSPORTER, ROLES.BUYER, ROLES.FARMER]}>
                   <FreightQuotesPage />
                 </ProtectedRoute>
               } />
 
               {/* Transport */}
               <Route path="/transporters" element={
-                <ProtectedRoute allowedRoles={['admin', 'transporter']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TRANSPORTER]}>
                   <TransportersListPage />
                 </ProtectedRoute>
               } />
 
               <Route path="/fleet" element={
-                <ProtectedRoute allowedRoles={['admin', 'transporter']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TRANSPORTER]}>
                   <FleetListPage />
                 </ProtectedRoute>
               } />
               <Route path="/fleet/new" element={
-                <ProtectedRoute allowedRoles={['admin', 'transporter']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TRANSPORTER]}>
                   <VehicleCreatePage />
                 </ProtectedRoute>
               } />
 
               <Route path="/drivers" element={
-                <ProtectedRoute allowedRoles={['admin', 'transporter']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TRANSPORTER]}>
                   <DriversListPage />
                 </ProtectedRoute>
               } />
               <Route path="/drivers/new" element={
-                <ProtectedRoute allowedRoles={['admin', 'transporter']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TRANSPORTER]}>
                   <DriverCreatePage />
                 </ProtectedRoute>
               } />
               <Route path="/drivers/:id" element={
-                <ProtectedRoute allowedRoles={['admin', 'transporter']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TRANSPORTER]}>
                   <DriverDetailPage />
                 </ProtectedRoute>
               } />
@@ -253,7 +255,7 @@ export default function App() {
                 </ProtectedRoute>
               } />
               <Route path="/shipments/new" element={
-                <ProtectedRoute allowedRoles={['admin', 'transporter']}>
+                <ProtectedRoute allowedRoles={[ROLES.TRANSPORTER]}>
                   <ShipmentCreatePage />
                 </ProtectedRoute>
               } />
@@ -264,13 +266,13 @@ export default function App() {
               } />
 
               <Route path="/deliveries" element={
-                <ProtectedRoute allowedRoles={['admin', 'driver', 'buyer']}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DRIVER, ROLES.BUYER, ROLES.TRANSPORTER]}>
                   <DeliveriesListPage />
                 </ProtectedRoute>
               } />
               <Route path="/deliveries/:id" element={
-                <ProtectedRoute allowedRoles={['admin', 'driver', 'buyer']}>
-                  <DeliveriesListPage />
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DRIVER, ROLES.BUYER, ROLES.TRANSPORTER]}>
+                  <DeliveryDetailPage />
                 </ProtectedRoute>
               } />
 
@@ -288,7 +290,7 @@ export default function App() {
               } />
 
               <Route path="/analytics" element={
-                <ProtectedRoute allowedRoles={['admin', 'transporter', 'farmer', 'buyer']}>
+                <ProtectedRoute allowedRoles={ALL_ROLES}>
                   <AnalyticsPage />
                 </ProtectedRoute>
               } />
@@ -301,7 +303,7 @@ export default function App() {
               } />
               <Route path="/users/:id" element={
                 <ProtectedRoute allowedRoles={ADMIN_ONLY}>
-                  <UsersPage />
+                  <UserDetailPage />
                 </ProtectedRoute>
               } />
               <Route path="/settings" element={
@@ -322,4 +324,3 @@ export default function App() {
     </QueryClientProvider>
   )
 }
-

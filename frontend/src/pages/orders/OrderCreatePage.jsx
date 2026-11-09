@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { ArrowLeft, ShoppingBag, AlertTriangle, Layers, Calendar, DollarSign, MapPin } from 'lucide-react'
 import { ordersApi } from '../../api/commerce.api'
 import { produceApi, batchesApi } from '../../api/agriculture.api'
+import { usersApi } from '../../api/users.api'
 
 export default function OrderCreatePage() {
   const navigate = useNavigate()
@@ -22,13 +24,19 @@ export default function OrderCreatePage() {
     queryFn: () => batchesApi.list().then(res => res.data),
   })
 
+  const { data: farmersData } = useQuery({
+    queryKey: ['farmers-for-po'],
+    queryFn: () => usersApi.list({ role: 'FARMER' }).then(res => res.data),
+  })
+
   const produceItems = Array.isArray(produceList) ? produceList : produceList?.items || []
   const batches = Array.isArray(batchesList) ? batchesList : batchesList?.items || []
+  const farmers = Array.isArray(farmersData) ? farmersData : farmersData?.items || []
 
   const [form, setForm] = useState({
-    seller_id: 'farmer1@agrichain.com',
+    seller_id: '',
     produce_type: '',
-    batch_id: initialBatchId,
+    batch_id: '',
     requested_quantity_kg: '',
     unit_price_inr: '', // User enters in INR, converted to paise on submit
     preferred_delivery_date: '',
@@ -37,21 +45,31 @@ export default function OrderCreatePage() {
     handling_requirements: '',
   })
 
-  // When a batch is selected, autofill produce_type and pickup address
-  const handleBatchSelect = (batchKey) => {
-    const selected = batches.find(b => b.batch_id === batchKey || (b.id || b._id) === batchKey)
+  // When a batch is selected, autofill produce_type, pickup address, seller_id, and default quantity
+  const handleBatchSelect = (batchId) => {
+    if (!batchId) {
+      setForm(prev => ({ ...prev, batch_id: '' }))
+      return
+    }
+    const selected = batches.find(b => (b.id || b._id) === batchId || b.batch_id === batchId)
     if (selected) {
       setForm(prev => ({
         ...prev,
-        batch_id: selected.batch_id,
+        batch_id: selected.id || selected._id,
         produce_type: selected.produce_type,
         pickup_address: selected.harvest_location || prev.pickup_address,
         seller_id: selected.farmer_id || prev.seller_id,
+        requested_quantity_kg: prev.requested_quantity_kg || String(selected.available_quantity_kg || selected.harvested_quantity_kg || ''),
       }))
-    } else {
-      setForm(prev => ({ ...prev, batch_id: batchKey }))
     }
   }
+
+  // Handle initial batch passed via location state
+  useEffect(() => {
+    if (initialBatchId && batches.length > 0) {
+      handleBatchSelect(initialBatchId)
+    }
+  }, [initialBatchId, batches])
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -60,6 +78,12 @@ export default function OrderCreatePage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+
+    if (!form.seller_id) {
+      setError('Please select a verified seller/farmer.')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -95,9 +119,7 @@ export default function OrderCreatePage() {
         onClick={() => navigate('/purchase-orders')}
         className="text-xs font-mono text-cyan-400 hover:text-cyan-300 mb-6 flex items-center gap-2 transition-colors"
       >
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
+        <ArrowLeft className="w-3.5 h-3.5" />
         ORDERS_REGISTRY
       </button>
 
@@ -114,9 +136,7 @@ export default function OrderCreatePage() {
 
         {error && (
           <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-start gap-3">
-            <svg className="w-5 h-5 shrink-0 mt-0.5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-red-400" />
             <span>{error}</span>
           </div>
         )}
@@ -134,8 +154,8 @@ export default function OrderCreatePage() {
               >
                 <option value="">No specific batch (Open market)</option>
                 {batches.map(b => (
-                  <option key={b.batch_id} value={b.batch_id}>
-                    {b.batch_id} — {b.produce_type} ({b.harvest_location})
+                  <option key={b.id || b._id || b.batch_id} value={b.id || b._id}>
+                    {b.batch_id} — {b.produce_type} ({b.harvest_location || 'Field Origin'})
                   </option>
                 ))}
               </select>
@@ -164,17 +184,22 @@ export default function OrderCreatePage() {
 
           <div className="space-y-2">
             <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-              Seller Identifier (Farmer/Supplier ID) *
+              Seller / Producer (Farmer) *
             </label>
-            <input
-              type="text"
+            <select
               name="seller_id"
               required
               value={form.seller_id}
               onChange={handleChange}
-              placeholder="farmer1@agrichain.com"
-              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-            />
+              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+            >
+              <option value="">Select verified farmer...</option>
+              {farmers.map(f => (
+                <option key={f.id || f._id} value={f.id || f._id}>
+                  {f.full_name} ({f.email})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -207,7 +232,7 @@ export default function OrderCreatePage() {
                 name="unit_price_inr"
                 value={form.unit_price_inr}
                 onChange={handleChange}
-                placeholder="45.50"
+                placeholder="35.50"
                 className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
               />
             </div>
@@ -219,74 +244,72 @@ export default function OrderCreatePage() {
             </label>
             <input
               type="date"
-              name="preferred_delivery_date"
               required
+              name="preferred_delivery_date"
               value={form.preferred_delivery_date}
               onChange={handleChange}
               className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Pickup Address *
-              </label>
-              <textarea
-                rows={2}
-                name="pickup_address"
-                required
-                value={form.pickup_address}
-                onChange={handleChange}
-                placeholder="Farm Gate / Warehouse Pickup Location"
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono resize-none"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Destination Delivery Address *
-              </label>
-              <textarea
-                rows={2}
-                name="delivery_address"
-                required
-                value={form.delivery_address}
-                onChange={handleChange}
-                placeholder="Retail Hub / Processing Plant Address"
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono resize-none"
-              />
-            </div>
-          </div>
-
           <div className="space-y-2">
             <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-              Special Handling Instructions
+              Farm / Warehouse Pickup Address *
             </label>
             <input
               type="text"
-              name="handling_requirements"
-              value={form.handling_requirements}
+              required
+              name="pickup_address"
+              value={form.pickup_address}
               onChange={handleChange}
-              placeholder="Cold chain required, ventilated crates only..."
+              placeholder="e.g. Green Valley Farms, Sector 4, Nashik, MH"
               className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
             />
           </div>
 
-          <div className="flex gap-4 pt-4">
+          <div className="space-y-2">
+            <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
+              Buyer Destination Address *
+            </label>
+            <input
+              type="text"
+              required
+              name="delivery_address"
+              value={form.delivery_address}
+              onChange={handleChange}
+              placeholder="e.g. Central Produce Terminal, APMC Market, Vashi, Navi Mumbai"
+              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
+              Cold Chain & Handling Requirements
+            </label>
+            <textarea
+              name="handling_requirements"
+              rows={3}
+              value={form.handling_requirements}
+              onChange={handleChange}
+              placeholder="Reefer transit between 2°C - 4°C, ventilated plastic crates, max stack height 6 units"
+              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono resize-none"
+            />
+          </div>
+
+          <div className="pt-4 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => navigate('/purchase-orders')}
-              className="flex-1 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium text-sm transition-all"
+              className="px-6 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium text-sm transition-all"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-bold text-sm shadow-lg shadow-cyan-900/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-500/20 transition-all disabled:opacity-50"
             >
-              {loading ? 'Submitting Order...' : 'Submit Purchase Order'}
+              {loading ? 'Submitting Order...' : 'Generate Purchase Order'}
             </button>
           </div>
         </form>
@@ -294,4 +317,3 @@ export default function OrderCreatePage() {
     </div>
   )
 }
-
