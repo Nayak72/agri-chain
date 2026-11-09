@@ -7,7 +7,7 @@ from app.api.v1.endpoints.delivery import DeliveryReportCreate, DeliveryReportRe
 from app.api.v1.endpoints.freight_bookings import FreightBookingCreate
 from app.api.v1.endpoints.vehicles import VehicleCreate
 from app.api.v1.endpoints.drivers import DriverCreate
-from app.api.v1.endpoints.produce import ProduceCreate
+from app.api.v1.endpoints.produce import ProduceCreate, ProduceResponse
 from app.api.v1.endpoints.warehouses import WarehouseCreate
 from datetime import date, datetime, timezone
 
@@ -97,3 +97,17 @@ def test_produce_catalogue_schema():
     model = ProduceCreate(**payload)
     assert model.produce_type == "TOMATO"
     assert model.unit == "kg"
+
+    # Verify ProduceResponse handles legacy/seeded documents without timestamps
+    doc = {
+        "id": "6aeee6b2446b99c151122334",
+        "produce_type": "APPLE",
+        "name": "Apple",
+        "category": "FRUIT",
+        "unit": "kg",
+    }
+    resp = ProduceResponse(**doc)
+    assert resp.name == "Apple"
+    assert resp.is_active is True
+    assert resp.description is None
+    assert resp.created_at is None

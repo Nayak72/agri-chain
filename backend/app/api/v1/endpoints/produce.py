@@ -35,10 +35,10 @@ class ProduceResponse(BaseModel):
     name: str
     category: ProduceCategory
     unit: str
-    description: Optional[str]
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
+    description: Optional[str] = None
+    is_active: bool = True
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 
 @router.post("", response_model=ProduceResponse)
@@ -84,7 +84,18 @@ async def list_produce(
         query["$or"] = [{"name": {"$regex": re.escape(q), "$options": "i"}}, {"produce_type": {"$regex": re.escape(q.upper())}}]
     total = await db.produce_catalogue.count_documents(query)
     produce = await db.produce_catalogue.find(query).sort("name", 1).skip((page - 1) * page_size).limit(page_size).to_list(page_size)
-    return Page(items=[ProduceResponse(id=str(p["_id"]), **p) for p in produce], total=total, page=page, page_size=page_size, has_next=page * page_size < total)
+    items = []
+    now = datetime.now(timezone.utc)
+    for p in produce:
+        doc = dict(p)
+        doc_id = str(doc.pop("_id", doc.get("id", "")))
+        doc.pop("id", None)
+        doc.setdefault("created_at", now)
+        doc.setdefault("updated_at", now)
+        doc.setdefault("is_active", True)
+        doc.setdefault("description", None)
+        items.append(ProduceResponse(id=doc_id, **doc))
+    return Page(items=items, total=total, page=page, page_size=page_size, has_next=page * page_size < total)
 
 
 @router.get("/{produce_id}", response_model=ProduceResponse)
@@ -98,7 +109,15 @@ async def get_produce(
     if not produce:
         raise NotFoundError("Produce", produce_id)
     
-    return ProduceResponse(id=str(produce["_id"]), **produce)
+    doc = dict(produce)
+    doc_id = str(doc.pop("_id", doc.get("id", "")))
+    doc.pop("id", None)
+    now = datetime.now(timezone.utc)
+    doc.setdefault("created_at", now)
+    doc.setdefault("updated_at", now)
+    doc.setdefault("is_active", True)
+    doc.setdefault("description", None)
+    return ProduceResponse(id=doc_id, **doc)
 
 
 @router.patch("/{produce_id}", response_model=ProduceResponse)
@@ -127,5 +146,15 @@ async def update_produce(
     if result.matched_count == 0:
         raise NotFoundError("Produce", produce_id)
     
-    updated = await db.produce_catalogue.find_one({"_id": ObjectId(produce_id)})
-    return ProduceResponse(id=str(updated["_id"]), **updated)
+    updated = await db.produce_catalogue.find_one({"_id": existing["_id"]})
+    if not updated:
+        raise NotFoundError("Produce", produce_id)
+    doc = dict(updated)
+    doc_id = str(doc.pop("_id", doc.get("id", "")))
+    doc.pop("id", None)
+    now = datetime.now(timezone.utc)
+    doc.setdefault("created_at", now)
+    doc.setdefault("updated_at", now)
+    doc.setdefault("is_active", True)
+    doc.setdefault("description", None)
+    return ProduceResponse(id=doc_id, **doc)

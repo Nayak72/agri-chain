@@ -25,6 +25,6 @@ class ProduceUpdate(BaseModel):
 
 
 class ProduceResponse(BaseSchema, ProduceBase):
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
+    is_active: bool = True
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

@@ -1,12 +1,6 @@
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from app.core.constants import (
-    UserRole, ProduceCategory, ProduceType, QualityGrade, BatchStatus,
-    WarehouseReceiptStatus, InspectionResult, InventoryStatus,
-    PurchaseOrderStatus, FreightBookingStatus, VehicleCategory, VehicleType,
-    VehicleStatus, DriverStatus, ShipmentStatus, SensorScenario, SensorStatus,
-    AlertSeverity, AlertStatus, DeliveryStatus, DamageClaimStatus,
-    LedgerEventType
-)
+from datetime import datetime, timezone
+from app.core.constants import UserRole
 import logging
 
 logger = logging.getLogger(__name__)
@@ -318,13 +312,26 @@ async def seed_produce_catalogue(db: AsyncIOMotorDatabase) -> None:
         {"produce_type": "PINEAPPLE", "name": "Pineapple", "category": "FRUIT", "unit": "kg", "description": "Fresh pineapple"},
     ]
     
+    now = datetime.now(timezone.utc)
     for produce in vegetables + fruits:
-        produce["is_active"] = True
+        doc = dict(produce)
+        doc["is_active"] = True
+        doc["created_at"] = now
+        doc["updated_at"] = now
         await db.produce_catalogue.update_one(
-            {"produce_type": produce["produce_type"]},
-            {"$setOnInsert": produce},
+            {"produce_type": doc["produce_type"]},
+            {"$setOnInsert": doc},
             upsert=True
         )
+    
+    await db.produce_catalogue.update_many(
+        {"$or": [{"created_at": {"$exists": False}}, {"created_at": None}]},
+        {"$set": {"created_at": now, "updated_at": now, "is_active": True}}
+    )
+    await db.produce_catalogue.update_many(
+        {"$or": [{"updated_at": {"$exists": False}}, {"updated_at": None}]},
+        {"$set": {"updated_at": now}}
+    )
 
 
 async def seed_handling_profiles(db: AsyncIOMotorDatabase) -> None:

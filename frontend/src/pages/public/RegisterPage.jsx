@@ -60,7 +60,7 @@ const ROLE_OPTIONS = [
 
 export default function RegisterPage() {
   const navigate = useNavigate()
-  const { register } = useAuth()
+  const { register, isAuthenticated } = useAuth()
 
   const [formData, setFormData] = useState({
     full_name: '',
