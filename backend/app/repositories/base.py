@@ -16,7 +16,7 @@ class BaseRepository:
         self.db = database
 
     def _collection(self):
-        database = self.db or get_database()
+        database = self.db if self.db is not None else get_database()
         return database[self.collection]
 
     async def get_by_any_id(self, id_or_business_id: str, session=None) -> dict[str, Any] | None:

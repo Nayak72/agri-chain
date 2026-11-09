@@ -111,3 +111,26 @@ def test_produce_catalogue_schema():
     assert resp.is_active is True
     assert resp.description is None
     assert resp.created_at is None
+
+
+@pytest.mark.asyncio
+async def test_base_repository_database_truth_check_safe():
+    """Verify BaseRepository does not perform truth-value testing on database instances."""
+    from unittest.mock import MagicMock
+    from app.repositories.base import BaseRepository
+
+    class MockMongoDatabase:
+        def __getitem__(self, name):
+            mock_col = MagicMock()
+            mock_col.find_one = MagicMock()
+            return mock_col
+
+        def __bool__(self):
+            raise NotImplementedError("Database objects do not implement truth value testing or bool().")
+
+    mock_db = MockMongoDatabase()
+    repo = BaseRepository(database=mock_db)
+    repo.collection = "test_col"
+
+    col = repo._collection()
+    assert col is not None
