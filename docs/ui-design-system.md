@@ -172,3 +172,4 @@ The design system incorporates three distinct typography families:
    - Table rows feature alternating hover wash (`hover:bg-stone-50/80`).
    - Monospace font is strictly maintained for identifiers, weights, currencies, timestamps, and hashes.
    - Column headers are displayed in uppercase micro type (`text-[11px] font-semibold text-stone-500 bg-stone-50/75`).
+
