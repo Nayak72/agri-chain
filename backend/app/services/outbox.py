@@ -137,3 +137,4 @@ async def process_outbox_events(
             )
 
     return processed_count
+
