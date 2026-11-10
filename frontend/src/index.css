@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-forest: #244634;
+  --color-ivory: #F6F4EC;
+  --color-surface: #FFFFFF;
+  --color-surface-muted: #F0EDE2;
+  --color-border: #E5E3D9;
+  --color-ink-primary: #26312A;
+  --color-ink-muted: #70786F;
+  --color-terracotta: #C88765;
+  --color-harvest: #D8BC8D;
+  --color-sage: #91A68C;
+  --color-slate-industrial: #46565D;
+}
+
 @layer base {
   *, *::before, *::after {
     box-sizing: border-box;
@@ -12,8 +26,8 @@
   }
 
   body {
-    @apply bg-[#030712] text-slate-200 font-sans antialiased;
-    @apply selection:bg-cyan-500/30 selection:text-cyan-200;
+    @apply bg-[#F6F4EC] text-[#26312A] font-sans antialiased;
+    @apply selection:bg-[#244634]/20 selection:text-[#244634];
     margin: 0;
     padding: 0;
   }

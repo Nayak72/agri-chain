@@ -4,22 +4,29 @@ import {
   Package,
   Warehouse,
   ClipboardCheck,
-  TrendingDown,
-  ArrowRightLeft,
-  Plus,
   Scale,
+  RefreshCw,
+  Plus,
+  ArrowRightLeft,
+  X,
+  AlertCircle,
   CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  FileText,
-  Clock,
-  Layers,
-  ShieldCheck
+  AlertTriangle
 } from 'lucide-react'
 import { inventoryApi, warehousesApi, batchesApi } from '../../api/agriculture.api'
 import { useAuth } from '../../context/AuthContext'
 import { ROLES, normalizeRole } from '../../constants/roles'
 import { formatWeight, formatDate, formatDateTime, getStatusColor, formatStatus, getApiError } from '../../utils'
+import { PageHeader } from '../../components/common/PageHeader'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Select } from '../../components/ui/select'
+import { Textarea } from '../../components/ui/textarea'
+import { Badge } from '../../components/ui/badge'
+import { Card, CardContent } from '../../components/ui/card'
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/ui/table'
+import { StatusBadge } from '../../components/common/StatusBadge'
+import { EmptyState } from '../../components/common/EmptyState'
 
 export default function InventoryPage() {
   const queryClient = useQueryClient()
@@ -92,7 +99,7 @@ export default function InventoryPage() {
   const batchList = Array.isArray(batchesData) ? batchesData : batchesData?.items || []
 
   // Inventory query
-  const { data: inventoryData, isLoading, refetch } = useQuery({
+  const { data: inventoryData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['inventory', selectedWarehouse],
     queryFn: () => inventoryApi.list(selectedWarehouse ? { warehouse_id: selectedWarehouse } : {}).then(res => res.data),
     staleTime: 20_000,
@@ -292,130 +299,130 @@ export default function InventoryPage() {
     const diffDays = Math.ceil((new Date(shelfLifeEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     if (diffDays <= 3) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-red-500/10 border border-red-500/30 text-red-400">
-          <span className="w-1 h-1 rounded-full bg-red-400 animate-ping"></span>
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono bg-red-50 border border-red-200 text-red-700 font-semibold">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
           EXPIRING ({diffDays}d)
         </span>
       )
     }
     if (diffDays <= 7) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 border border-amber-500/30 text-amber-400">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono bg-amber-50 border border-amber-200 text-amber-800 font-medium">
           FEFO PRIORITY ({diffDays}d)
         </span>
       )
     }
     return (
-      <span className="text-[10px] font-mono text-slate-500">
+      <span className="text-[11px] font-mono text-[#526357]">
         {diffDays}d shelf life
       </span>
     )
   }
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-4 lg:px-8 py-10 animate-fade-in-up">
+    <div className="space-y-6 animate-fade-in-up">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="flex h-2 w-2 rounded-full bg-cyan-500"></span>
-            <span className="text-xs font-mono font-medium text-cyan-500 uppercase tracking-widest">
-              FEFO Inventory & Receiving Hub
-            </span>
+      <PageHeader
+        eyebrow="FEFO Inventory & Receiving Hub"
+        title="Warehouse Inventory"
+        description="Intake harvest produce, reconcile weight distributions, log quality grading, and manage FEFO stock allocation."
+        actions={
+          <div className="flex items-center gap-2.5">
+            {isManagerOrAdmin && (
+              <>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setReceiptForm(prev => ({
+                      ...prev,
+                      warehouse_id: selectedWarehouse || (warehouseList[0]?.id || warehouseList[0]?._id || ''),
+                    }))
+                    setShowReceiptModal(true)
+                  }}
+                  className="gap-1.5 bg-[#244634] hover:bg-[#1A3326] text-white shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Receive Harvest Batch</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowInspectionModal(true)}
+                  className="gap-1.5 bg-white border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
+                >
+                  <ClipboardCheck className="w-4 h-4 text-[#3F7C56]" />
+                  <span>Log Inspection</span>
+                </Button>
+              </>
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="gap-2 bg-white/80 border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+              <span>Sync</span>
+            </Button>
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">
-            Warehouse <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Inventory</span>
-          </h1>
-          <p className="text-slate-400 mt-2 max-w-xl text-sm">
-            Intake harvest produce, reconcile weight distributions, log quality grading, and manage FEFO stock allocation.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {isManagerOrAdmin && (
-            <>
-              <button
-                onClick={() => {
-                  setReceiptForm(prev => ({
-                    ...prev,
-                    warehouse_id: selectedWarehouse || (warehouseList[0]?.id || warehouseList[0]?._id || ''),
-                  }))
-                  setShowReceiptModal(true)
-                }}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 hover:from-cyan-300 hover:to-emerald-300 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-md shadow-cyan-500/20 transition-all"
-              >
-                <Plus className="w-4 h-4" /> Receive Harvest Batch
-              </button>
-
-              <button
-                onClick={() => setShowInspectionModal(true)}
-                className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-600 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
-              >
-                <ClipboardCheck className="w-4 h-4 text-emerald-400" /> Log Inspection
-              </button>
-            </>
-          )}
-
-          <button
-            onClick={() => refetch()}
-            className="px-4 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white transition-all text-xs font-mono flex items-center gap-2"
-          >
-            Sync
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Tabs and Warehouse filter */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <div className="flex gap-2 p-1 rounded-xl bg-slate-900 border border-slate-800">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-white border border-[#E1DDD0]">
           <button
             onClick={() => setActiveTab('stock')}
-            className={`px-4 py-2 rounded-lg text-xs font-mono font-semibold transition-all ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all ${
               activeTab === 'stock'
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-[#244634] text-white shadow-xs'
+                : 'text-[#526357] hover:text-[#26312A] hover:bg-[#F2EFE7]'
             }`}
           >
             ACTIVE STOCK (FEFO)
           </button>
           <button
             onClick={() => setActiveTab('receipts')}
-            className={`px-4 py-2 rounded-lg text-xs font-mono font-semibold transition-all ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all ${
               activeTab === 'receipts'
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-[#244634] text-white shadow-xs'
+                : 'text-[#526357] hover:text-[#26312A] hover:bg-[#F2EFE7]'
             }`}
           >
             WAREHOUSE RECEIPTS
           </button>
           <button
             onClick={() => setActiveTab('inspections')}
-            className={`px-4 py-2 rounded-lg text-xs font-mono font-semibold transition-all ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all ${
               activeTab === 'inspections'
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-[#244634] text-white shadow-xs'
+                : 'text-[#526357] hover:text-[#26312A] hover:bg-[#F2EFE7]'
             }`}
           >
             QUALITY INSPECTIONS
           </button>
           <button
             onClick={() => setActiveTab('movements')}
-            className={`px-4 py-2 rounded-lg text-xs font-mono font-semibold transition-all ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all ${
               activeTab === 'movements'
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-[#244634] text-white shadow-xs'
+                : 'text-[#526357] hover:text-[#26312A] hover:bg-[#F2EFE7]'
             }`}
           >
             MOVEMENT HISTORY
           </button>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-mono text-slate-500 uppercase">Warehouse:</span>
-          <select
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono text-[#526357] uppercase font-semibold">Warehouse:</span>
+          <Select
             value={selectedWarehouse}
             onChange={(e) => setSelectedWarehouse(e.target.value)}
-            className="bg-[#0b1121] border border-slate-800 rounded-xl px-4 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+            className="bg-white border-[#E1DDD0] text-xs font-mono w-56 focus-visible:ring-[#244634]"
           >
             <option value="">All Storage Nodes</option>
             {warehouseList.map((wh) => (
@@ -423,638 +430,647 @@ export default function InventoryPage() {
                 {wh.name} ({wh.city})
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
 
       {/* TAB 1: Active Stock Table (FEFO) */}
       {activeTab === 'stock' && (
-        <div className="bg-[#0b1121] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+        <Card className="bg-white/95 border-[#E1DDD0] overflow-hidden shadow-xs">
           {isLoading ? (
-            <div className="p-16 text-center text-slate-500 font-mono text-sm animate-pulse">
+            <div className="p-16 text-center text-[#526357] font-mono text-xs animate-pulse">
               Querying distributed inventory nodes...
             </div>
           ) : sortedItems.length === 0 ? (
-            <div className="p-16 text-center">
-              <Package className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <h3 className="text-white font-semibold text-base">No Stock Found</h3>
-              <p className="text-slate-400 text-xs mt-1">
-                {selectedWarehouse ? 'This warehouse has no active inventory.' : 'Receive a harvest batch to establish stock.'}
-              </p>
-            </div>
+            <EmptyState
+              icon={Package}
+              title="No Stock Found"
+              description={selectedWarehouse ? 'This warehouse has no active inventory.' : 'Receive a harvest batch to establish stock.'}
+            />
           ) : (
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 uppercase text-[11px]">
-                <tr>
-                  <th className="py-3 px-4">Batch / Produce</th>
-                  <th className="py-3 px-4">Storage Bay</th>
-                  <th className="py-3 px-4">Quality Grade</th>
-                  <th className="py-3 px-4">Available (KG)</th>
-                  <th className="py-3 px-4">Reserved</th>
-                  <th className="py-3 px-4">FEFO Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+            <Table>
+              <TableHeader className="bg-[#F2EFE7]/60">
+                <TableRow className="border-[#ECE7DA]">
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E] py-3.5">Batch / Produce</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Storage Bay</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Quality Grade</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Available (KG)</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Reserved</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">FEFO Status</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E] text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-[#ECE7DA] font-mono text-xs">
                 {sortedItems.map((item) => (
-                  <tr key={item.id || item._id} className="hover:bg-slate-900/40 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="font-bold text-white">{item.produce_type}</div>
-                      <div className="text-[10px] text-slate-500">{item.batch_id}</div>
-                    </td>
-                    <td className="py-3 px-4 text-cyan-400 font-semibold">{item.storage_location || 'Bay 1'}</td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                  <TableRow key={item.id || item._id} className="hover:bg-[#F2EFE7]/40 transition-colors border-[#ECE7DA]">
+                    <TableCell className="py-3.5">
+                      <div className="font-bold text-[#1B2A20] font-sans">{item.produce_type}</div>
+                      <div className="text-[10px] text-[#7A887E]">{item.batch_id}</div>
+                    </TableCell>
+                    <TableCell className="text-[#244634] font-semibold">{item.storage_location || 'Bay 1'}</TableCell>
+                    <TableCell>
+                      <span className="px-2 py-0.5 rounded bg-[#E8EFE9] text-[#244634] text-[10px] font-semibold border border-[#C3D4C7]">
                         {item.quality_grade || 'GRADE_A'}
                       </span>
-                    </td>
-                    <td className="py-3 px-4 font-bold text-white">{formatWeight(item.quantity_kg)}</td>
-                    <td className="py-3 px-4 text-slate-400">{formatWeight(item.reserved_quantity_kg || 0)}</td>
-                    <td className="py-3 px-4">{getFefoBadge(item.estimated_shelf_life_end)}</td>
-                    <td className="py-3 px-4 text-right">
+                    </TableCell>
+                    <TableCell className="font-bold text-[#244634]">{formatWeight(item.quantity_kg)}</TableCell>
+                    <TableCell className="text-[#526357]">{formatWeight(item.reserved_quantity_kg || 0)}</TableCell>
+                    <TableCell>{getFefoBadge(item.estimated_shelf_life_end)}</TableCell>
+                    <TableCell className="text-right">
                       {isManagerOrAdmin && (
-                        <button
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleOpenMovement(item)}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs font-semibold"
+                          className="text-xs font-mono text-[#244634] border-[#C3D4C7] hover:bg-[#E8EFE9] h-7 px-2.5"
                         >
                           Transfer
-                        </button>
+                        </Button>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           )}
-        </div>
+        </Card>
       )}
 
       {/* TAB 2: Warehouse Receipts */}
       {activeTab === 'receipts' && (
-        <div className="bg-[#0b1121] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+        <Card className="bg-white/95 border-[#E1DDD0] overflow-hidden shadow-xs">
           {receiptsLoading ? (
-            <div className="p-16 text-center text-slate-500 font-mono text-sm animate-pulse">
+            <div className="p-16 text-center text-[#526357] font-mono text-xs animate-pulse">
               Querying warehouse intake records...
             </div>
           ) : receiptsList.length === 0 ? (
-            <div className="p-16 text-center">
-              <Warehouse className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <h3 className="text-white font-semibold text-base">No Warehouse Receipts</h3>
-              <p className="text-slate-400 text-xs mt-1">
-                Receive a harvest batch to generate intake receipts with exact weight reconciliation.
-              </p>
-            </div>
+            <EmptyState
+              icon={Warehouse}
+              title="No Warehouse Receipts"
+              description="Receive a harvest batch to generate intake receipts with exact weight reconciliation."
+            />
           ) : (
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 uppercase text-[11px]">
-                <tr>
-                  <th className="py-3 px-4">Receipt ID</th>
-                  <th className="py-3 px-4">Batch Reference</th>
-                  <th className="py-3 px-4">Received Wt</th>
-                  <th className="py-3 px-4">Accepted Wt</th>
-                  <th className="py-3 px-4">Damaged / Rejected</th>
-                  <th className="py-3 px-4">Grade</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Received Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+            <Table>
+              <TableHeader className="bg-[#F2EFE7]/60">
+                <TableRow className="border-[#ECE7DA]">
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E] py-3.5">Receipt ID</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Batch Reference</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Received Wt</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Accepted Wt</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Damaged / Rejected</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Grade</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Status</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Received Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-[#ECE7DA] font-mono text-xs">
                 {receiptsList.map((r) => (
-                  <tr key={r.id || r._id} className="hover:bg-slate-900/40 transition-colors">
-                    <td className="py-3 px-4 font-bold text-cyan-400">{r.receipt_id}</td>
-                    <td className="py-3 px-4 text-slate-300">{r.batch_id}</td>
-                    <td className="py-3 px-4 font-bold text-white">{formatWeight(r.received_weight_kg)}</td>
-                    <td className="py-3 px-4 text-emerald-400 font-semibold">{formatWeight(r.accepted_weight_kg)}</td>
-                    <td className="py-3 px-4 text-slate-400">
+                  <TableRow key={r.id || r._id} className="hover:bg-[#F2EFE7]/40 transition-colors border-[#ECE7DA]">
+                    <TableCell className="font-bold text-[#244634] py-3.5">{r.receipt_id}</TableCell>
+                    <TableCell className="text-[#26312A]">{r.batch_id}</TableCell>
+                    <TableCell className="font-bold text-[#1B2A20]">{formatWeight(r.received_weight_kg)}</TableCell>
+                    <TableCell className="text-[#244634] font-semibold">{formatWeight(r.accepted_weight_kg)}</TableCell>
+                    <TableCell className="text-[#526357]">
                       {formatWeight(r.damaged_weight_kg || 0)} / {formatWeight(r.rejected_weight_kg || 0)}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                    </TableCell>
+                    <TableCell>
+                      <span className="px-2 py-0.5 rounded bg-[#F2EFE7] text-[#26312A] text-[10px] font-semibold">
                         {r.quality_grade}
                       </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-0.5 rounded ${getStatusColor(r.status)}`}>
-                        {formatStatus(r.status)}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-slate-500">
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={r.status} />
+                    </TableCell>
+                    <TableCell className="text-[#7A887E]">
                       {r.receiving_date ? formatDateTime(r.receiving_date) : 'N/A'}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           )}
-        </div>
+        </Card>
       )}
 
       {/* TAB 3: Quality Inspections */}
       {activeTab === 'inspections' && (
-        <div className="bg-[#0b1121] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+        <Card className="bg-white/95 border-[#E1DDD0] overflow-hidden shadow-xs">
           {inspectionsLoading ? (
-            <div className="p-16 text-center text-slate-500 font-mono text-sm animate-pulse">
+            <div className="p-16 text-center text-[#526357] font-mono text-xs animate-pulse">
               Querying quality inspection records...
             </div>
           ) : inspectionsList.length === 0 ? (
-            <div className="p-16 text-center">
-              <ClipboardCheck className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <h3 className="text-white font-semibold text-base">No Quality Inspections Logged</h3>
-              <p className="text-slate-400 text-xs mt-1">
-                Conduct quality grading on intake receipts to evaluate visual quality, uniformity, and defect %.
-              </p>
-            </div>
+            <EmptyState
+              icon={ClipboardCheck}
+              title="No Quality Inspections Logged"
+              description="Conduct quality grading on intake receipts to evaluate visual quality, uniformity, and defect %."
+            />
           ) : (
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 uppercase text-[11px]">
-                <tr>
-                  <th className="py-3 px-4">Inspection ID</th>
-                  <th className="py-3 px-4">Receipt Ref</th>
-                  <th className="py-3 px-4">Visual Score</th>
-                  <th className="py-3 px-4">Uniformity</th>
-                  <th className="py-3 px-4">Defect %</th>
-                  <th className="py-3 px-4">Result</th>
-                  <th className="py-3 px-4">Assigned Grade</th>
-                  <th className="py-3 px-4">Inspection Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+            <Table>
+              <TableHeader className="bg-[#F2EFE7]/60">
+                <TableRow className="border-[#ECE7DA]">
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E] py-3.5">Inspection ID</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Receipt Ref</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Visual Score</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Uniformity</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Defect %</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Result</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Assigned Grade</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Inspection Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-[#ECE7DA] font-mono text-xs">
                 {inspectionsList.map((insp) => (
-                  <tr key={insp.id || insp._id} className="hover:bg-slate-900/40 transition-colors">
-                    <td className="py-3 px-4 font-bold text-cyan-400">{insp.inspection_id}</td>
-                    <td className="py-3 px-4 text-slate-300">{insp.receipt_id}</td>
-                    <td className="py-3 px-4 font-semibold text-white">{insp.visual_quality_score} / 100</td>
-                    <td className="py-3 px-4 text-slate-300">{insp.size_uniformity_score} / 100</td>
-                    <td className="py-3 px-4 text-amber-400 font-semibold">{insp.defect_percentage}%</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-0.5 rounded ${insp.result === 'PASSED' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                  <TableRow key={insp.id || insp._id} className="hover:bg-[#F2EFE7]/40 transition-colors border-[#ECE7DA]">
+                    <TableCell className="font-bold text-[#244634] py-3.5">{insp.inspection_id}</TableCell>
+                    <TableCell className="text-[#26312A]">{insp.receipt_id}</TableCell>
+                    <TableCell className="font-semibold text-[#1B2A20]">{insp.visual_quality_score} / 100</TableCell>
+                    <TableCell className="text-[#526357]">{insp.size_uniformity_score} / 100</TableCell>
+                    <TableCell className="text-[#B36B21] font-semibold">{insp.defect_percentage}%</TableCell>
+                    <TableCell>
+                      <Badge variant={insp.result === 'PASSED' ? 'success' : 'danger'} size="sm">
                         {insp.result}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-cyan-300 font-bold">{insp.quality_grade}</td>
-                    <td className="py-3 px-4 text-slate-500">
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-[#244634] font-bold">{insp.quality_grade}</TableCell>
+                    <TableCell className="text-[#7A887E]">
                       {insp.inspection_date ? formatDateTime(insp.inspection_date) : 'N/A'}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           )}
-        </div>
+        </Card>
       )}
 
       {/* TAB 4: Movement History */}
       {activeTab === 'movements' && (
-        <div className="bg-[#0b1121] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+        <Card className="bg-white/95 border-[#E1DDD0] overflow-hidden shadow-xs">
           {movementsLoading ? (
-            <div className="p-16 text-center text-slate-500 font-mono text-sm animate-pulse">
+            <div className="p-16 text-center text-[#526357] font-mono text-xs animate-pulse">
               Querying ledger movements...
             </div>
           ) : movements.length === 0 ? (
-            <div className="p-16 text-center text-slate-500 font-mono text-sm">
+            <div className="p-16 text-center text-[#7A887E] font-mono text-xs">
               No stock movements recorded yet.
             </div>
           ) : (
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 uppercase text-[11px]">
-                <tr>
-                  <th className="py-3 px-4">Movement ID</th>
-                  <th className="py-3 px-4">Type</th>
-                  <th className="py-3 px-4">Quantity (KG)</th>
-                  <th className="py-3 px-4">Reference</th>
-                  <th className="py-3 px-4">Timestamp</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+            <Table>
+              <TableHeader className="bg-[#F2EFE7]/60">
+                <TableRow className="border-[#ECE7DA]">
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E] py-3.5">Movement ID</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Type</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Quantity (KG)</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Reference</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Timestamp</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-[#ECE7DA] font-mono text-xs">
                 {movements.map((m) => (
-                  <tr key={m.id || m._id} className="hover:bg-slate-900/40">
-                    <td className="py-3 px-4 font-bold text-white">{m.movement_id}</td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400">
+                  <TableRow key={m.id || m._id} className="hover:bg-[#F2EFE7]/40 border-[#ECE7DA]">
+                    <TableCell className="font-bold text-[#1B2A20] py-3.5">{m.movement_id}</TableCell>
+                    <TableCell>
+                      <Badge variant="sage" size="sm" className="font-mono text-[10px]">
                         {m.movement_type}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 font-semibold text-white">{formatWeight(m.quantity_kg)}</td>
-                    <td className="py-3 px-4 text-slate-400">{m.reference_id || '—'}</td>
-                    <td className="py-3 px-4 text-slate-500">{m.created_at ? formatDateTime(m.created_at) : 'N/A'}</td>
-                  </tr>
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-semibold text-[#244634]">{formatWeight(m.quantity_kg)}</TableCell>
+                    <TableCell className="text-[#526357]">{m.reference_id || '—'}</TableCell>
+                    <TableCell className="text-[#7A887E]">{m.created_at ? formatDateTime(m.created_at) : 'N/A'}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           )}
-        </div>
+        </Card>
       )}
 
       {/* Modal 1: Receive Harvest Batch */}
       {showReceiptModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 bg-[#1B2A20]/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <Card className="bg-white border-[#E1DDD0] max-w-xl w-full shadow-2xl space-y-4 my-8">
+            <div className="flex items-center justify-between p-6 pb-3 border-b border-[#ECE7DA]">
               <div className="flex items-center gap-2">
-                <Warehouse className="w-5 h-5 text-cyan-400" />
-                <h3 className="text-base font-bold text-white">Receive Harvest Batch at Warehouse</h3>
+                <Warehouse className="w-5 h-5 text-[#244634]" />
+                <h3 className="text-base font-serif font-bold text-[#1B2A20]">Receive Harvest Batch at Warehouse</h3>
               </div>
-              <button onClick={() => setShowReceiptModal(false)} className="text-slate-400 hover:text-white">✕</button>
+              <button onClick={() => setShowReceiptModal(false)} className="text-[#7A887E] hover:text-[#26312A]">
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {receiptError && (
-              <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs font-mono">
-                {receiptError}
-              </div>
-            )}
-
-            <form onSubmit={handleReceiptSubmit} className="space-y-4 text-xs font-mono">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-slate-400 uppercase block mb-1">Target Warehouse *</label>
-                  <select
-                    required
-                    value={receiptForm.warehouse_id}
-                    onChange={(e) => setReceiptForm({ ...receiptForm, warehouse_id: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                  >
-                    <option value="">Select Warehouse</option>
-                    {warehouseList.map((wh) => (
-                      <option key={wh.id || wh._id} value={wh.id || wh._id}>
-                        {wh.name} ({wh.city})
-                      </option>
-                    ))}
-                  </select>
+            <div className="px-6 pb-6">
+              {receiptError && (
+                <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-mono flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
+                  <span>{receiptError}</span>
                 </div>
+              )}
 
-                <div>
-                  <label className="text-slate-400 uppercase block mb-1">Harvest Batch *</label>
-                  <select
-                    required
-                    value={receiptForm.batch_id}
-                    onChange={(e) => {
-                      const bId = e.target.value
-                      const b = batchList.find(item => (item.id || item._id) === bId)
-                      setReceiptForm({
-                        ...receiptForm,
-                        batch_id: bId,
-                        farmer_id: b?.farmer_id || receiptForm.farmer_id,
-                        received_weight_kg: b?.harvested_quantity_kg ? String(b.harvested_quantity_kg) : receiptForm.received_weight_kg,
-                        accepted_weight_kg: b?.harvested_quantity_kg ? String(b.harvested_quantity_kg) : receiptForm.accepted_weight_kg,
-                        quality_grade: b?.quality_grade || receiptForm.quality_grade,
-                      })
-                    }}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                  >
-                    <option value="">Select Harvested Batch</option>
-                    {batchList.map((b) => (
-                      <option key={b.id || b._id} value={b.id || b._id}>
-                        {b.batch_id} — {b.produce_type} ({b.harvested_quantity_kg} kg)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Exact Weight Reconciliation Section */}
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <Scale className="w-4 h-4 text-cyan-400" /> Exact Weight Reconciliation
-                  </span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
-                    isWeightBalanced
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                      : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                  }`}>
-                    {isWeightBalanced ? 'BALANCED (Sum Matches)' : 'UNBALANCED'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="text-slate-400 block mb-1">Received Wt (kg)*</label>
-                    <input
-                      type="number"
-                      step="0.1"
+              <form onSubmit={handleReceiptSubmit} className="space-y-4 text-xs font-mono">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[#526357] uppercase font-semibold block">Target Warehouse *</label>
+                    <Select
                       required
-                      value={receiptForm.received_weight_kg}
-                      onChange={(e) => setReceiptForm({ ...receiptForm, received_weight_kg: e.target.value })}
-                      placeholder="e.g. 5000"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-bold"
-                    />
+                      value={receiptForm.warehouse_id}
+                      onChange={(e) => setReceiptForm({ ...receiptForm, warehouse_id: e.target.value })}
+                      className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                    >
+                      <option value="">Select Warehouse</option>
+                      {warehouseList.map((wh) => (
+                        <option key={wh.id || wh._id} value={wh.id || wh._id}>
+                          {wh.name} ({wh.city})
+                        </option>
+                      ))}
+                    </Select>
                   </div>
 
-                  <div>
-                    <label className="text-slate-400 block mb-1">Accepted (kg)*</label>
-                    <input
-                      type="number"
-                      step="0.1"
+                  <div className="space-y-1">
+                    <label className="text-[#526357] uppercase font-semibold block">Harvest Batch *</label>
+                    <Select
                       required
-                      value={receiptForm.accepted_weight_kg}
-                      onChange={(e) => setReceiptForm({ ...receiptForm, accepted_weight_kg: e.target.value })}
-                      placeholder="e.g. 4800"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-emerald-400 font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-slate-400 block mb-1">Damaged (kg)*</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      required
-                      value={receiptForm.damaged_weight_kg}
-                      onChange={(e) => setReceiptForm({ ...receiptForm, damaged_weight_kg: e.target.value })}
-                      placeholder="0"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-amber-400 font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-slate-400 block mb-1">Rejected (kg)*</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      required
-                      value={receiptForm.rejected_weight_kg}
-                      onChange={(e) => setReceiptForm({ ...receiptForm, rejected_weight_kg: e.target.value })}
-                      placeholder="0"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-red-400 font-bold"
-                    />
+                      value={receiptForm.batch_id}
+                      onChange={(e) => {
+                        const bId = e.target.value
+                        const b = batchList.find(item => (item.id || item._id) === bId)
+                        setReceiptForm({
+                          ...receiptForm,
+                          batch_id: bId,
+                          farmer_id: b?.farmer_id || receiptForm.farmer_id,
+                          received_weight_kg: b?.harvested_quantity_kg ? String(b.harvested_quantity_kg) : receiptForm.received_weight_kg,
+                          accepted_weight_kg: b?.harvested_quantity_kg ? String(b.harvested_quantity_kg) : receiptForm.accepted_weight_kg,
+                          quality_grade: b?.quality_grade || receiptForm.quality_grade,
+                        })
+                      }}
+                      className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                    >
+                      <option value="">Select Harvested Batch</option>
+                      {batchList.map((b) => (
+                        <option key={b.id || b._id} value={b.id || b._id}>
+                          {b.batch_id} — {b.produce_type} ({b.harvested_quantity_kg} kg)
+                        </option>
+                      ))}
+                    </Select>
                   </div>
                 </div>
 
-                <div className="text-[11px] text-slate-400 flex justify-between pt-1 border-t border-slate-800">
-                  <span>Reconciliation Formula:</span>
-                  <span className={isWeightBalanced ? 'text-emerald-400 font-bold' : 'text-amber-400'}>
-                    {receivedKg} kg = {acceptedKg} + {damagedKg} + {rejectedKg} ({totalSum} kg)
-                  </span>
-                </div>
-              </div>
+                {/* Exact Weight Reconciliation Section */}
+                <div className="p-4 rounded-xl bg-[#F2EFE7]/60 border border-[#ECE7DA] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#1B2A20] flex items-center gap-1.5">
+                      <Scale className="w-4 h-4 text-[#244634]" /> Exact Weight Reconciliation
+                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                      isWeightBalanced
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        : 'bg-amber-50 text-amber-800 border border-amber-200'
+                    }`}>
+                      {isWeightBalanced ? 'BALANCED (Sum Matches)' : 'UNBALANCED'}
+                    </span>
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Storage Location *</label>
-                  <input
-                    type="text"
-                    required
-                    value={receiptForm.storage_location}
-                    onChange={(e) => setReceiptForm({ ...receiptForm, storage_location: e.target.value })}
-                    placeholder="Bay A-1"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
-                  />
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[#526357] block">Received Wt (kg)*</label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        required
+                        value={receiptForm.received_weight_kg}
+                        onChange={(e) => setReceiptForm({ ...receiptForm, received_weight_kg: e.target.value })}
+                        placeholder="e.g. 5000"
+                        className="bg-white border-[#E1DDD0] font-bold text-[#1B2A20] focus-visible:ring-[#244634]"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[#526357] block">Accepted (kg)*</label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        required
+                        value={receiptForm.accepted_weight_kg}
+                        onChange={(e) => setReceiptForm({ ...receiptForm, accepted_weight_kg: e.target.value })}
+                        placeholder="e.g. 4800"
+                        className="bg-white border-[#E1DDD0] font-bold text-[#244634] focus-visible:ring-[#244634]"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[#526357] block">Damaged (kg)*</label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        required
+                        value={receiptForm.damaged_weight_kg}
+                        onChange={(e) => setReceiptForm({ ...receiptForm, damaged_weight_kg: e.target.value })}
+                        placeholder="0"
+                        className="bg-white border-[#E1DDD0] font-bold text-[#B36B21] focus-visible:ring-[#244634]"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[#526357] block">Rejected (kg)*</label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        required
+                        value={receiptForm.rejected_weight_kg}
+                        onChange={(e) => setReceiptForm({ ...receiptForm, rejected_weight_kg: e.target.value })}
+                        placeholder="0"
+                        className="bg-white border-[#E1DDD0] font-bold text-[#9E3A2B] focus-visible:ring-[#244634]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-[#526357] flex justify-between pt-1 border-t border-[#ECE7DA]">
+                    <span>Reconciliation Formula:</span>
+                    <span className={isWeightBalanced ? 'text-[#244634] font-bold' : 'text-[#B36B21]'}>
+                      {receivedKg} kg = {acceptedKg} + {damagedKg} + {rejectedKg} ({totalSum} kg)
+                    </span>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="text-slate-400 block mb-1">Initial Grade *</label>
-                  <select
-                    value={receiptForm.quality_grade}
-                    onChange={(e) => setReceiptForm({ ...receiptForm, quality_grade: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[#526357] block font-semibold">Storage Location *</label>
+                    <Input
+                      type="text"
+                      required
+                      value={receiptForm.storage_location}
+                      onChange={(e) => setReceiptForm({ ...receiptForm, storage_location: e.target.value })}
+                      placeholder="Bay A-1"
+                      className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[#526357] block font-semibold">Initial Grade *</label>
+                    <Select
+                      value={receiptForm.quality_grade}
+                      onChange={(e) => setReceiptForm({ ...receiptForm, quality_grade: e.target.value })}
+                      className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                    >
+                      <option value="GRADE_A">GRADE_A (Premium)</option>
+                      <option value="GRADE_B">GRADE_B (Standard)</option>
+                      <option value="GRADE_C">GRADE_C (Commercial)</option>
+                      <option value="REJECTED">REJECTED</option>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[#526357] block font-semibold">Packaging *</label>
+                    <Select
+                      value={receiptForm.packaging_condition}
+                      onChange={(e) => setReceiptForm({ ...receiptForm, packaging_condition: e.target.value })}
+                      className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                    >
+                      <option value="GOOD">GOOD</option>
+                      <option value="ACCEPTABLE">ACCEPTABLE</option>
+                      <option value="DAMAGED">DAMAGED</option>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowReceiptModal(false)}
+                    className="flex-1 bg-white border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
                   >
-                    <option value="GRADE_A">GRADE_A (Premium)</option>
-                    <option value="GRADE_B">GRADE_B (Standard)</option>
-                    <option value="GRADE_C">GRADE_C (Commercial)</option>
-                    <option value="REJECTED">REJECTED</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-slate-400 block mb-1">Packaging *</label>
-                  <select
-                    value={receiptForm.packaging_condition}
-                    onChange={(e) => setReceiptForm({ ...receiptForm, packaging_condition: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={createReceiptMutation.isPending || !isWeightBalanced}
+                    className="flex-1 bg-[#244634] hover:bg-[#1A3326] text-white shadow-sm"
                   >
-                    <option value="GOOD">GOOD</option>
-                    <option value="ACCEPTABLE">ACCEPTABLE</option>
-                    <option value="DAMAGED">DAMAGED</option>
-                  </select>
+                    {createReceiptMutation.isPending ? 'Intaking...' : 'Confirm Intake Receipt'}
+                  </Button>
                 </div>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowReceiptModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-300 hover:bg-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createReceiptMutation.isPending || !isWeightBalanced}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 hover:from-cyan-300 hover:to-emerald-300 text-slate-950 font-bold disabled:opacity-40 transition-all"
-                >
-                  {createReceiptMutation.isPending ? 'Intaking...' : 'Confirm Intake Receipt'}
-                </button>
-              </div>
-            </form>
-          </div>
+              </form>
+            </div>
+          </Card>
         </div>
       )}
 
       {/* Modal 2: Log Quality Inspection */}
       {showInspectionModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 bg-[#1B2A20]/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <Card className="bg-white border-[#E1DDD0] max-w-xl w-full shadow-2xl space-y-4 my-8">
+            <div className="flex items-center justify-between p-6 pb-3 border-b border-[#ECE7DA]">
               <div className="flex items-center gap-2">
-                <ClipboardCheck className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-white">Log Quality Grading Inspection</h3>
+                <ClipboardCheck className="w-5 h-5 text-[#3F7C56]" />
+                <h3 className="text-base font-serif font-bold text-[#1B2A20]">Log Quality Grading Inspection</h3>
               </div>
-              <button onClick={() => setShowInspectionModal(false)} className="text-slate-400 hover:text-white">✕</button>
+              <button onClick={() => setShowInspectionModal(false)} className="text-[#7A887E] hover:text-[#26312A]">
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {inspectionError && (
-              <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs font-mono">
-                {inspectionError}
-              </div>
-            )}
+            <div className="px-6 pb-6">
+              {inspectionError && (
+                <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-mono flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
+                  <span>{inspectionError}</span>
+                </div>
+              )}
 
-            <form onSubmit={handleInspectionSubmit} className="space-y-4 text-xs font-mono">
-              <div>
-                <label className="text-slate-400 uppercase block mb-1">Select Warehouse Receipt *</label>
-                <select
-                  required
-                  value={inspectionForm.receipt_id}
-                  onChange={(e) => {
-                    const rId = e.target.value
-                    const r = receiptsList.find(item => (item.id || item._id) === rId)
-                    setInspectionForm({
-                      ...inspectionForm,
-                      receipt_id: rId,
-                      batch_id: r?.batch_id || inspectionForm.batch_id,
-                      quality_grade: r?.quality_grade || inspectionForm.quality_grade,
-                    })
-                  }}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                >
-                  <option value="">Select Receipt</option>
-                  {receiptsList.map((r) => (
-                    <option key={r.id || r._id} value={r.id || r._id}>
-                      {r.receipt_id} — Batch: {r.batch_id} ({r.accepted_weight_kg} kg)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Visual Score (0-100)*</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
+              <form onSubmit={handleInspectionSubmit} className="space-y-4 text-xs font-mono">
+                <div className="space-y-1">
+                  <label className="text-[#526357] uppercase font-semibold block">Select Warehouse Receipt *</label>
+                  <Select
                     required
-                    value={inspectionForm.visual_quality_score}
-                    onChange={(e) => setInspectionForm({ ...inspectionForm, visual_quality_score: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-slate-400 block mb-1">Uniformity (0-100)*</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    required
-                    value={inspectionForm.size_uniformity_score}
-                    onChange={(e) => setInspectionForm({ ...inspectionForm, size_uniformity_score: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-slate-400 block mb-1">Ripeness (0-100)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={inspectionForm.ripeness_score}
-                    onChange={(e) => setInspectionForm({ ...inspectionForm, ripeness_score: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-slate-400 block mb-1">Defect % (0-100)*</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="100"
-                    required
-                    value={inspectionForm.defect_percentage}
-                    onChange={(e) => setInspectionForm({ ...inspectionForm, defect_percentage: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-amber-400"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-slate-400 block mb-1">Inspection Result *</label>
-                  <select
-                    value={inspectionForm.result}
-                    onChange={(e) => setInspectionForm({ ...inspectionForm, result: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
+                    value={inspectionForm.receipt_id}
+                    onChange={(e) => {
+                      const rId = e.target.value
+                      const r = receiptsList.find(item => (item.id || item._id) === rId)
+                      setInspectionForm({
+                        ...inspectionForm,
+                        receipt_id: rId,
+                        batch_id: r?.batch_id || inspectionForm.batch_id,
+                        quality_grade: r?.quality_grade || inspectionForm.quality_grade,
+                      })
+                    }}
+                    className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
                   >
-                    <option value="PASSED">PASSED</option>
-                    <option value="CONDITIONAL">CONDITIONAL</option>
-                    <option value="FAILED">FAILED</option>
-                  </select>
+                    <option value="">Select Receipt</option>
+                    {receiptsList.map((r) => (
+                      <option key={r.id || r._id} value={r.id || r._id}>
+                        {r.receipt_id} — Batch: {r.batch_id} ({r.accepted_weight_kg} kg)
+                      </option>
+                    ))}
+                  </Select>
                 </div>
 
-                <div>
-                  <label className="text-slate-400 block mb-1">Final Quality Grade *</label>
-                  <select
-                    value={inspectionForm.quality_grade}
-                    onChange={(e) => setInspectionForm({ ...inspectionForm, quality_grade: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[#526357] block">Visual (0-100)*</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      required
+                      value={inspectionForm.visual_quality_score}
+                      onChange={(e) => setInspectionForm({ ...inspectionForm, visual_quality_score: e.target.value })}
+                      className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[#526357] block">Uniformity (0-100)*</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      required
+                      value={inspectionForm.size_uniformity_score}
+                      onChange={(e) => setInspectionForm({ ...inspectionForm, size_uniformity_score: e.target.value })}
+                      className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[#526357] block">Ripeness (0-100)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={inspectionForm.ripeness_score}
+                      onChange={(e) => setInspectionForm({ ...inspectionForm, ripeness_score: e.target.value })}
+                      className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[#526357] block">Defect % (0-100)*</label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      required
+                      value={inspectionForm.defect_percentage}
+                      onChange={(e) => setInspectionForm({ ...inspectionForm, defect_percentage: e.target.value })}
+                      className="bg-white border-[#E1DDD0] text-[#B36B21] focus-visible:ring-[#244634]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[#526357] block font-semibold">Inspection Result *</label>
+                    <Select
+                      value={inspectionForm.result}
+                      onChange={(e) => setInspectionForm({ ...inspectionForm, result: e.target.value })}
+                      className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                    >
+                      <option value="PASSED">PASSED</option>
+                      <option value="CONDITIONAL">CONDITIONAL</option>
+                      <option value="FAILED">FAILED</option>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[#526357] block font-semibold">Final Quality Grade *</label>
+                    <Select
+                      value={inspectionForm.quality_grade}
+                      onChange={(e) => setInspectionForm({ ...inspectionForm, quality_grade: e.target.value })}
+                      className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                    >
+                      <option value="GRADE_A">GRADE_A (Export / Premium)</option>
+                      <option value="GRADE_B">GRADE_B (Standard Retail)</option>
+                      <option value="GRADE_C">GRADE_C (Processing)</option>
+                      <option value="REJECTED">REJECTED</option>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="foreign_matter"
+                    checked={inspectionForm.foreign_matter_present}
+                    onChange={(e) => setInspectionForm({ ...inspectionForm, foreign_matter_present: e.target.checked })}
+                    className="rounded border-[#C3D4C7] text-[#244634] focus:ring-0"
+                  />
+                  <label htmlFor="foreign_matter" className="text-[#26312A] font-sans text-xs">Foreign matter detected in sample</label>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[#526357] block font-semibold">Inspection Notes</label>
+                  <Textarea
+                    rows={2}
+                    value={inspectionForm.notes}
+                    onChange={(e) => setInspectionForm({ ...inspectionForm, notes: e.target.value })}
+                    placeholder="Observations regarding sugar brix, color indexing, packaging..."
+                    className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowInspectionModal(false)}
+                    className="flex-1 bg-white border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
                   >
-                    <option value="GRADE_A">GRADE_A (Export / Premium)</option>
-                    <option value="GRADE_B">GRADE_B (Standard Retail)</option>
-                    <option value="GRADE_C">GRADE_C (Processing)</option>
-                    <option value="REJECTED">REJECTED</option>
-                  </select>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={createInspectionMutation.isPending}
+                    className="flex-1 bg-[#244634] hover:bg-[#1A3326] text-white shadow-sm"
+                  >
+                    {createInspectionMutation.isPending ? 'Logging...' : 'Save Inspection'}
+                  </Button>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="foreign_matter"
-                  checked={inspectionForm.foreign_matter_present}
-                  onChange={(e) => setInspectionForm({ ...inspectionForm, foreign_matter_present: e.target.checked })}
-                  className="rounded border-slate-800 text-cyan-500 focus:ring-0"
-                />
-                <label htmlFor="foreign_matter" className="text-slate-300">Foreign matter detected in sample</label>
-              </div>
-
-              <div>
-                <label className="text-slate-400 block mb-1">Inspection Notes</label>
-                <textarea
-                  rows={2}
-                  value={inspectionForm.notes}
-                  onChange={(e) => setInspectionForm({ ...inspectionForm, notes: e.target.value })}
-                  placeholder="Observations regarding sugar brix, color indexing, packaging..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white resize-none"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowInspectionModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-300 hover:bg-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createInspectionMutation.isPending}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold disabled:opacity-50"
-                >
-                  {createInspectionMutation.isPending ? 'Logging...' : 'Save Inspection'}
-                </button>
-              </div>
-            </form>
-          </div>
+              </form>
+            </div>
+          </Card>
         </div>
       )}
 
       {/* Modal 3: Movement Modal */}
       {showMovementModal && selectedItemForMovement && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-1">Record Stock Movement</h3>
-            <p className="text-xs text-slate-400 font-mono mb-4">
-              Batch: <span className="text-cyan-400">{selectedItemForMovement.batch_id}</span> ({selectedItemForMovement.produce_type})
+        <div className="fixed inset-0 z-50 bg-[#1B2A20]/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <Card className="bg-white border-[#E1DDD0] max-w-md w-full shadow-2xl p-6">
+            <h3 className="text-lg font-serif font-bold text-[#1B2A20] mb-1">Record Stock Movement</h3>
+            <p className="text-xs text-[#526357] font-mono mb-4">
+              Batch: <span className="text-[#244634] font-semibold">{selectedItemForMovement.batch_id}</span> ({selectedItemForMovement.produce_type})
             </p>
 
             {movementError && (
-              <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs">
-                {movementError}
+              <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
+                <span>{movementError}</span>
               </div>
             )}
 
             <form onSubmit={handleMovementSubmit} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-slate-400 uppercase">Movement Type *</label>
-                <select
+                <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Movement Type *</label>
+                <Select
                   value={movementForm.movement_type}
                   onChange={(e) => setMovementForm({ ...movementForm, movement_type: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
+                  className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                 >
                   <option value="INTAKE">INTAKE (Stock In)</option>
                   <option value="DISPATCH">DISPATCH (Outbound Shipment)</option>
                   <option value="RELOCATION">RELOCATION (Internal Bay Transfer)</option>
                   <option value="ADJUSTMENT">ADJUSTMENT (Cycle Count)</option>
                   <option value="DAMAGE_WRITE_OFF">DAMAGE WRITE OFF</option>
-                </select>
+                </Select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-slate-400 uppercase">Quantity (KG) *</label>
-                <input
+                <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Quantity (KG) *</label>
+                <Input
                   type="number"
                   step="0.1"
                   min="0.1"
@@ -1062,50 +1078,52 @@ export default function InventoryPage() {
                   value={movementForm.quantity_kg}
                   onChange={(e) => setMovementForm({ ...movementForm, quantity_kg: e.target.value })}
                   placeholder="e.g. 500"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
+                  className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-slate-400 uppercase">Reference ID</label>
-                <input
+                <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Reference ID</label>
+                <Input
                   type="text"
                   value={movementForm.reference_id}
                   onChange={(e) => setMovementForm({ ...movementForm, reference_id: e.target.value })}
                   placeholder="Shipment or PO ID"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
+                  className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-slate-400 uppercase">Notes</label>
-                <textarea
+                <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Notes</label>
+                <Textarea
                   rows={2}
                   value={movementForm.notes}
                   onChange={(e) => setMovementForm({ ...movementForm, notes: e.target.value })}
                   placeholder="Operational notes..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 resize-none"
+                  className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                 />
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setShowMovementModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-800 hover:bg-slate-800 text-slate-300 text-xs font-mono"
+                  className="flex-1 bg-white border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7] text-xs font-mono"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
+                  variant="primary"
                   disabled={createMovementMutation.isPending}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 text-white font-mono text-xs font-bold disabled:opacity-50"
+                  className="flex-1 bg-[#244634] hover:bg-[#1A3326] text-white font-mono text-xs shadow-sm"
                 >
                   {createMovementMutation.isPending ? 'Logging...' : 'Confirm Movement'}
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
+          </Card>
         </div>
       )}
     </div>

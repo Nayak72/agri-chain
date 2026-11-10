@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, ShoppingBag, AlertTriangle, Layers, Calendar, DollarSign, MapPin } from 'lucide-react'
+import { ArrowLeft, AlertCircle, ShoppingBag } from 'lucide-react'
 import { ordersApi } from '../../api/commerce.api'
 import { produceApi, batchesApi } from '../../api/agriculture.api'
 import { usersApi } from '../../api/users.api'
 import { formatApiErrorMessage } from '../../utils'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Select } from '../../components/ui/select'
+import { Textarea } from '../../components/ui/textarea'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card'
 
 export default function OrderCreatePage() {
   const navigate = useNavigate()
@@ -126,206 +131,217 @@ export default function OrderCreatePage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 lg:px-8 py-10 animate-fade-in-up">
-      <button
+    <div className="max-w-3xl mx-auto py-4 space-y-6 animate-fade-in-up">
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => navigate('/purchase-orders')}
-        className="text-xs font-mono text-cyan-400 hover:text-cyan-300 mb-6 flex items-center gap-2 transition-colors"
+        className="gap-2 text-xs font-mono text-[#526357] hover:text-[#26312A] -ml-2"
       >
         <ArrowLeft className="w-3.5 h-3.5" />
         ORDERS_REGISTRY
-      </button>
+      </Button>
 
-      <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-8 shadow-2xl">
-        <div className="mb-8">
-          <span className="text-xs font-mono uppercase tracking-widest text-cyan-400 mb-1 block">
-            Procurement Contract
-          </span>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Create Purchase Order</h1>
-          <p className="text-slate-400 text-sm mt-1">
+      <Card className="bg-white/95 border-[#E1DDD0] shadow-sm">
+        <CardHeader className="border-b border-[#ECE7DA] pb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-2 h-2 rounded-full bg-[#244634]" />
+            <span className="text-[11px] font-mono uppercase tracking-widest text-[#244634]">
+              Procurement Contract
+            </span>
+          </div>
+          <CardTitle className="text-2xl font-serif font-bold text-[#1B2A20]">
+            Create Purchase Order
+          </CardTitle>
+          <CardDescription className="text-xs text-[#526357]">
             Initiate a trade commitment between buyer and seller with volume and pricing terms.
-          </p>
-        </div>
+          </CardDescription>
+        </CardHeader>
 
-        {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-red-400" />
-            <span>{error}</span>
-          </div>
-        )}
+        <CardContent className="pt-6">
+          {error && (
+            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0 text-red-600 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Select Provenance Batch (Optional)
-              </label>
-              <select
-                value={form.batch_id}
-                onChange={(e) => handleBatchSelect(e.target.value)}
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-              >
-                <option value="">No specific batch (Open market)</option>
-                {batches.map(b => (
-                  <option key={b.id || b._id || b.batch_id} value={b.id || b._id}>
-                    {b.batch_id} — {b.produce_type} ({b.harvest_location || 'Field Origin'})
-                  </option>
-                ))}
-              </select>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Select Provenance Batch (Optional)
+                </label>
+                <Select
+                  value={form.batch_id}
+                  onChange={(e) => handleBatchSelect(e.target.value)}
+                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                >
+                  <option value="">No specific batch (Open market)</option>
+                  {batches.map(b => (
+                    <option key={b.id || b._id || b.batch_id} value={b.id || b._id}>
+                      {b.batch_id} — {b.produce_type} ({b.harvest_location || 'Field Origin'})
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Produce Commodity Type *
+                </label>
+                <Select
+                  name="produce_type"
+                  required
+                  value={form.produce_type}
+                  onChange={handleChange}
+                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                >
+                  <option value="">Select commodity...</option>
+                  {produceItems.map(p => (
+                    <option key={p.produce_type || p.id} value={p.produce_type}>
+                      {p.name} ({p.produce_type})
+                    </option>
+                  ))}
+                </Select>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Produce Commodity Type *
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                Seller / Producer (Farmer) *
               </label>
-              <select
-                name="produce_type"
+              <Select
+                name="seller_id"
                 required
-                value={form.produce_type}
+                value={form.seller_id}
                 onChange={handleChange}
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
               >
-                <option value="">Select commodity...</option>
-                {produceItems.map(p => (
-                  <option key={p.produce_type || p.id} value={p.produce_type}>
-                    {p.name} ({p.produce_type})
+                <option value="">Select verified farmer...</option>
+                {farmers.map(f => (
+                  <option key={f.id || f._id} value={f.id || f._id}>
+                    {f.full_name} ({f.email})
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-              Seller / Producer (Farmer) *
-            </label>
-            <select
-              name="seller_id"
-              required
-              value={form.seller_id}
-              onChange={handleChange}
-              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-            >
-              <option value="">Select verified farmer...</option>
-              {farmers.map(f => (
-                <option key={f.id || f._id} value={f.id || f._id}>
-                  {f.full_name} ({f.email})
-                </option>
-              ))}
-            </select>
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Requested Quantity (KG) *
+                </label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  required
+                  name="requested_quantity_kg"
+                  value={form.requested_quantity_kg}
+                  onChange={handleChange}
+                  placeholder="2500"
+                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                />
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Requested Quantity (KG) *
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Agreed Unit Price (₹ / KG) *
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  name="unit_price_inr"
+                  value={form.unit_price_inr}
+                  onChange={handleChange}
+                  placeholder="35.50"
+                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                Preferred Delivery Date *
               </label>
-              <input
-                type="number"
-                step="0.1"
-                min="0.1"
+              <Input
+                type="date"
                 required
-                name="requested_quantity_kg"
-                value={form.requested_quantity_kg}
+                name="preferred_delivery_date"
+                value={form.preferred_delivery_date}
                 onChange={handleChange}
-                placeholder="2500"
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+                className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Agreed Unit Price (₹ / KG) *
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                Farm / Warehouse Pickup Address *
               </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
+              <Input
+                type="text"
                 required
-                name="unit_price_inr"
-                value={form.unit_price_inr}
+                name="pickup_address"
+                value={form.pickup_address}
                 onChange={handleChange}
-                placeholder="35.50"
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+                placeholder="e.g. Green Valley Farms, Sector 4, Nashik, MH"
+                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
               />
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-              Preferred Delivery Date *
-            </label>
-            <input
-              type="date"
-              required
-              name="preferred_delivery_date"
-              value={form.preferred_delivery_date}
-              onChange={handleChange}
-              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-            />
-          </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                Buyer Destination Address *
+              </label>
+              <Input
+                type="text"
+                required
+                name="delivery_address"
+                value={form.delivery_address}
+                onChange={handleChange}
+                placeholder="e.g. Central Produce Terminal, APMC Market, Vashi, Navi Mumbai"
+                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-              Farm / Warehouse Pickup Address *
-            </label>
-            <input
-              type="text"
-              required
-              name="pickup_address"
-              value={form.pickup_address}
-              onChange={handleChange}
-              placeholder="e.g. Green Valley Farms, Sector 4, Nashik, MH"
-              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-            />
-          </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                Cold Chain & Handling Requirements
+              </label>
+              <Textarea
+                name="handling_requirements"
+                rows={3}
+                value={form.handling_requirements}
+                onChange={handleChange}
+                placeholder="Reefer transit between 2°C - 4°C, ventilated plastic crates, max stack height 6 units"
+                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-              Buyer Destination Address *
-            </label>
-            <input
-              type="text"
-              required
-              name="delivery_address"
-              value={form.delivery_address}
-              onChange={handleChange}
-              placeholder="e.g. Central Produce Terminal, APMC Market, Vashi, Navi Mumbai"
-              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-              Cold Chain & Handling Requirements
-            </label>
-            <textarea
-              name="handling_requirements"
-              rows={3}
-              value={form.handling_requirements}
-              onChange={handleChange}
-              placeholder="Reefer transit between 2°C - 4°C, ventilated plastic crates, max stack height 6 units"
-              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono resize-none"
-            />
-          </div>
-
-          <div className="pt-4 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/purchase-orders')}
-              className="px-6 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium text-sm transition-all"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-500/20 transition-all disabled:opacity-50"
-            >
-              {loading ? 'Submitting Order...' : 'Generate Purchase Order'}
-            </button>
-          </div>
-        </form>
-      </div>
+            <div className="pt-4 flex items-center justify-end gap-3 border-t border-[#ECE7DA]">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate('/purchase-orders')}
+                className="bg-white border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={loading}
+                className="bg-[#244634] hover:bg-[#1A3326] text-white shadow-sm"
+              >
+                {loading ? 'Submitting Order...' : 'Generate Purchase Order'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

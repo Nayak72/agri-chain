@@ -16,12 +16,17 @@ import {
   Package,
   Layers,
   Lock,
-  ChevronRight
+  ChevronRight,
+  ExternalLink,
+  XCircle,
+  FileText
 } from 'lucide-react'
 import { shipmentsApi, checkpointsApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
 import { ROLES, normalizeRole } from '../../constants/roles'
-import { formatWeight, formatDate, formatDateTime, getStatusColor, formatStatus, getApiError } from '../../utils'
+import { formatWeight, formatDate, formatDateTime, formatStatus, getApiError } from '../../utils'
+import PageHeader from '../../components/common/PageHeader'
+import StatusBadge from '../../components/common/StatusBadge'
 
 const TIMELINE_STAGES = [
   { key: 'BOOKING_CONFIRMED', label: 'Booking Confirmed', desc: 'Freight quotation accepted and dispatch authorized' },
@@ -194,30 +199,30 @@ export default function ShipmentDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin mb-4" />
-        <span className="text-slate-500 font-mono text-sm animate-pulse">Reading consignment timeline...</span>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-3">
+        <div className="w-8 h-8 border-3 border-stone-200 border-t-[#244634] rounded-full animate-spin" />
+        <span className="text-stone-500 font-mono text-xs tracking-wide">Reading consignment timeline...</span>
       </div>
     )
   }
 
   if (error || !shipment) {
     return (
-      <div className="max-w-xl mx-auto py-20 text-center">
-        <div className="text-5xl mb-4">⚠️</div>
-        <h2 className="text-2xl font-bold text-white mb-2">Shipment Not Found</h2>
-        <p className="text-slate-400 mb-6">Could not retrieve shipment record for ID: {id}</p>
-        <button
-          onClick={() => navigate('/shipments')}
-          className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium"
-        >
-          Return to Shipments List
-        </button>
+      <div className="max-w-xl mx-auto py-16 text-center">
+        <div className="p-8 rounded-2xl bg-white border border-stone-200 shadow-sm">
+          <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+          <h2 className="text-xl font-bold text-stone-900 mb-1">Shipment Not Found</h2>
+          <p className="text-stone-500 text-sm mb-6">Could not retrieve shipment record for ID: {id}</p>
+          <button
+            onClick={() => navigate('/shipments')}
+            className="px-5 py-2.5 rounded-lg bg-[#244634] hover:bg-[#1b3527] text-white text-sm font-semibold transition-all"
+          >
+            Return to Shipments List
+          </button>
+        </div>
       </div>
     )
   }
-
-  const statusColor = getStatusColor(shipment.status)
 
   // Determine timeline progress
   const currentStatusIndex = TIMELINE_STAGES.findIndex(s => s.key === shipment.status)
@@ -226,41 +231,24 @@ export default function ShipmentDetailPage() {
   const isOperator = [ROLES.DRIVER, ROLES.TRANSPORTER, ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER].includes(userRole)
 
   return (
-    <div className="max-w-6xl mx-auto px-4 lg:px-8 py-10 animate-fade-in-up space-y-6">
-      <button
-        onClick={() => navigate('/shipments')}
-        className="text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-2 transition-colors"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" />
-        SHIPMENTS_CONSIGNMENTS
-      </button>
-
-      {/* Header Deck */}
-      <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-8 relative overflow-hidden shadow-2xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-                ACTIVE SHIPMENT
-              </span>
-              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider border ${statusColor}`}>
-                {formatStatus(shipment.status)}
-              </span>
-            </div>
-            <h1 className="text-3xl font-bold font-mono text-white tracking-tight">{shipment.shipment_id || sId}</h1>
-            <p className="text-slate-400 text-sm mt-1">
-              Corridor Route: <span className="text-white font-semibold">{shipment.pickup_city}</span> ({shipment.pickup_state}) → <span className="text-white font-semibold">{shipment.destination_city}</span> ({shipment.destination_state})
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageHeader
+        breadcrumbs={[
+          { label: 'Shipments', href: '/shipments' },
+          { label: shipment.shipment_id || sId }
+        ]}
+        title={shipment.shipment_id || sId}
+        description={`Corridor Route: ${shipment.pickup_city} (${shipment.pickup_state}) → ${shipment.destination_city} (${shipment.destination_state})`}
+        badge={<StatusBadge status={shipment.status} />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2.5">
             {/* Simulation Shortcut */}
             <button
               onClick={() => navigate('/cold-chain', { state: { shipmentId: sId } })}
-              className="px-4 py-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-400 font-mono text-xs font-bold transition-all flex items-center gap-2"
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono font-semibold rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-800 hover:bg-cyan-100 shadow-xs transition-all"
             >
-              <Thermometer className="w-4 h-4" />
-              Cold-Chain Telemetry
+              <Thermometer className="w-4 h-4 text-cyan-700" />
+              <span>Cold-Chain Telemetry</span>
             </button>
 
             {/* Loading Action */}
@@ -271,7 +259,7 @@ export default function ShipmentDetailPage() {
                   setActualPackageCount(String(shipment.package_count || 100))
                   setShowLoadModal(true)
                 }}
-                className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs font-bold transition-all"
+                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-mono font-bold shadow-xs transition-all"
               >
                 Log Cargo Loading
               </button>
@@ -282,9 +270,9 @@ export default function ShipmentDetailPage() {
               <button
                 onClick={() => dispatchMutation.mutate()}
                 disabled={dispatchMutation.isPending}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-mono text-xs font-bold transition-all disabled:opacity-50"
+                className="px-4 py-2 rounded-lg bg-[#244634] hover:bg-[#1b3527] text-white text-xs font-mono font-bold shadow-xs transition-all disabled:opacity-50"
               >
-                {dispatchMutation.isPending ? 'Dispatching...' : 'Dispatch Shipment Consignment'}
+                {dispatchMutation.isPending ? 'Dispatching...' : 'Dispatch Consignment'}
               </button>
             )}
 
@@ -293,7 +281,7 @@ export default function ShipmentDetailPage() {
               <button
                 onClick={() => startTransitMutation.mutate()}
                 disabled={startTransitMutation.isPending}
-                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold transition-all disabled:opacity-50"
+                className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-mono font-bold shadow-xs transition-all disabled:opacity-50"
               >
                 {startTransitMutation.isPending ? 'Starting Transit...' : 'Start Transit'}
               </button>
@@ -304,7 +292,7 @@ export default function ShipmentDetailPage() {
               <button
                 onClick={() => arriveMutation.mutate()}
                 disabled={arriveMutation.isPending}
-                className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-mono text-xs font-bold transition-all disabled:opacity-50"
+                className="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-mono font-bold shadow-xs transition-all disabled:opacity-50"
               >
                 {arriveMutation.isPending ? 'Recording Arrival...' : 'Mark Arrived at Destination'}
               </button>
@@ -315,7 +303,7 @@ export default function ShipmentDetailPage() {
               <button
                 onClick={() => outForDeliveryMutation.mutate()}
                 disabled={outForDeliveryMutation.isPending}
-                className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs font-bold transition-all disabled:opacity-50"
+                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-mono font-bold shadow-xs transition-all disabled:opacity-50"
               >
                 {outForDeliveryMutation.isPending ? 'Updating...' : 'Set Out for Delivery'}
               </button>
@@ -325,7 +313,7 @@ export default function ShipmentDetailPage() {
             {['OUT_FOR_DELIVERY'].includes(shipment.status) && (
               <button
                 onClick={() => navigate('/deliveries', { state: { shipmentId: sId } })}
-                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold transition-all"
+                className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-mono font-bold shadow-xs transition-all"
               >
                 Record Delivery Inspection
               </button>
@@ -340,34 +328,37 @@ export default function ShipmentDetailPage() {
                   }
                 }}
                 disabled={cancelMutation.isPending}
-                className="px-4 py-2.5 rounded-xl bg-red-600/20 border border-red-500/40 hover:bg-red-600/30 text-red-300 font-mono text-xs font-bold transition-all disabled:opacity-50"
+                className="px-3.5 py-2 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-mono font-semibold transition-all disabled:opacity-50"
               >
-                {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Shipment'}
+                {cancelMutation.isPending ? 'Cancelling...' : 'Cancel'}
               </button>
             )}
           </div>
+        }
+      />
+
+      {actionError && (
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-mono flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>{actionError}</span>
         </div>
+      )}
 
-        {actionError && (
-          <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs font-mono">
-            {actionError}
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Connected Vertical Timeline */}
+      {/* Main Grid: Timeline + Checkpoints (Left 2 cols) & Assets / Telemetry (Right 1 col) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Connected Vertical Timeline & Corridor Checkpoints */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-8 shadow-2xl">
-            <div className="mb-6 flex justify-between items-center">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+          {/* Vertical Progress Timeline */}
+          <div className="bg-white border border-stone-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+            <div className="mb-6 flex justify-between items-center pb-4 border-b border-stone-100">
+              <h2 className="text-base font-bold text-stone-900 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#244634]" />
                 Connected Consignment Timeline
               </h2>
-              <span className="text-xs font-mono text-slate-500">Stage {activeIdx + 1} of {TIMELINE_STAGES.length}</span>
+              <span className="text-xs font-mono text-stone-500 font-medium">Stage {activeIdx + 1} of {TIMELINE_STAGES.length}</span>
             </div>
 
-            <div className="relative pl-6 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
+            <div className="relative pl-6 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-stone-200">
               {TIMELINE_STAGES.map((stage, idx) => {
                 const isPast = idx < activeIdx
                 const isCurrent = idx === activeIdx
@@ -375,30 +366,30 @@ export default function ShipmentDetailPage() {
                 return (
                   <div key={stage.key} className="relative flex items-start gap-4">
                     {/* Indicator Dot */}
-                    <div className={`absolute -left-6 top-1 w-6 h-6 rounded-full flex items-center justify-center border text-xs transition-all ${
+                    <div className={`absolute -left-6 top-1 w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all ${
                       isPast
-                        ? 'bg-emerald-500 border-emerald-400 text-slate-950 font-bold'
+                        ? 'bg-[#244634] text-white font-bold ring-4 ring-[#244634]/10'
                         : isCurrent
-                        ? 'bg-cyan-500 border-cyan-300 text-slate-950 font-bold shadow-[0_0_12px_rgba(6,182,212,0.8)]'
-                        : 'bg-slate-900 border-slate-700 text-slate-600'
+                        ? 'bg-amber-500 text-white font-bold ring-4 ring-amber-500/20 shadow-xs'
+                        : 'bg-white border-2 border-stone-300 text-stone-400 font-mono'
                     }`}>
                       {isPast ? '✓' : idx + 1}
                     </div>
 
                     <div className="pl-4">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5">
                         <h3 className={`text-sm font-mono font-bold ${
-                          isCurrent ? 'text-cyan-400' : isPast ? 'text-white' : 'text-slate-600'
+                          isCurrent ? 'text-amber-800' : isPast ? 'text-stone-900' : 'text-stone-400'
                         }`}>
                           {stage.label}
                         </h3>
                         {isCurrent && (
-                          <span className="px-2 py-0.5 rounded text-[9px] font-mono uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 animate-pulse">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-amber-100 text-amber-900 font-semibold border border-amber-200 animate-pulse">
                             Active Stage
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5 font-mono">{stage.desc}</p>
+                      <p className="text-xs text-stone-500 mt-0.5 font-sans leading-relaxed">{stage.desc}</p>
                     </div>
                   </div>
                 )
@@ -407,17 +398,17 @@ export default function ShipmentDetailPage() {
           </div>
 
           {/* Corridor Route Checkpoints Card */}
-          <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="bg-white border border-stone-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-5">
+            <div className="flex items-center justify-between pb-4 border-b border-stone-100">
               <div className="flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-cyan-400" />
-                <h3 className="text-base font-bold text-white">Corridor Milestones & Checkpoints</h3>
+                <MapPin className="w-5 h-5 text-[#244634]" />
+                <h3 className="text-base font-bold text-stone-900">Corridor Milestones & Checkpoints</h3>
               </div>
 
               {isOperator && (
                 <button
                   onClick={() => setShowCheckpointModal(true)}
-                  className="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all"
+                  className="px-3 py-1.5 rounded-lg bg-stone-100 border border-stone-200 hover:bg-stone-200/80 text-stone-700 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all"
                 >
                   <Plus className="w-3.5 h-3.5" /> Log Checkpoint
                 </button>
@@ -425,28 +416,28 @@ export default function ShipmentDetailPage() {
             </div>
 
             {checkpointsLoading ? (
-              <div className="py-6 text-center text-xs font-mono text-slate-500 animate-pulse">
+              <div className="py-6 text-center text-xs font-mono text-stone-400 animate-pulse">
                 Querying corridor milestones...
               </div>
             ) : checkpoints.length === 0 ? (
-              <div className="py-8 text-center text-xs font-mono text-slate-500">
+              <div className="py-8 text-center text-xs font-mono text-stone-500">
                 No checkpoints logged along this corridor yet. Drivers and operators log checkpoints at tollways and transit hubs.
               </div>
             ) : (
-              <div className="divide-y divide-slate-800/60 font-mono text-xs">
+              <div className="divide-y divide-stone-100 font-mono text-xs">
                 {checkpoints.map((cp) => (
                   <div key={cp.id || cp._id} className="py-3 flex items-center justify-between">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-white">#{cp.sequence} {cp.name}</span>
-                        <span className="text-[10px] text-cyan-400">({cp.city}, {cp.state})</span>
-                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
-                          cp.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-400'
+                      <div className="flex items-center gap-2 font-sans">
+                        <span className="text-xs font-bold text-stone-900 font-mono">#{cp.sequence} {cp.name}</span>
+                        <span className="text-[11px] text-stone-500 font-sans">({cp.city}, {cp.state})</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          cp.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-stone-100 text-stone-600'
                         }`}>
                           {cp.status}
                         </span>
                       </div>
-                      {cp.notes && <p className="text-[11px] text-slate-400 mt-0.5">{cp.notes}</p>}
+                      {cp.notes && <p className="text-[11px] text-stone-500 mt-0.5 font-sans">{cp.notes}</p>}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -456,7 +447,7 @@ export default function ShipmentDetailPage() {
                             cpId: cp.id || cp._id,
                             data: { actual_arrival: new Date().toISOString(), status: 'COMPLETED' }
                           })}
-                          className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-cyan-300"
+                          className="px-2.5 py-1 rounded bg-[#244634] hover:bg-[#1b3527] text-[10px] text-white font-mono font-medium transition-colors"
                         >
                           Mark Arrived
                         </button>
@@ -471,44 +462,47 @@ export default function ShipmentDetailPage() {
 
         {/* Assets & Telematics Sidebar */}
         <div className="space-y-6">
-          {/* Asset Assignments */}
-          <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-6 shadow-2xl">
-            <h3 className="text-xs font-mono text-slate-500 uppercase tracking-widest mb-4">
+          {/* Asset Assignments Card */}
+          <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-sm space-y-4">
+            <h3 className="text-xs font-mono text-stone-500 uppercase tracking-widest font-semibold">
               Assigned Assets
             </h3>
-            <div className="space-y-4 font-mono text-xs">
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                <span className="text-[10px] text-slate-500 uppercase block">Fleet Vehicle</span>
-                <span className="text-white font-bold">{shipment.vehicle_id || 'Not assigned'}</span>
+            <div className="space-y-3 font-mono text-xs">
+              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                <span className="text-[10px] text-stone-500 uppercase block font-sans">Fleet Vehicle</span>
+                <span className="text-stone-900 font-bold text-sm">{shipment.vehicle_id || 'Not assigned'}</span>
               </div>
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                <span className="text-[10px] text-slate-500 uppercase block">Commercial Driver</span>
-                <span className="text-white font-bold">{shipment.driver_id || 'Not assigned'}</span>
+              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                <span className="text-[10px] text-stone-500 uppercase block font-sans">Commercial Driver</span>
+                <span className="text-stone-900 font-bold text-sm">{shipment.driver_id || 'Not assigned'}</span>
               </div>
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                <span className="text-[10px] text-slate-500 uppercase block">Cargo Weight</span>
-                <span className="text-emerald-400 font-bold">{formatWeight(shipment.total_cargo_weight_kg || shipment.cargo_quantity_kg)}</span>
+              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                <span className="text-[10px] text-stone-500 uppercase block font-sans">Cargo Weight</span>
+                <span className="text-emerald-700 font-bold text-sm">
+                  {formatWeight(shipment.total_cargo_weight_kg || shipment.cargo_quantity_kg)}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Sensor Quick Badge */}
-          <div className="bg-[#0b1121] border border-cyan-500/30 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-mono px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40 uppercase tracking-wider font-bold">
-                SIMULATED DATA
+          {/* Sensor Telematics Quick Link Card */}
+          <div className="bg-white border border-emerald-200 rounded-2xl p-6 shadow-sm relative overflow-hidden space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded border border-emerald-200 uppercase tracking-wider font-bold">
+                TELEMETRY ACTIVE
               </span>
-              <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+              <span className="flex h-2 w-2 rounded-full bg-emerald-600 animate-ping" />
             </div>
-            <h3 className="text-sm font-bold text-white mb-1">Cold-Chain Datalogger</h3>
-            <p className="text-xs text-slate-400 leading-relaxed mb-4 font-mono">
-              Simulated temperature & humidity sensors streaming active telematics for this consignment.
+            <h3 className="text-sm font-bold text-stone-900 font-sans">Cold-Chain Datalogger</h3>
+            <p className="text-xs text-stone-500 leading-relaxed font-sans">
+              Continuous temperature & humidity sensors streaming live telematics for this consignment corridor.
             </p>
             <button
               onClick={() => navigate('/cold-chain', { state: { shipmentId: sId } })}
-              className="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold transition-all text-center"
+              className="w-full py-2.5 rounded-lg bg-[#244634] hover:bg-[#1b3527] text-white font-mono text-xs font-bold transition-all text-center flex items-center justify-center gap-2"
             >
-              Launch Telemetry Monitor →
+              <Thermometer className="w-4 h-4 text-emerald-300" />
+              <span>Launch Telemetry Monitor →</span>
             </button>
           </div>
         </div>
@@ -516,50 +510,50 @@ export default function ShipmentDetailPage() {
 
       {/* Cargo Loading Modal */}
       {showLoadModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-1">Verify Cargo Loading</h3>
-            <p className="text-xs text-slate-400 font-mono mb-4">
+        <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-stone-200 rounded-2xl p-6 max-w-md w-full shadow-xl animate-fade-in-up">
+            <h3 className="text-lg font-bold text-stone-900 mb-1">Verify Cargo Loading</h3>
+            <p className="text-xs text-stone-500 mb-4 font-sans">
               Enter verified gross scale weight and package count at loading bay origin.
             </p>
 
-            <form onSubmit={handleLoadSubmit} className="space-y-4 font-mono text-xs">
+            <form onSubmit={handleLoadSubmit} className="space-y-4 text-xs font-mono">
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 uppercase">Actual Loaded Weight (KG) *</label>
+                <label className="text-[10px] text-stone-600 uppercase font-semibold">Actual Loaded Weight (KG) *</label>
                 <input
                   type="number"
                   step="0.1"
                   required
                   value={actualWeight}
                   onChange={(e) => setActualWeight(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 uppercase">Actual Package Count *</label>
+                <label className="text-[10px] text-stone-600 uppercase font-semibold">Actual Package Count *</label>
                 <input
                   type="number"
                   min="1"
                   required
                   value={actualPackageCount}
                   onChange={(e) => setActualPackageCount(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                 />
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-3 border-t border-stone-100">
                 <button
                   type="button"
                   onClick={() => setShowLoadModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-300"
+                  className="flex-1 py-2.5 rounded-lg border border-stone-200 text-stone-700 hover:bg-stone-50 font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loadMutation.isPending}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 text-white font-bold disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-lg bg-[#244634] hover:bg-[#1b3527] text-white font-bold disabled:opacity-50"
                 >
                   {loadMutation.isPending ? 'Logging...' : 'Confirm Loaded'}
                 </button>
@@ -571,74 +565,74 @@ export default function ShipmentDetailPage() {
 
       {/* Corridor Checkpoint Modal */}
       {showCheckpointModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-1">Log Route Checkpoint</h3>
-            <p className="text-xs text-slate-400 font-mono mb-4">
+        <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-stone-200 rounded-2xl p-6 max-w-md w-full shadow-xl animate-fade-in-up">
+            <h3 className="text-lg font-bold text-stone-900 mb-1">Log Route Checkpoint</h3>
+            <p className="text-xs text-stone-500 mb-4 font-sans">
               Record physical milestone transit along corridor route.
             </p>
 
-            <form onSubmit={handleCheckpointSubmit} className="space-y-4 font-mono text-xs">
+            <form onSubmit={handleCheckpointSubmit} className="space-y-4 text-xs font-mono">
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 uppercase">Checkpoint / Tollway Name *</label>
+                <label className="text-[10px] text-stone-600 uppercase font-semibold">Checkpoint / Tollway Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Igatpuri Ghath Checkpoint"
                   value={checkpointForm.name}
                   onChange={(e) => setCheckpointForm({ ...checkpointForm, name: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 uppercase">City *</label>
+                  <label className="text-[10px] text-stone-600 uppercase font-semibold">City *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Igatpuri"
                     value={checkpointForm.city}
                     onChange={(e) => setCheckpointForm({ ...checkpointForm, city: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 uppercase">State *</label>
+                  <label className="text-[10px] text-stone-600 uppercase font-semibold">State *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Maharashtra"
                     value={checkpointForm.state}
                     onChange={(e) => setCheckpointForm({ ...checkpointForm, state: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 uppercase">Notes</label>
+                <label className="text-[10px] text-stone-600 uppercase font-semibold">Notes</label>
                 <input
                   type="text"
                   placeholder="Vehicle inspected, seals intact"
                   value={checkpointForm.notes}
                   onChange={(e) => setCheckpointForm({ ...checkpointForm, notes: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                 />
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-3 border-t border-stone-100">
                 <button
                   type="button"
                   onClick={() => setShowCheckpointModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-300"
+                  className="flex-1 py-2.5 rounded-lg border border-stone-200 text-stone-700 hover:bg-stone-50 font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createCheckpointMutation.isPending}
-                  className="flex-1 py-2.5 rounded-xl bg-cyan-500 text-slate-950 font-bold disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-lg bg-[#244634] hover:bg-[#1b3527] text-white font-bold disabled:opacity-50"
                 >
                   {createCheckpointMutation.isPending ? 'Logging...' : 'Save Checkpoint'}
                 </button>

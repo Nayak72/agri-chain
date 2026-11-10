@@ -1,10 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, Link } from 'react-router-dom'
+import { Plus, RefreshCw, CheckCircle2, AlertTriangle, ShieldCheck, FileCheck, Package, ExternalLink, ArrowRight } from 'lucide-react'
 import { deliveryApi } from '../../api/monitoring.api'
 import { shipmentsApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
-import { formatWeight, formatDate, formatDateTime, getStatusColor, formatStatus, getApiError } from '../../utils'
+import { formatWeight, formatDate, formatDateTime, formatStatus, getApiError } from '../../utils'
+import PageHeader from '../../components/common/PageHeader'
+import StatusBadge from '../../components/common/StatusBadge'
+import EmptyState from '../../components/common/EmptyState'
 
 export default function DeliveriesListPage() {
   const location = useLocation()
@@ -28,7 +32,7 @@ export default function DeliveriesListPage() {
   const [formSuccess, setFormSuccess] = useState('')
 
   // Query delivery reports
-  const { data: reportsData, isLoading, refetch } = useQuery({
+  const { data: reportsData, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['delivery-reports'],
     queryFn: () => deliveryApi.reports().then(res => res.data),
     staleTime: 30_000,
@@ -117,150 +121,165 @@ export default function DeliveriesListPage() {
   }
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-4 lg:px-8 py-10 animate-fade-in-up">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="flex h-2 w-2 rounded-full bg-emerald-500"></span>
-            <span className="text-xs font-mono font-medium text-emerald-500 uppercase tracking-widest">
-              Destination Custody
-            </span>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageHeader
+        breadcrumbs={[
+          { label: 'Logistics', href: '/shipments' },
+          { label: 'Deliveries' }
+        ]}
+        title="Delivery Inspections"
+        description="Inbound delivery verification, weight discrepancies, damaged claims, and proof-of-delivery signatures."
+        badge={
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            Destination Custody
+          </span>
+        }
+        actions={
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 hover:border-stone-300 shadow-sm transition-all disabled:opacity-60"
+            >
+              <RefreshCw className={`w-4 h-4 text-stone-500 ${isFetching ? 'animate-spin' : ''}`} />
+              <span>Sync</span>
+            </button>
+            <button
+              onClick={() => {
+                setFormError('')
+                setShowCreateModal(true)
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-[#244634] text-white hover:bg-[#1b3527] shadow-sm transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Record Inspection Report</span>
+            </button>
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">
-            Delivery <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Inspections</span>
-          </h1>
-          <p className="text-slate-500 mt-2 max-w-xl">
-            Inbound delivery verification, weight discrepancies, damaged claims, and proof-of-delivery signatures.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => refetch()}
-            className="px-4 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white transition-all text-sm font-medium flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Sync
-          </button>
-          <button
-            onClick={() => {
-              setFormError('')
-              setShowCreateModal(true)
-            }}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-semibold text-sm shadow-lg shadow-cyan-900/20 transition-all flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Record Inspection Report
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {formSuccess && (
-        <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm font-mono flex items-center gap-2">
-          <span>✓</span> {formSuccess}
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-sans flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{formSuccess}</span>
         </div>
       )}
       {formError && (
-        <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm font-mono flex items-center gap-2">
-          <span>✕</span> {formError}
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm font-sans flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>{formError}</span>
         </div>
       )}
 
-      {/* Reports Table */}
-      <div className="bg-[#0b1121] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-        {isLoading ? (
-          <div className="p-16 text-center text-slate-500 font-mono text-sm animate-pulse">
-            Querying delivery inspections...
+      {/* Reports Table Container */}
+      {isLoading ? (
+        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-16 flex flex-col items-center justify-center space-y-3">
+          <div className="w-8 h-8 border-3 border-stone-200 border-t-[#244634] rounded-full animate-spin" />
+          <span className="text-stone-500 font-mono text-xs tracking-wide">Querying delivery inspections...</span>
+        </div>
+      ) : reports.length === 0 ? (
+        <EmptyState
+          icon={FileCheck}
+          title="No Delivery Reports Recorded"
+          description="When consignments reach destination terminals, inspection reports can be completed here."
+          actionLabel="Create First Delivery Report"
+          onAction={() => setShowCreateModal(true)}
+        />
+      ) : (
+        <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-stone-200 text-[11px] uppercase tracking-wider text-stone-500 bg-stone-50/75">
+                  <th className="px-6 py-3.5 font-semibold">Report ID</th>
+                  <th className="px-6 py-3.5 font-semibold">Shipment Reference</th>
+                  <th className="px-6 py-3.5 font-semibold">Delivered Quantity</th>
+                  <th className="px-6 py-3.5 font-semibold">Damaged / Missing</th>
+                  <th className="px-6 py-3.5 font-semibold">Received By</th>
+                  <th className="px-6 py-3.5 font-semibold">Status</th>
+                  <th className="px-6 py-3.5 text-right font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100 font-mono">
+                {reports.map((r) => {
+                  const rKey = r.id || r._id || r.report_id
+                  return (
+                    <tr
+                      key={rKey}
+                      className="hover:bg-stone-50/80 transition-colors cursor-pointer group"
+                      onClick={() => navigate(`/deliveries/${rKey}`)}
+                    >
+                      <td className="px-6 py-4 font-bold text-[#244634] group-hover:underline">
+                        {r.report_id || rKey}
+                      </td>
+                      <td className="px-6 py-4 text-stone-700">
+                        {r.shipment_public_id || r.shipment_id}
+                      </td>
+                      <td className="px-6 py-4 text-emerald-700 font-semibold">
+                        {formatWeight(r.delivered_quantity_kg)}
+                      </td>
+                      <td className="px-6 py-4">
+                        {r.damaged_quantity_kg > 0 || r.missing_quantity_kg > 0 ? (
+                          <span className="text-amber-700 font-semibold">
+                            {r.damaged_quantity_kg > 0 && `${r.damaged_quantity_kg}kg dmg`}
+                            {r.missing_quantity_kg > 0 && ` ${r.missing_quantity_kg}kg mis`}
+                          </span>
+                        ) : (
+                          <span className="text-stone-400 font-sans">None (100% OK)</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-stone-700 font-sans">
+                        {r.received_by}
+                      </td>
+                      <td className="px-6 py-4 font-sans">
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => confirmDeliveryMutation.mutate(r.shipment_id)}
+                            disabled={confirmDeliveryMutation.isPending}
+                            className="px-3 py-1 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-medium font-sans transition-all disabled:opacity-50"
+                          >
+                            Confirm Custody
+                          </button>
+                          <Link
+                            to={`/deliveries/${rKey}`}
+                            className="p-1 rounded text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+                          >
+                            <ArrowRight className="w-4 h-4" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
-        ) : reports.length === 0 ? (
-          <div className="p-16 text-center">
-            <div className="text-4xl mb-3">📋</div>
-            <h3 className="text-base font-medium text-white mb-1">No Delivery Reports Recorded</h3>
-            <p className="text-slate-500 text-xs max-w-sm mx-auto mb-4">
-              When consignments reach destination terminals, inspection reports can be completed here.
-            </p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="text-xs font-mono text-cyan-400 hover:text-cyan-300"
-            >
-              + Create First Delivery Report
-            </button>
+          <div className="px-6 py-3 border-t border-stone-100 bg-stone-50/50 text-[11px] font-mono text-stone-500 flex justify-between items-center">
+            <span>Showing {reports.length} delivery reports</span>
+            <span>Recorded destination inspection manifests</span>
           </div>
-        ) : (
-          <table className="w-full text-left font-mono text-xs">
-            <thead>
-              <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500 bg-slate-950/40">
-                <th className="px-6 py-4">Report ID</th>
-                <th className="px-6 py-4">Shipment Reference</th>
-                <th className="px-6 py-4">Delivered Quantity</th>
-                <th className="px-6 py-4">Damaged / Missing</th>
-                <th className="px-6 py-4">Received By</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {reports.map((r) => {
-                const rKey = r.id || r._id || r.report_id
-                const statusColor = getStatusColor(r.status)
-                return (
-                  <tr key={rKey} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-6 py-4 font-bold text-cyan-400">{r.report_id || rKey}</td>
-                    <td className="px-6 py-4 text-slate-300">{r.shipment_public_id || r.shipment_id}</td>
-                    <td className="px-6 py-4 text-emerald-400 font-semibold">{formatWeight(r.delivered_quantity_kg)}</td>
-                    <td className="px-6 py-4">
-                      {r.damaged_quantity_kg > 0 || r.missing_quantity_kg > 0 ? (
-                        <span className="text-red-400 font-semibold">
-                          {r.damaged_quantity_kg > 0 && `${r.damaged_quantity_kg}kg dmg`}
-                          {r.missing_quantity_kg > 0 && ` ${r.missing_quantity_kg}kg mis`}
-                        </span>
-                      ) : (
-                        <span className="text-slate-500">None (100% OK)</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-slate-300">{r.received_by}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[10px] uppercase tracking-wider ${statusColor}`}>
-                        {formatStatus(r.status)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => confirmDeliveryMutation.mutate(r.shipment_id)}
-                        disabled={confirmDeliveryMutation.isPending}
-                        className="px-3 py-1 rounded-lg bg-emerald-600/20 border border-emerald-500/40 hover:bg-emerald-600 text-emerald-300 hover:text-white text-[10px] transition-all disabled:opacity-50"
-                      >
-                        Confirm Custody
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Inspection Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-1">Destination Inspection Report</h3>
-            <p className="text-xs text-slate-400 font-mono mb-4">Record delivered weights, condition grades, and receiver sign-off.</p>
+        <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-stone-200 rounded-2xl p-6 max-w-lg w-full shadow-xl animate-fade-in-up">
+            <h3 className="text-lg font-bold text-stone-900 mb-1">Destination Inspection Report</h3>
+            <p className="text-xs text-stone-500 mb-4 font-sans">Record delivered weights, condition grades, and receiver sign-off.</p>
 
-            <form onSubmit={handleSubmitReport} className="space-y-4 font-mono text-xs">
+            <form onSubmit={handleSubmitReport} className="space-y-4 text-xs font-mono">
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 uppercase">Select Consignment Shipment *</label>
+                <label className="text-[10px] text-stone-600 uppercase font-semibold font-sans">Select Consignment Shipment *</label>
                 <select
                   required
                   value={reportForm.shipment_id}
                   onChange={(e) => setReportForm({ ...reportForm, shipment_id: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                 >
                   <option value="">Select active shipment...</option>
                   {shipments.map(s => (
@@ -271,9 +290,9 @@ export default function DeliveriesListPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 uppercase">Delivered (KG) *</label>
+                  <label className="text-[10px] text-stone-600 uppercase font-semibold font-sans">Delivered (KG) *</label>
                   <input
                     type="number"
                     step="0.1"
@@ -281,66 +300,66 @@ export default function DeliveriesListPage() {
                     required
                     value={reportForm.delivered_quantity_kg}
                     onChange={(e) => setReportForm({ ...reportForm, delivered_quantity_kg: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 uppercase">Damaged (KG)</label>
+                  <label className="text-[10px] text-stone-600 uppercase font-semibold font-sans">Damaged (KG)</label>
                   <input
                     type="number"
                     step="0.1"
                     min="0"
                     value={reportForm.damaged_quantity_kg}
                     onChange={(e) => setReportForm({ ...reportForm, damaged_quantity_kg: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 uppercase">Missing (KG)</label>
+                  <label className="text-[10px] text-stone-600 uppercase font-semibold font-sans">Missing (KG)</label>
                   <input
                     type="number"
                     step="0.1"
                     min="0"
                     value={reportForm.missing_quantity_kg}
                     onChange={(e) => setReportForm({ ...reportForm, missing_quantity_kg: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 uppercase">Received By (Inspector / Buyer) *</label>
+                <label className="text-[10px] text-stone-600 uppercase font-semibold font-sans">Received By (Inspector / Buyer) *</label>
                 <input
                   type="text"
                   required
                   value={reportForm.received_by}
                   onChange={(e) => setReportForm({ ...reportForm, received_by: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 uppercase">Inspection Notes & Exceptions</label>
+                <label className="text-[10px] text-stone-600 uppercase font-semibold font-sans">Inspection Notes & Exceptions</label>
                 <textarea
                   rows={2}
                   value={reportForm.notes}
                   onChange={(e) => setReportForm({ ...reportForm, notes: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 resize-none"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] resize-none font-sans"
                 />
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-3 border-t border-stone-100">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-300"
+                  className="flex-1 py-2.5 rounded-lg border border-stone-200 text-stone-700 hover:bg-stone-50 font-medium font-sans"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createReportMutation.isPending}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 text-white font-bold disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-lg bg-[#244634] hover:bg-[#1b3527] text-white font-bold font-sans disabled:opacity-50"
                 >
                   {createReportMutation.isPending ? 'Logging...' : 'Submit Report'}
                 </button>
@@ -352,4 +371,3 @@ export default function DeliveriesListPage() {
     </div>
   )
 }
-

@@ -1,8 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, AlertCircle, Truck, ThermometerSnowflake } from 'lucide-react'
 import { fleetApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
 import { formatApiErrorMessage } from '../../utils'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Select } from '../../components/ui/select'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card'
 
 export default function VehicleCreatePage() {
   const navigate = useNavigate()
@@ -90,209 +95,215 @@ export default function VehicleCreatePage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 lg:px-8 py-10 animate-fade-in-up">
-      <button
+    <div className="max-w-2xl mx-auto py-4 space-y-6 animate-fade-in-up">
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => navigate('/fleet')}
-        className="text-xs font-mono text-cyan-400 hover:text-cyan-300 mb-6 flex items-center gap-2 transition-colors"
+        className="gap-2 text-xs font-mono text-[#526357] hover:text-[#26312A] -ml-2"
       >
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
+        <ArrowLeft className="w-3.5 h-3.5" />
         FLEET_INVENTORY
-      </button>
+      </Button>
 
-      <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-8 shadow-2xl">
-        <div className="mb-8">
-          <span className="text-xs font-mono uppercase tracking-widest text-cyan-400 mb-1 block">
-            Fleet Asset Enrollment
-          </span>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Register Fleet Vehicle</h1>
-          <p className="text-slate-400 text-sm mt-1">
+      <Card className="bg-white/95 border-[#E1DDD0] shadow-sm">
+        <CardHeader className="border-b border-[#ECE7DA] pb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-2 h-2 rounded-full bg-[#244634]" />
+            <span className="text-[11px] font-mono uppercase tracking-widest text-[#244634]">
+              Fleet Asset Enrollment
+            </span>
+          </div>
+          <CardTitle className="text-2xl font-serif font-bold text-[#1B2A20]">
+            Register Fleet Vehicle
+          </CardTitle>
+          <CardDescription className="text-xs text-[#526357]">
             Enroll a commercial freight truck with vehicle registration and fitness credentials.
-          </p>
-        </div>
+          </CardDescription>
+        </CardHeader>
 
-        {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-start gap-3">
-            <svg className="w-5 h-5 shrink-0 mt-0.5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Vehicle Registration No *
-              </label>
-              <input
-                type="text"
-                required
-                name="registration_number"
-                value={form.registration_number}
-                onChange={handleChange}
-                placeholder="MH-15-DC-4421"
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono uppercase"
-              />
+        <CardContent className="pt-6">
+          {error && (
+            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0 text-red-600 mt-0.5" />
+              <span>{error}</span>
             </div>
+          )}
 
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Fleet Category *
-              </label>
-              <select
-                name="category"
-                value={form.category}
-                onChange={handleChange}
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-              >
-                <option value="REEFER_14FT">Refrigerated Truck (14ft)</option>
-                <option value="REEFER_20FT">Refrigerated Truck (20ft)</option>
-                <option value="REEFER_32FT">Refrigerated Trailer (32ft)</option>
-                <option value="OPEN_TRUCK">Open Truck (Tarpaulin)</option>
-                <option value="CLOSED_CONTAINER">Closed Container</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Vehicle Make / Body Type *
-              </label>
-              <input
-                type="text"
-                required
-                name="vehicle_type"
-                value={form.vehicle_type}
-                onChange={handleChange}
-                placeholder="Tata Ultra T.7 Reefer"
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Max Payload Capacity (KG) *
-              </label>
-              <input
-                type="number"
-                min="500"
-                required
-                name="max_payload_kg"
-                value={form.max_payload_kg}
-                onChange={handleChange}
-                placeholder="3500"
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-              />
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                name="refrigeration_available"
-                checked={form.refrigeration_available}
-                onChange={handleChange}
-                className="w-4 h-4 rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0"
-              />
-              <span className="text-xs font-mono font-semibold text-slate-200">
-                Vehicle Equipped with Active Refrigeration Unit
-              </span>
-            </label>
-
-            {form.refrigeration_available && (
-              <div className="grid grid-cols-2 gap-4 pt-1">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-slate-400 uppercase">Min Temp (°C)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    name="temperature_min"
-                    value={form.temperature_min}
-                    onChange={handleChange}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-slate-400 uppercase">Max Temp (°C)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    name="temperature_max"
-                    value={form.temperature_max}
-                    onChange={handleChange}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 font-mono"
-                  />
-                </div>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Vehicle Registration No *
+                </label>
+                <Input
+                  type="text"
+                  required
+                  name="registration_number"
+                  value={form.registration_number}
+                  onChange={handleChange}
+                  placeholder="MH-15-DC-4421"
+                  className="bg-white border-[#E1DDD0] uppercase font-mono focus-visible:ring-[#244634]"
+                />
               </div>
-            )}
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Registration Expiry *
-              </label>
-              <input
-                type="date"
-                required
-                name="registration_expiry"
-                value={form.registration_expiry}
-                onChange={handleChange}
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-              />
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Fleet Category *
+                </label>
+                <Select
+                  name="category"
+                  value={form.category}
+                  onChange={handleChange}
+                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                >
+                  <option value="REEFER_14FT">Refrigerated Truck (14ft)</option>
+                  <option value="REEFER_20FT">Refrigerated Truck (20ft)</option>
+                  <option value="REEFER_32FT">Refrigerated Trailer (32ft)</option>
+                  <option value="OPEN_TRUCK">Open Truck (Tarpaulin)</option>
+                  <option value="CLOSED_CONTAINER">Closed Container</option>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Insurance Expiry *
-              </label>
-              <input
-                type="date"
-                required
-                name="insurance_expiry"
-                value={form.insurance_expiry}
-                onChange={handleChange}
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Fitness Certificate *
-              </label>
-              <input
-                type="date"
-                required
-                name="fitness_expiry"
-                value={form.fitness_expiry}
-                onChange={handleChange}
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-              />
-            </div>
-          </div>
 
-          <div className="flex gap-4 pt-4">
-            <button
-              type="button"
-              onClick={() => navigate('/fleet')}
-              className="flex-1 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium text-sm transition-all"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-bold text-sm shadow-lg shadow-cyan-900/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-            >
-              {loading ? 'Enrolling Asset...' : 'Register Vehicle Asset'}
-            </button>
-          </div>
-        </form>
-      </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Vehicle Make / Body Type *
+                </label>
+                <Input
+                  type="text"
+                  required
+                  name="vehicle_type"
+                  value={form.vehicle_type}
+                  onChange={handleChange}
+                  placeholder="Tata Ultra T.7 Reefer"
+                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Max Payload Capacity (KG) *
+                </label>
+                <Input
+                  type="number"
+                  min="500"
+                  required
+                  name="max_payload_kg"
+                  value={form.max_payload_kg}
+                  onChange={handleChange}
+                  placeholder="3500"
+                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#E8EFE9]/40 border border-[#C3D4C7] space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="refrigeration_available"
+                  checked={form.refrigeration_available}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded border-[#C3D4C7] text-[#244634] focus:ring-0"
+                />
+                <span className="text-xs font-mono font-semibold text-[#1B2A20]">
+                  Vehicle Equipped with Active Refrigeration Unit
+                </span>
+              </label>
+
+              {form.refrigeration_available && (
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-[#C3D4C7]/50">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Min Temp (°C)</label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      name="temperature_min"
+                      value={form.temperature_min}
+                      onChange={handleChange}
+                      className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Max Temp (°C)</label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      name="temperature_max"
+                      value={form.temperature_max}
+                      onChange={handleChange}
+                      className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Registration Expiry *
+                </label>
+                <Input
+                  type="date"
+                  required
+                  name="registration_expiry"
+                  value={form.registration_expiry}
+                  onChange={handleChange}
+                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Insurance Expiry *
+                </label>
+                <Input
+                  type="date"
+                  required
+                  name="insurance_expiry"
+                  value={form.insurance_expiry}
+                  onChange={handleChange}
+                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Fitness Certificate *
+                </label>
+                <Input
+                  type="date"
+                  required
+                  name="fitness_expiry"
+                  value={form.fitness_expiry}
+                  onChange={handleChange}
+                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-4 border-t border-[#ECE7DA]">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate('/fleet')}
+                className="flex-1 bg-white border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={loading}
+                className="flex-1 bg-[#244634] hover:bg-[#1A3326] text-white shadow-sm"
+              >
+                {loading ? 'Enrolling Asset...' : 'Register Vehicle Asset'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }
-

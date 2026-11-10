@@ -1,9 +1,18 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { RefreshCw, CheckCircle, AlertCircle, DollarSign, Send } from 'lucide-react'
 import { freightQuotesApi, freightBookingsApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
 import { formatCurrency, formatDate, formatDateTime, formatStatus, getApiError } from '../../utils'
+import { PageHeader } from '../../components/common/PageHeader'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Select } from '../../components/ui/select'
+import { Textarea } from '../../components/ui/textarea'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card'
+import { StatusBadge } from '../../components/common/StatusBadge'
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/ui/table'
 
 export default function FreightQuotesPage() {
   const location = useLocation()
@@ -33,7 +42,7 @@ export default function FreightQuotesPage() {
   const [successMsg, setSuccessMsg] = useState('')
 
   // Query all quotes
-  const { data: quotesData, isLoading, refetch } = useQuery({
+  const { data: quotesData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['freight-quotes-all'],
     queryFn: () => freightQuotesApi.list().then(res => res.data),
     staleTime: 30_000,
@@ -115,245 +124,240 @@ export default function FreightQuotesPage() {
   }
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-4 lg:px-8 py-10 animate-fade-in-up">
+    <div className="space-y-6 animate-fade-in-up">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="flex h-2 w-2 rounded-full bg-cyan-500"></span>
-            <span className="text-xs font-mono font-medium text-cyan-500 uppercase tracking-widest">
-              Fleet Commercial Exchange
-            </span>
-          </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">
-            Freight <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Quotations</span>
-          </h1>
-          <p className="text-slate-500 mt-2 max-w-xl">
-            Submit pricing proposals for agricultural haulage, manage fuel surcharges, and review awarded bids.
-          </p>
-        </div>
+      <PageHeader
+        eyebrow="Fleet Commercial Exchange"
+        title="Freight Quotations"
+        description="Submit pricing proposals for agricultural haulage, manage fuel surcharges, and review awarded bids."
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="gap-2 bg-white/80 border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
+          </Button>
+        }
+      />
 
-        <button
-          onClick={() => refetch()}
-          className="px-4 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white transition-all text-sm font-medium flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Sync
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Quotation Submission Form */}
-        <div className="lg:col-span-1 bg-[#0b1121] border border-slate-800 rounded-3xl p-6 shadow-2xl h-fit">
-          <div className="mb-6">
-            <span className="text-xs font-mono uppercase tracking-widest text-emerald-400 mb-1 block">
-              Carrier Bid
-            </span>
-            <h2 className="text-xl font-bold text-white tracking-tight">Submit Freight Quotation</h2>
-            <p className="text-slate-400 text-xs mt-1">
+        <Card className="lg:col-span-1 bg-white/95 border-[#E1DDD0] shadow-sm h-fit">
+          <CardHeader className="border-b border-[#ECE7DA] pb-5">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2 h-2 rounded-full bg-[#3F7C56]" />
+              <span className="text-[11px] font-mono uppercase tracking-widest text-[#3F7C56]">
+                Carrier Bid
+              </span>
+            </div>
+            <CardTitle className="text-xl font-serif font-bold text-[#1B2A20]">
+              Submit Freight Quotation
+            </CardTitle>
+            <CardDescription className="text-xs text-[#526357]">
               Provide transit metrics and pricing breakdown in INR.
-            </p>
-          </div>
+            </CardDescription>
+          </CardHeader>
 
-          {formError && (
-            <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs font-mono">
-              {formError}
-            </div>
-          )}
+          <CardContent className="pt-5">
+            {formError && (
+              <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-mono flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
+                <span>{formError}</span>
+              </div>
+            )}
 
-          {successMsg && (
-            <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-mono">
-              {successMsg}
-            </div>
-          )}
+            {successMsg && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+                <span>{successMsg}</span>
+              </div>
+            )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Booking ID *</label>
-              <select
-                name="booking_id"
-                required
-                value={form.booking_id}
-                onChange={handleChange}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Booking ID *</label>
+                <Select
+                  name="booking_id"
+                  required
+                  value={form.booking_id}
+                  onChange={handleChange}
+                  className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                >
+                  <option value="">Select dispatch booking...</option>
+                  {bookings.map(b => (
+                    <option key={b.booking_id || b.id} value={b.booking_id || b.id}>
+                      {b.booking_id || b.id} — {b.pickup_city} to {b.destination_city}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Vehicle Category *</label>
+                <Select
+                  name="proposed_vehicle_category"
+                  value={form.proposed_vehicle_category}
+                  onChange={handleChange}
+                  className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                >
+                  <option value="REEFER_14FT">Refrigerated Truck (14ft)</option>
+                  <option value="REEFER_20FT">Refrigerated Truck (20ft)</option>
+                  <option value="REEFER_32FT">Refrigerated Trailer (32ft)</option>
+                  <option value="OPEN_TRUCK">Open Tarpaulin Truck</option>
+                  <option value="CLOSED_CONTAINER">Closed Container</option>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Base Freight (₹) *</label>
+                  <Input
+                    type="number"
+                    required
+                    name="freight_base_charge_inr"
+                    value={form.freight_base_charge_inr}
+                    onChange={handleChange}
+                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Handling (₹)</label>
+                  <Input
+                    type="number"
+                    name="handling_charge_inr"
+                    value={form.handling_charge_inr}
+                    onChange={handleChange}
+                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Fuel Surcharge (₹)</label>
+                  <Input
+                    type="number"
+                    name="fuel_surcharge_inr"
+                    value={form.fuel_surcharge_inr}
+                    onChange={handleChange}
+                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Other Charges (₹)</label>
+                  <Input
+                    type="number"
+                    name="other_charges_inr"
+                    value={form.other_charges_inr}
+                    onChange={handleChange}
+                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Distance (KM) *</label>
+                  <Input
+                    type="number"
+                    required
+                    name="planned_distance_km"
+                    value={form.planned_distance_km}
+                    onChange={handleChange}
+                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Transit Hours *</label>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    required
+                    name="estimated_transit_hours"
+                    value={form.estimated_transit_hours}
+                    onChange={handleChange}
+                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={submitQuoteMutation.isPending}
+                className="w-full bg-[#244634] hover:bg-[#1A3326] text-white shadow-sm mt-3"
               >
-                <option value="">Select dispatch booking...</option>
-                {bookings.map(b => (
-                  <option key={b.booking_id || b.id} value={b.booking_id || b.id}>
-                    {b.booking_id || b.id} — {b.pickup_city} to {b.destination_city}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Vehicle Category *</label>
-              <select
-                name="proposed_vehicle_category"
-                value={form.proposed_vehicle_category}
-                onChange={handleChange}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
-              >
-                <option value="REEFER_14FT">Refrigerated Truck (14ft)</option>
-                <option value="REEFER_20FT">Refrigerated Truck (20ft)</option>
-                <option value="REEFER_32FT">Refrigerated Trailer (32ft)</option>
-                <option value="OPEN_TRUCK">Open Tarpaulin Truck</option>
-                <option value="CLOSED_CONTAINER">Closed Container</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Base Freight (₹) *</label>
-                <input
-                  type="number"
-                  required
-                  name="freight_base_charge_inr"
-                  value={form.freight_base_charge_inr}
-                  onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Handling (₹)</label>
-                <input
-                  type="number"
-                  name="handling_charge_inr"
-                  value={form.handling_charge_inr}
-                  onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Fuel Surcharge (₹)</label>
-                <input
-                  type="number"
-                  name="fuel_surcharge_inr"
-                  value={form.fuel_surcharge_inr}
-                  onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Other Charges (₹)</label>
-                <input
-                  type="number"
-                  name="other_charges_inr"
-                  value={form.other_charges_inr}
-                  onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Distance (KM) *</label>
-                <input
-                  type="number"
-                  required
-                  name="planned_distance_km"
-                  value={form.planned_distance_km}
-                  onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Transit Hours *</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  required
-                  name="estimated_transit_hours"
-                  value={form.estimated_transit_hours}
-                  onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={submitQuoteMutation.isPending}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-mono text-xs font-bold shadow-lg shadow-cyan-900/20 disabled:opacity-50 transition-all mt-4"
-            >
-              {submitQuoteMutation.isPending ? 'Publishing Quotation...' : 'Transmit Quotation Bid'}
-            </button>
-          </form>
-        </div>
+                {submitQuoteMutation.isPending ? 'Publishing Quotation...' : 'Transmit Quotation Bid'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
 
         {/* Right Column: Quotes List */}
-        <div className="lg:col-span-2 bg-[#0b1121] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl h-fit">
-          <div className="p-6 border-b border-slate-800">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
+        <Card className="lg:col-span-2 bg-white/95 border-[#E1DDD0] overflow-hidden shadow-sm h-fit">
+          <div className="p-6 border-b border-[#ECE7DA] bg-[#F2EFE7]/40">
+            <h2 className="text-base font-serif font-bold text-[#1B2A20] flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#244634]" />
               Exchange Quotations Ledger
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Live bids submitted across active logistics bookings</p>
+            <p className="text-xs text-[#526357] mt-0.5">Live bids submitted across active logistics bookings</p>
           </div>
 
           {isLoading ? (
-            <div className="p-16 text-center text-slate-500 font-mono text-xs animate-pulse">
+            <div className="p-16 text-center text-[#526357] font-mono text-xs animate-pulse">
               Querying quotation exchange...
             </div>
           ) : quotes.length === 0 ? (
             <div className="p-16 text-center">
-              <div className="text-4xl mb-3">💰</div>
-              <h3 className="text-base font-medium text-white mb-1">No Quotations on Record</h3>
-              <p className="text-slate-500 text-xs">Use the submission form to post a carrier bid.</p>
+              <div className="w-12 h-12 rounded-full bg-[#F2EFE7] text-[#7A887E] flex items-center justify-center mx-auto mb-3">
+                <DollarSign className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-semibold text-[#1B2A20] mb-1">No Quotations on Record</h3>
+              <p className="text-xs text-[#526357]">Use the submission form to post a carrier bid.</p>
             </div>
           ) : (
-            <table className="w-full text-left font-mono text-xs">
-              <thead>
-                <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500 bg-slate-950/40">
-                  <th className="px-6 py-4">Quote ID</th>
-                  <th className="px-6 py-4">Booking Ref</th>
-                  <th className="px-6 py-4">Vehicle Category</th>
-                  <th className="px-6 py-4">Distance & Transit</th>
-                  <th className="px-6 py-4">Total Amount</th>
-                  <th className="px-6 py-4">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
+            <Table>
+              <TableHeader className="bg-[#F2EFE7]/60">
+                <TableRow className="border-[#ECE7DA]">
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E] py-3.5">Quote ID</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Booking Ref</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Vehicle Category</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Distance & Transit</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Total Amount</TableHead>
+                  <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-[#ECE7DA] font-mono text-xs">
                 {quotes.map((q) => {
                   const quoteKey = q.id || q._id || q.quotation_id
-                  const isAccepted = q.status === 'ACCEPTED'
                   return (
-                    <tr key={quoteKey} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="px-6 py-4 font-bold text-cyan-400">{q.quotation_id || quoteKey}</td>
-                      <td className="px-6 py-4 text-slate-300 cursor-pointer hover:underline" onClick={() => navigate(`/freight-bookings/${q.booking_id}`)}>
+                    <TableRow key={quoteKey} className="hover:bg-[#F2EFE7]/40 transition-colors border-[#ECE7DA]">
+                      <TableCell className="font-bold text-[#244634] py-4">{q.quotation_id || quoteKey}</TableCell>
+                      <TableCell className="text-[#26312A] cursor-pointer hover:underline font-semibold" onClick={() => navigate(`/freight-bookings/${q.booking_id}`)}>
                         {q.booking_id}
-                      </td>
-                      <td className="px-6 py-4 text-slate-400">{q.proposed_vehicle_category}</td>
-                      <td className="px-6 py-4 text-slate-300">
-                        {q.planned_distance_km} km • {q.estimated_transit_hours} hrs
-                      </td>
-                      <td className="px-6 py-4 text-emerald-400 font-bold">
+                      </TableCell>
+                      <TableCell className="text-[#526357]">{q.proposed_vehicle_category}</TableCell>
+                      <TableCell className="text-[#26312A]">
+                        {q.planned_distance_km} km • <span className="text-[#B36B21]">{q.estimated_transit_hours} hrs</span>
+                      </TableCell>
+                      <TableCell className="text-[#244634] font-bold">
                         {formatCurrency(q.total_freight_charge_paise || q.freight_base_charge_paise)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] uppercase border ${
-                          isAccepted
-                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                            : 'bg-slate-800 border-slate-700 text-slate-400'
-                        }`}>
-                          {q.status || 'PENDING'}
-                        </span>
-                      </td>
-                    </tr>
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={q.status || 'PENDING'} />
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   )
 }
-

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Truck, AlertTriangle, UserCheck, ShieldAlert, CheckCircle2, MapPin } from 'lucide-react'
+import { ArrowLeft, Truck, AlertTriangle, ShieldAlert, CheckCircle2, MapPin, User, ShieldCheck } from 'lucide-react'
 import { shipmentsApi, freightBookingsApi, fleetApi, driversApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
 import { ROLES, normalizeRole } from '../../constants/roles'
 import { formatWeight, formatApiErrorMessage } from '../../utils'
+import PageHeader from '../../components/common/PageHeader'
 
 export default function ShipmentCreatePage() {
   const navigate = useNavigate()
@@ -137,15 +138,15 @@ export default function ShipmentCreatePage() {
   if (userRole !== ROLES.TRANSPORTER) {
     return (
       <div className="max-w-xl mx-auto px-4 py-16 text-center">
-        <div className="p-8 rounded-2xl bg-slate-900 border border-red-500/30">
-          <ShieldAlert className="w-12 h-12 text-red-400 mx-auto mb-3" />
-          <h2 className="text-lg font-bold text-white">Transporter Authorization Required</h2>
-          <p className="text-xs text-slate-400 mt-2 mb-6">
+        <div className="p-8 rounded-2xl bg-white border border-rose-200 shadow-sm">
+          <ShieldAlert className="w-12 h-12 text-rose-600 mx-auto mb-3" />
+          <h2 className="text-lg font-bold text-stone-900">Transporter Authorization Required</h2>
+          <p className="text-xs text-stone-500 mt-2 mb-6 leading-relaxed">
             Under AgriChain RBAC policy, shipment dispatching is restricted to registered carriers with vehicle and driver assets.
           </p>
           <button
             onClick={() => navigate('/shipments')}
-            className="px-4 py-2 rounded-xl bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700"
+            className="px-4 py-2 rounded-lg bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800 transition-colors"
           >
             Return to Shipments
           </button>
@@ -155,29 +156,26 @@ export default function ShipmentCreatePage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 lg:px-8 py-10 animate-fade-in-up">
-      <button
-        onClick={() => navigate('/shipments')}
-        className="text-xs font-mono text-cyan-400 hover:text-cyan-300 mb-6 flex items-center gap-2 transition-colors"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" />
-        SHIPMENTS_CONSIGNMENTS
-      </button>
-
-      <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-8 shadow-2xl">
-        <div className="mb-8">
-          <span className="text-xs font-mono uppercase tracking-widest text-cyan-400 mb-1 block">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageHeader
+        breadcrumbs={[
+          { label: 'Shipments', href: '/shipments' },
+          { label: 'Initialize Consignment' }
+        ]}
+        title="Initialize Shipment Consignment"
+        description="Bind an approved freight booking with transport vehicle and driver assets for cold-chain haulage."
+        badge={
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
+            <Truck className="w-3.5 h-3.5 text-amber-600" />
             Consignment Dispatch
           </span>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Initialize Shipment Consignment</h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Bind an approved freight booking with transport vehicle and driver assets for cold-chain haulage.
-          </p>
-        </div>
+        }
+      />
 
+      <div className="bg-white border border-stone-200 rounded-2xl p-6 sm:p-8 shadow-sm">
         {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-red-400" />
+          <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-rose-600" />
             <span>{error}</span>
           </div>
         )}
@@ -185,15 +183,15 @@ export default function ShipmentCreatePage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Booking Selector */}
           <div className="space-y-2">
-            <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-              Confirmed Freight Booking *
+            <label className="block text-xs font-mono font-semibold text-stone-600 uppercase tracking-wider">
+              Confirmed Freight Booking <span className="text-rose-500">*</span>
             </label>
             <select
               required
               name="booking_id"
               value={form.booking_id}
               onChange={(e) => handleBookingSelect(e.target.value)}
-              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+              className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-2.5 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono transition-colors"
             >
               <option value="">Select confirmed freight booking...</option>
               {bookings.map(b => (
@@ -206,16 +204,16 @@ export default function ShipmentCreatePage() {
 
           {/* Selected booking preview banner */}
           {selectedBookingDetails && (
-            <div className="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/20 text-xs font-mono text-slate-300 space-y-2">
-              <div className="flex justify-between font-bold text-cyan-300">
+            <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 text-xs font-mono text-stone-700 space-y-2">
+              <div className="flex justify-between font-bold text-[#244634]">
                 <span>Route: {selectedBookingDetails.pickup_city} → {selectedBookingDetails.destination_city}</span>
                 <span>{formatWeight(selectedBookingDetails.total_cargo_weight_kg)}</span>
               </div>
-              <div className="flex justify-between text-slate-400 text-[11px]">
+              <div className="flex justify-between text-stone-600 text-[11px] font-sans">
                 <span>Pickup: {selectedBookingDetails.pickup_address}</span>
                 <span>Destination: {selectedBookingDetails.destination_address}</span>
               </div>
-              <div className="text-[11px] text-emerald-400">
+              <div className="text-[11px] text-emerald-800 font-semibold font-mono">
                 Linked Accepted Quote: {selectedBookingDetails.accepted_quotation_id}
               </div>
             </div>
@@ -224,15 +222,15 @@ export default function ShipmentCreatePage() {
           {/* Vehicle and Driver selection */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Assigned Haulage Vehicle *
+              <label className="block text-xs font-mono font-semibold text-stone-600 uppercase tracking-wider">
+                Assigned Haulage Vehicle <span className="text-rose-500">*</span>
               </label>
               <select
                 required
                 name="vehicle_id"
                 value={form.vehicle_id}
                 onChange={handleChange}
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+                className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-2.5 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono transition-colors"
               >
                 <option value="">Select available vehicle...</option>
                 {vehicles.map(v => (
@@ -244,15 +242,15 @@ export default function ShipmentCreatePage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Assigned Commercial Driver *
+              <label className="block text-xs font-mono font-semibold text-stone-600 uppercase tracking-wider">
+                Assigned Commercial Driver <span className="text-rose-500">*</span>
               </label>
               <select
                 required
                 name="driver_id"
                 value={form.driver_id}
                 onChange={handleChange}
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+                className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-2.5 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono transition-colors"
               >
                 <option value="">Select available driver...</option>
                 {drivers.map(d => (
@@ -264,22 +262,22 @@ export default function ShipmentCreatePage() {
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400 leading-relaxed">
-            <span className="text-slate-300 font-semibold">State Machine Progression:</span> Shipment creation transitions status directly to <span className="text-cyan-400 font-mono font-bold">DRIVER_ASSIGNED</span>. Vehicle and driver status will be locked to <span className="text-amber-400 font-mono font-bold">ASSIGNED</span> until delivery finalization.
+          <div className="p-4 rounded-xl bg-stone-50 border border-stone-200 text-xs text-stone-600 leading-relaxed font-sans">
+            <span className="text-stone-900 font-semibold">State Machine Progression:</span> Shipment creation transitions status directly to <span className="text-[#244634] font-mono font-bold">DRIVER_ASSIGNED</span>. Vehicle and driver status will be locked to <span className="text-amber-700 font-mono font-bold">ASSIGNED</span> until delivery finalization.
           </div>
 
-          <div className="pt-4 flex items-center justify-end gap-3">
+          <div className="pt-4 flex items-center justify-end gap-3 border-t border-stone-100">
             <button
               type="button"
               onClick={() => navigate('/shipments')}
-              className="px-6 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium text-sm transition-all"
+              className="px-5 py-2.5 rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 font-medium text-sm transition-all"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-500/20 transition-all disabled:opacity-50"
+              className="px-6 py-2.5 rounded-lg bg-[#244634] hover:bg-[#1b3527] text-white font-semibold text-sm shadow-sm transition-all disabled:opacity-50"
             >
               {loading ? 'Initializing Consignment...' : 'Confirm Shipment Dispatch'}
             </button>

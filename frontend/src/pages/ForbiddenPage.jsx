@@ -1,23 +1,28 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { ShieldAlert, ArrowLeft } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 export default function ForbiddenPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
+
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
-      <div className="text-6xl mb-4">🚫</div>
-      <h1 className="text-3xl font-bold text-white mb-2">Access Restricted</h1>
-      <p className="text-slate-400 mb-6 max-w-sm">
-        Your role ({user?.role || 'unknown'}) does not have permission to view this page.
+    <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-4">
+      <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center mb-5 shadow-xs">
+        <ShieldAlert className="w-8 h-8 stroke-[2]" />
+      </div>
+      <h1 className="text-3xl font-bold text-ink-primary font-serif mb-2">Access Restricted</h1>
+      <p className="text-ink-secondary mb-6 max-w-sm text-sm leading-relaxed">
+        Your role <span className="font-mono font-semibold text-forest">({user?.role || 'UNKNOWN'})</span> does not have authorized permissions to access this operational sector.
       </p>
-      <button
+      <Button
         onClick={() => navigate('/dashboard')}
-        className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold transition-all"
+        className="px-6 py-2.5"
       >
+        <ArrowLeft className="w-4 h-4 mr-2" />
         Return to Dashboard
-      </button>
+      </Button>
     </div>
   )
 }
-

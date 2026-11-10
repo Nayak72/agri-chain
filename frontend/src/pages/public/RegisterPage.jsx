@@ -18,7 +18,6 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { ROLES } from '../../constants/roles'
-import AmbientBackground from '../../components/layout/AmbientBackground'
 
 const ROLE_OPTIONS = [
   {
@@ -130,57 +129,55 @@ export default function RegisterPage() {
     }
   }
 
-  const selectedRoleMeta = ROLE_OPTIONS.find(r => r.role === formData.role)
-
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-200 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative selection:bg-cyan-500/30 selection:text-cyan-200">
-      <AmbientBackground />
-
-      <div className="sm:mx-auto sm:w-full sm:max-w-xl px-4 relative z-10">
+    <div className="min-h-screen bg-[#F6F4EC] text-[#26312A] flex flex-col justify-center py-12 sm:px-6 lg:px-8 selection:bg-forest/20 selection:text-forest">
+      <div className="sm:mx-auto sm:w-full sm:max-w-xl px-4">
+        
+        {/* Brand Header */}
         <div className="flex items-center justify-center gap-3 mb-6">
-          <Link to={isAuthenticated ? "/dashboard" : "/"} className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
-              <span className="text-white font-bold text-xl font-mono">A</span>
+          <Link to={isAuthenticated ? "/dashboard" : "/"} className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-forest text-white flex items-center justify-center shadow-xs">
+              <Leaf className="h-6 w-6 stroke-[2.2]" />
             </div>
             <div className="text-left">
-              <div className="font-bold text-xl tracking-tight text-white leading-none">AgriChain</div>
-              <div className="text-[10px] text-cyan-400 font-mono tracking-wider mt-0.5">SUPPLY CHAIN OS</div>
+              <span className="font-bold text-xl tracking-tight text-ink-primary leading-none block">AgriChain</span>
+              <span className="text-[10px] text-forest font-mono tracking-wider font-semibold">NATURE MEETS PRECISION</span>
             </div>
           </Link>
         </div>
 
         <div className="text-center mb-8">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink-primary font-serif">
             Create Your Platform Account
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-2">
+          <p className="text-xs sm:text-sm text-ink-secondary mt-1.5">
             Join the integrated agricultural supply chain network
           </p>
         </div>
 
-        <div className="bg-[#0b1121]/90 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl">
+        <div className="bg-surface border border-border rounded-3xl p-6 sm:p-8 shadow-sm">
           {formError && (
-            <div className="mb-6 p-4 rounded-xl bg-red-950/40 border border-red-500/30 flex items-start gap-3 text-red-300 text-xs sm:text-sm">
-              <AlertCircle className="w-5 h-5 shrink-0 text-red-400 mt-0.5" />
-              <div>{formError}</div>
+            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-800 text-xs sm:text-sm">
+              <AlertCircle className="w-5 h-5 shrink-0 text-red-600 mt-0.5" />
+              <div className="font-medium leading-relaxed">{formError}</div>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Full Name */}
             <div>
-              <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
+              <label className="block text-xs font-mono font-semibold uppercase text-ink-secondary mb-1.5">
                 Full Name *
               </label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-tertiary" />
                 <input
                   type="text"
                   required
                   value={formData.full_name}
                   onChange={(e) => handleChange('full_name', e.target.value)}
                   placeholder="e.g. Ramesh Patel"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                  className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all"
                 />
               </div>
             </div>
@@ -188,34 +185,34 @@ export default function RegisterPage() {
             {/* Email & Phone */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
+                <label className="block text-xs font-mono font-semibold uppercase text-ink-secondary mb-1.5">
                   Email Address *
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-tertiary" />
                   <input
                     type="email"
                     required
                     value={formData.email}
                     onChange={(e) => handleChange('email', e.target.value)}
                     placeholder="name@example.com"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
+                <label className="block text-xs font-mono font-semibold uppercase text-ink-secondary mb-1.5">
                   Phone Number
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-tertiary" />
                   <input
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => handleChange('phone', e.target.value)}
                     placeholder="+91 98765 43210"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all font-mono"
                   />
                 </div>
               </div>
@@ -223,7 +220,7 @@ export default function RegisterPage() {
 
             {/* Role Selector */}
             <div>
-              <label className="block text-xs font-mono uppercase text-slate-400 mb-2">
+              <label className="block text-xs font-mono font-semibold uppercase text-ink-secondary mb-2">
                 Operational Role *
               </label>
               <div className="space-y-2">
@@ -234,37 +231,37 @@ export default function RegisterPage() {
                     <div
                       key={opt.role}
                       onClick={() => handleChange('role', opt.role)}
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
+                      className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start gap-3.5 ${
                         isSelected
-                          ? 'border-cyan-500/60 bg-cyan-950/20 shadow-md shadow-cyan-500/10'
-                          : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
+                          ? 'border-forest bg-forest/5 shadow-xs'
+                          : 'border-border bg-surface hover:bg-surface-muted/50'
                       }`}
                     >
                       <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
                           isSelected
-                            ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-                            : 'bg-slate-800 text-slate-400'
+                            ? 'bg-forest text-white'
+                            : 'bg-surface-muted text-ink-secondary'
                         }`}
                       >
-                        <Icon className="w-4 h-4" />
+                        <Icon className="w-4 h-4 stroke-[2]" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <span className={`text-sm font-semibold ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                          <span className={`text-sm font-bold ${isSelected ? 'text-forest' : 'text-ink-primary'}`}>
                             {opt.label}
                           </span>
                           <span
-                            className={`text-[10px] font-mono px-2 py-0.5 rounded ${
+                            className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md border ${
                               opt.autoApprove
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : 'bg-amber-50 text-amber-800 border-amber-200'
                             }`}
                           >
                             {opt.autoApprove ? 'Auto-approved' : 'Admin approval required'}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400 mt-0.5">{opt.desc}</p>
+                        <p className="text-xs text-ink-secondary mt-0.5 leading-relaxed">{opt.desc}</p>
                       </div>
                     </div>
                   )
@@ -275,23 +272,23 @@ export default function RegisterPage() {
             {/* Password Fields */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
+                <label className="block text-xs font-mono font-semibold uppercase text-ink-secondary mb-1.5">
                   Password *
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-tertiary" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={formData.password}
                     onChange={(e) => handleChange('password', e.target.value)}
                     placeholder="Min 6 characters"
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    className="w-full pl-10 pr-10 py-2.5 bg-surface border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all font-mono"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-tertiary hover:text-ink-secondary cursor-pointer"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -299,40 +296,40 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
+                <label className="block text-xs font-mono font-semibold uppercase text-ink-secondary mb-1.5">
                   Confirm Password *
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-tertiary" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={formData.confirm_password}
                     onChange={(e) => handleChange('confirm_password', e.target.value)}
                     placeholder="Repeat password"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all font-mono"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400 leading-relaxed">
-              <span className="text-slate-300 font-semibold">Security Note:</span> System administrator accounts cannot be created via public registration. Contact your platform administrator for administrative provisioning.
+            <div className="p-3.5 rounded-xl bg-surface-muted/70 border border-border text-xs text-ink-secondary leading-relaxed">
+              <span className="text-ink-primary font-semibold">Security Note:</span> System administrator accounts cannot be created via public registration. Contact your platform administrator for administrative provisioning.
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 hover:from-cyan-300 hover:to-emerald-300 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-forest hover:bg-forest-dark text-white font-semibold text-sm shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
             >
               {loading ? 'Creating Account...' : 'Complete Registration'}
               {!loading && <ArrowRight className="w-4 h-4" />}
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-slate-800 text-center">
-            <span className="text-xs text-slate-400">Already have an account? </span>
-            <Link to="/login" className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 underline">
+          <div className="mt-6 pt-6 border-t border-border text-center">
+            <span className="text-xs text-ink-secondary">Already have an account? </span>
+            <Link to="/login" className="text-xs font-semibold text-forest hover:underline">
               Sign In
             </Link>
           </div>
@@ -341,4 +338,3 @@ export default function RegisterPage() {
     </div>
   )
 }
-

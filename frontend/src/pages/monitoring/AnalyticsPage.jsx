@@ -32,8 +32,9 @@ import {
 } from 'recharts'
 import { analyticsApi } from '../../api/analytics.api'
 import { formatCurrency } from '../../utils'
+import PageHeader from '../../components/common/PageHeader'
 
-const COLORS = ['#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+const COLORS = ['#244634', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#0284c7']
 
 export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState('overview') // 'overview' | 'freight' | 'quality' | 'fleet'
@@ -76,7 +77,7 @@ export default function AnalyticsPage() {
 
   // Prepare chart datasets
   const fleetDistribution = fleetData ? [
-    { name: 'Assigned', value: fleetData.assigned_vehicles || 0, color: '#06b6d4' },
+    { name: 'Assigned', value: fleetData.assigned_vehicles || 0, color: '#244634' },
     { name: 'Available', value: fleetData.available_vehicles || 0, color: '#10b981' },
     { name: 'Maintenance', value: fleetData.maintenance_vehicles || 0, color: '#f59e0b' },
   ] : []
@@ -99,52 +100,48 @@ export default function AnalyticsPage() {
   })) || []
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-              <TrendingUp className="h-6 w-6 text-cyan-400" />
-              Supply Chain Analytics & Intelligence
-            </h1>
-            <span className="px-2.5 py-1 text-xs font-mono font-semibold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded flex items-center gap-1.5">
-              <ShieldCheck className="h-3 w-3 text-emerald-400" />
-              FASTAPI LIVE AGGREGATIONS
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-slate-400">
-            Real-time multi-dimensional operational metrics across freight spend, vehicle fleet efficiency, cold-chain compliance, and cargo quality
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
+      <PageHeader
+        breadcrumbs={[
+          { label: 'Intelligence', href: '/analytics' },
+          { label: 'Analytics' }
+        ]}
+        title="Supply Chain Analytics & Intelligence"
+        description="Real-time multi-dimensional operational metrics across freight spend, vehicle fleet efficiency, cold-chain compliance, and cargo quality."
+        badge={
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+            FASTAPI LIVE AGGREGATIONS
+          </span>
+        }
+        actions={
           <button
             onClick={fetchAllAnalytics}
             disabled={loading}
-            className="px-3 py-2 rounded-lg text-xs font-mono bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors flex items-center gap-2"
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 shadow-xs transition-colors"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh Analytics
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-stone-400' : 'text-stone-500'}`} />
+            <span>Refresh Analytics</span>
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {error && (
-        <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-4 text-sm text-red-300 flex items-center gap-3">
-          <AlertTriangle className="h-5 w-5 text-red-400 shrink-0" />
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto text-xs font-mono">
+      <div className="flex items-center gap-2 border-b border-stone-200 pb-3 overflow-x-auto text-xs font-mono">
         <button
           onClick={() => setActiveTab('overview')}
           className={`px-4 py-2 rounded-lg font-semibold uppercase tracking-wider transition-colors flex items-center gap-2 ${
             activeTab === 'overview'
-              ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-[#244634] text-white shadow-xs'
+              : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
           }`}
         >
           <BarChart3 className="h-4 w-4" />
@@ -154,8 +151,8 @@ export default function AnalyticsPage() {
           onClick={() => setActiveTab('freight')}
           className={`px-4 py-2 rounded-lg font-semibold uppercase tracking-wider transition-colors flex items-center gap-2 ${
             activeTab === 'freight'
-              ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-[#244634] text-white shadow-xs'
+              : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
           }`}
         >
           <DollarSign className="h-4 w-4" />
@@ -165,8 +162,8 @@ export default function AnalyticsPage() {
           onClick={() => setActiveTab('quality')}
           className={`px-4 py-2 rounded-lg font-semibold uppercase tracking-wider transition-colors flex items-center gap-2 ${
             activeTab === 'quality'
-              ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-[#244634] text-white shadow-xs'
+              : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
           }`}
         >
           <Thermometer className="h-4 w-4" />
@@ -176,8 +173,8 @@ export default function AnalyticsPage() {
           onClick={() => setActiveTab('fleet')}
           className={`px-4 py-2 rounded-lg font-semibold uppercase tracking-wider transition-colors flex items-center gap-2 ${
             activeTab === 'fleet'
-              ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-[#244634] text-white shadow-xs'
+              : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
           }`}
         >
           <Truck className="h-4 w-4" />
@@ -190,54 +187,54 @@ export default function AnalyticsPage() {
         <div className="space-y-6">
           {/* Top KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="flex items-center justify-between text-slate-400 text-xs font-mono uppercase mb-2">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
                 <span>Total Shipments</span>
-                <Truck className="h-4 w-4 text-cyan-400" />
+                <Truck className="h-4 w-4 text-[#244634]" />
               </div>
-              <div className="text-3xl font-bold font-mono text-white">
+              <div className="text-3xl font-bold font-mono text-stone-900">
                 {dashboardData?.total_shipments ?? 0}
               </div>
-              <div className="text-xs text-slate-400 mt-1">
+              <div className="text-xs text-stone-500 mt-1 font-sans">
                 {dashboardData?.active_shipments ?? 0} active in transit
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="flex items-center justify-between text-slate-400 text-xs font-mono uppercase mb-2">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
                 <span>On-Time Delivery</span>
-                <Percent className="h-4 w-4 text-emerald-400" />
+                <Percent className="h-4 w-4 text-emerald-700" />
               </div>
-              <div className="text-3xl font-bold font-mono text-emerald-400">
+              <div className="text-3xl font-bold font-mono text-emerald-700">
                 {dashboardData?.on_time_delivery_percentage ?? 0}%
               </div>
-              <div className="text-xs text-slate-400 mt-1">
+              <div className="text-xs text-stone-500 mt-1 font-sans">
                 Completed: {dashboardData?.completed_shipments ?? 0} shipments
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="flex items-center justify-between text-slate-400 text-xs font-mono uppercase mb-2">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
                 <span>Avg Transit Duration</span>
-                <Clock className="h-4 w-4 text-purple-400" />
+                <Clock className="h-4 w-4 text-purple-700" />
               </div>
-              <div className="text-3xl font-bold font-mono text-white">
-                {dashboardData?.average_transit_hours ?? 0} <span className="text-sm font-normal text-slate-400">hrs</span>
+              <div className="text-3xl font-bold font-mono text-stone-900">
+                {dashboardData?.average_transit_hours ?? 0} <span className="text-sm font-normal text-stone-500 font-sans">hrs</span>
               </div>
-              <div className="text-xs text-slate-400 mt-1">
+              <div className="text-xs text-stone-500 mt-1 font-sans">
                 From dispatch to delivery
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="flex items-center justify-between text-slate-400 text-xs font-mono uppercase mb-2">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
                 <span>Delayed Rate</span>
-                <AlertTriangle className="h-4 w-4 text-amber-400" />
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
               </div>
-              <div className="text-3xl font-bold font-mono text-amber-400">
+              <div className="text-3xl font-bold font-mono text-amber-700">
                 {dashboardData?.delayed_shipments ?? 0}
               </div>
-              <div className="text-xs text-slate-400 mt-1">
+              <div className="text-xs text-stone-500 mt-1 font-sans">
                 {dashboardData?.cancelled_shipments ?? 0} cancelled
               </div>
             </div>
@@ -246,31 +243,32 @@ export default function AnalyticsPage() {
           {/* Dual Charts in Overview */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Shipment Pipeline Bar Chart */}
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-5">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-white mb-4 flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-cyan-400" />
+            <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-900 mb-4 flex items-center gap-2 font-mono">
+                <BarChart3 className="h-4 w-4 text-[#244634]" />
                 Shipment Status Distribution
               </h2>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={[
-                      { name: 'Active', count: dashboardData?.active_shipments ?? 0, fill: '#06b6d4' },
+                      { name: 'Active', count: dashboardData?.active_shipments ?? 0, fill: '#244634' },
                       { name: 'Delivered', count: dashboardData?.completed_shipments ?? 0, fill: '#10b981' },
                       { name: 'Delayed', count: dashboardData?.delayed_shipments ?? 0, fill: '#f59e0b' },
                       { name: 'Cancelled', count: dashboardData?.cancelled_shipments ?? 0, fill: '#ef4444' },
                     ]}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="name" stroke="#64748b" fontSize={11} fontFamily="monospace" />
-                    <YAxis stroke="#64748b" fontSize={11} fontFamily="monospace" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} fontFamily="monospace" />
+                    <YAxis stroke="#94a3b8" fontSize={11} fontFamily="monospace" />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#030712',
-                        borderColor: '#334155',
+                        backgroundColor: '#ffffff',
+                        borderColor: '#e2e8f0',
                         borderRadius: '0.5rem',
                         fontFamily: 'monospace',
-                        color: '#fff',
+                        color: '#0f172a',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                       }}
                     />
                     <Bar dataKey="count" radius={[4, 4, 0, 0]} />
@@ -280,9 +278,9 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Quality Compliance Pie Chart */}
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-5">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-white mb-4 flex items-center gap-2">
-                <Thermometer className="h-4 w-4 text-emerald-400" />
+            <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-900 mb-4 flex items-center gap-2 font-mono">
+                <Thermometer className="h-4 w-4 text-emerald-700" />
                 Cold-Chain Telemetry Health
               </h2>
               <div className="h-64 w-full flex items-center justify-center">
@@ -304,18 +302,19 @@ export default function AnalyticsPage() {
                       </Pie>
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: '#030712',
-                          borderColor: '#334155',
+                          backgroundColor: '#ffffff',
+                          borderColor: '#e2e8f0',
                           borderRadius: '0.5rem',
                           fontFamily: 'monospace',
-                          color: '#fff',
+                          color: '#0f172a',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                         }}
                       />
                       <Legend />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="text-xs font-mono text-slate-400 text-center">
+                  <div className="text-xs font-mono text-stone-400 text-center">
                     No sensor readings recorded yet.
                   </div>
                 )}
@@ -329,66 +328,67 @@ export default function AnalyticsPage() {
       {activeTab === 'freight' && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="text-xs font-mono uppercase text-slate-400 mb-1">Total Freight Spend</div>
-              <div className="text-2xl font-bold font-mono text-emerald-400">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="text-xs font-mono uppercase text-stone-500 mb-1">Total Freight Spend</div>
+              <div className="text-2xl font-bold font-mono text-emerald-700">
                 {formatCurrency(freightData?.total_freight_expenditure_paise ?? 0)}
               </div>
-              <div className="text-xs text-slate-400 mt-1">Aggregated expenditure</div>
+              <div className="text-xs text-stone-500 mt-1 font-sans">Aggregated expenditure</div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="text-xs font-mono uppercase text-slate-400 mb-1">Avg Freight Cost</div>
-              <div className="text-2xl font-bold font-mono text-white">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="text-xs font-mono uppercase text-stone-500 mb-1">Avg Freight Cost</div>
+              <div className="text-2xl font-bold font-mono text-stone-900">
                 {formatCurrency(freightData?.average_freight_cost_paise ?? 0)}
               </div>
-              <div className="text-xs text-slate-400 mt-1">Per shipment booking</div>
+              <div className="text-xs text-stone-500 mt-1 font-sans">Per shipment booking</div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="text-xs font-mono uppercase text-slate-400 mb-1">Cost Per Kilogram</div>
-              <div className="text-2xl font-bold font-mono text-cyan-400">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="text-xs font-mono uppercase text-stone-500 mb-1">Cost Per Kilogram</div>
+              <div className="text-2xl font-bold font-mono text-[#244634]">
                 ₹{freightData?.freight_cost_per_kg ? freightData.freight_cost_per_kg.toFixed(2) : '0.00'} / kg
               </div>
-              <div className="text-xs text-slate-400 mt-1">Transport unit economic rate</div>
+              <div className="text-xs text-stone-500 mt-1 font-sans">Transport unit economic rate</div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="text-xs font-mono uppercase text-slate-400 mb-1">Avg Quotation Value</div>
-              <div className="text-2xl font-bold font-mono text-purple-400">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="text-xs font-mono uppercase text-stone-500 mb-1">Avg Quotation Value</div>
+              <div className="text-2xl font-bold font-mono text-purple-700">
                 {formatCurrency(freightData?.average_quotation_value_paise ?? 0)}
               </div>
-              <div className="text-xs text-slate-400 mt-1">Bidding marketplace mean</div>
+              <div className="text-xs text-stone-500 mt-1 font-sans">Bidding marketplace mean</div>
             </div>
           </div>
 
           {/* Transporter wise spend */}
-          <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-white mb-4">
+          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-900 mb-4 font-mono">
               Carrier / Transporter Spend Distribution (INR)
             </h2>
             {transporterCostChartData.length === 0 ? (
-              <div className="py-12 text-center text-xs font-mono text-slate-400 border border-dashed border-slate-800 rounded-lg">
+              <div className="py-12 text-center text-xs font-mono text-stone-400 border border-dashed border-stone-200 rounded-xl">
                 No carrier quotation transactions recorded
               </div>
             ) : (
               <div className="h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={transporterCostChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="name" stroke="#64748b" fontSize={11} fontFamily="monospace" />
-                    <YAxis stroke="#64748b" fontSize={11} fontFamily="monospace" tickFormatter={(v) => `₹${v}`} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} fontFamily="monospace" />
+                    <YAxis stroke="#94a3b8" fontSize={11} fontFamily="monospace" tickFormatter={(v) => `₹${v}`} />
                     <Tooltip
                       formatter={(v) => [`₹${v.toLocaleString()}`, 'Total Spend']}
                       contentStyle={{
-                        backgroundColor: '#030712',
-                        borderColor: '#334155',
+                        backgroundColor: '#ffffff',
+                        borderColor: '#e2e8f0',
                         borderRadius: '0.5rem',
                         fontFamily: 'monospace',
-                        color: '#fff',
+                        color: '#0f172a',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                       }}
                     />
-                    <Bar dataKey="cost" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="cost" fill="#244634" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -401,59 +401,60 @@ export default function AnalyticsPage() {
       {activeTab === 'quality' && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="text-xs font-mono uppercase text-slate-400 mb-1">Cold-Chain Compliance</div>
-              <div className="text-2xl font-bold font-mono text-emerald-400">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="text-xs font-mono uppercase text-stone-500 mb-1">Cold-Chain Compliance</div>
+              <div className="text-2xl font-bold font-mono text-emerald-700">
                 {qualityData?.cold_chain_compliance_percentage != null
                   ? `${qualityData.cold_chain_compliance_percentage}%`
-                  : 'N/A — No sensor readings'}
+                  : 'N/A — No readings'}
               </div>
-              <div className="text-xs text-slate-400 mt-1">Readings within safety limits</div>
+              <div className="text-xs text-stone-500 mt-1 font-sans">Readings within safety limits</div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="text-xs font-mono uppercase text-slate-400 mb-1">Damage Rate</div>
-              <div className="text-2xl font-bold font-mono text-amber-400">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="text-xs font-mono uppercase text-stone-500 mb-1">Damage Rate</div>
+              <div className="text-2xl font-bold font-mono text-amber-700">
                 {qualityData?.damage_rate_percentage ?? 0}%
               </div>
-              <div className="text-xs text-slate-400 mt-1">Transit loss percentage</div>
+              <div className="text-xs text-stone-500 mt-1 font-sans">Transit loss percentage</div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="text-xs font-mono uppercase text-slate-400 mb-1">Total Cargo Handled</div>
-              <div className="text-2xl font-bold font-mono text-white">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="text-xs font-mono uppercase text-stone-500 mb-1">Total Cargo Handled</div>
+              <div className="text-2xl font-bold font-mono text-stone-900">
                 {(qualityData?.total_dispatched_quantity_kg ?? 0).toLocaleString()} kg
               </div>
-              <div className="text-xs text-slate-400 mt-1">Dispatched volume</div>
+              <div className="text-xs text-stone-500 mt-1 font-sans">Dispatched volume</div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="text-xs font-mono uppercase text-slate-400 mb-1">Temperature Excursions</div>
-              <div className="text-2xl font-bold font-mono text-red-400">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="text-xs font-mono uppercase text-stone-500 mb-1">Temperature Excursions</div>
+              <div className="text-2xl font-bold font-mono text-rose-700">
                 {qualityData?.temperature_excursion_count ?? 0}
               </div>
-              <div className="text-xs text-slate-400 mt-1">Alerts logged to ledger</div>
+              <div className="text-xs text-stone-500 mt-1 font-sans">Alerts logged to ledger</div>
             </div>
           </div>
 
           {/* Cargo Acceptance Breakdown */}
-          <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-white mb-4">
+          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-900 mb-4 font-mono">
               Cargo Delivery Acceptance vs Transit Damage (Kilograms)
             </h2>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={qualityCargoData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="name" stroke="#64748b" fontSize={11} fontFamily="monospace" />
-                  <YAxis stroke="#64748b" fontSize={11} fontFamily="monospace" tickFormatter={(v) => `${v}kg`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} fontFamily="monospace" />
+                  <YAxis stroke="#94a3b8" fontSize={11} fontFamily="monospace" tickFormatter={(v) => `${v}kg`} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#030712',
-                      borderColor: '#334155',
+                      backgroundColor: '#ffffff',
+                      borderColor: '#e2e8f0',
                       borderRadius: '0.5rem',
                       fontFamily: 'monospace',
-                      color: '#fff',
+                      color: '#0f172a',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                     }}
                   />
                   <Bar dataKey="kg" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -468,41 +469,41 @@ export default function AnalyticsPage() {
       {activeTab === 'fleet' && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="text-xs font-mono uppercase text-slate-400 mb-1">Fleet Utilization</div>
-              <div className="text-2xl font-bold font-mono text-cyan-400">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="text-xs font-mono uppercase text-stone-500 mb-1">Fleet Utilization</div>
+              <div className="text-2xl font-bold font-mono text-[#244634]">
                 {fleetData?.vehicle_utilization_percentage ?? 0}%
               </div>
-              <div className="text-xs text-slate-400 mt-1">Vehicles assigned in missions</div>
+              <div className="text-xs text-stone-500 mt-1 font-sans">Vehicles assigned in missions</div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="text-xs font-mono uppercase text-slate-400 mb-1">Total Fleet Size</div>
-              <div className="text-2xl font-bold font-mono text-white">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="text-xs font-mono uppercase text-stone-500 mb-1">Total Fleet Size</div>
+              <div className="text-2xl font-bold font-mono text-stone-900">
                 {fleetData?.total_vehicles ?? 0}
               </div>
-              <div className="text-xs text-slate-400 mt-1">{fleetData?.available_vehicles ?? 0} available</div>
+              <div className="text-xs text-stone-500 mt-1 font-sans">{fleetData?.available_vehicles ?? 0} available</div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="text-xs font-mono uppercase text-slate-400 mb-1">Active Drivers</div>
-              <div className="text-2xl font-bold font-mono text-purple-400">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="text-xs font-mono uppercase text-stone-500 mb-1">Active Drivers</div>
+              <div className="text-2xl font-bold font-mono text-purple-700">
                 {fleetData?.total_drivers ?? 0}
               </div>
-              <div className="text-xs text-slate-400 mt-1">{fleetData?.available_drivers ?? 0} on duty / standby</div>
+              <div className="text-xs text-stone-500 mt-1 font-sans">{fleetData?.available_drivers ?? 0} on duty / standby</div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-              <div className="text-xs font-mono uppercase text-slate-400 mb-1">Maintenance Fleet</div>
-              <div className="text-2xl font-bold font-mono text-amber-400">
+            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+              <div className="text-xs font-mono uppercase text-stone-500 mb-1">Maintenance Fleet</div>
+              <div className="text-2xl font-bold font-mono text-amber-700">
                 {fleetData?.maintenance_vehicles ?? 0}
               </div>
-              <div className="text-xs text-slate-400 mt-1">Depot servicing required</div>
+              <div className="text-xs text-stone-500 mt-1 font-sans">Depot servicing required</div>
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-white mb-4">
+          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-900 mb-4 font-mono">
               Fleet Operational Availability Breakdown
             </h2>
             <div className="h-64 w-full flex items-center justify-center">
@@ -524,18 +525,19 @@ export default function AnalyticsPage() {
                     </Pie>
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#030712',
-                        borderColor: '#334155',
+                        backgroundColor: '#ffffff',
+                        borderColor: '#e2e8f0',
                         borderRadius: '0.5rem',
                         fontFamily: 'monospace',
-                        color: '#fff',
+                        color: '#0f172a',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                       }}
                     />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="text-xs font-mono text-slate-400">No vehicles enrolled in fleet registry</div>
+                <div className="text-xs font-mono text-stone-400">No vehicles enrolled in fleet registry</div>
               )}
             </div>
           </div>
@@ -544,4 +546,3 @@ export default function AnalyticsPage() {
     </div>
   )
 }
-

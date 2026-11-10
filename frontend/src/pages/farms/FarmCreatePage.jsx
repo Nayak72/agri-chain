@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, AlertCircle, Sprout, Save } from 'lucide-react'
 import { farmsApi } from '../../api/agriculture.api'
 import { formatApiErrorMessage } from '../../utils'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Textarea } from '../../components/ui/textarea'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card'
 
 export default function FarmCreatePage() {
   const navigate = useNavigate()
@@ -86,211 +91,217 @@ export default function FarmCreatePage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 lg:px-8 py-10 animate-fade-in-up">
-      <button
+    <div className="max-w-3xl mx-auto py-4 space-y-6 animate-fade-in-up">
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => navigate('/farms')}
-        className="text-xs font-mono text-cyan-400 hover:text-cyan-300 mb-6 flex items-center gap-2 transition-colors"
+        className="gap-2 text-xs font-mono text-[#526357] hover:text-[#26312A] -ml-2"
       >
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
+        <ArrowLeft className="w-3.5 h-3.5" />
         FARM_NETWORK
-      </button>
+      </Button>
 
-      <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-        <div className="mb-8">
-          <span className="text-xs font-mono uppercase tracking-widest text-emerald-400 mb-1 block">
-            Node Onboarding
-          </span>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Register Agricultural Farm</h1>
-          <p className="text-slate-400 text-sm mt-1">
+      <Card className="bg-white/95 border-[#E1DDD0] shadow-sm">
+        <CardHeader className="border-b border-[#ECE7DA] pb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-2 h-2 rounded-full bg-[#3F7C56]" />
+            <span className="text-[11px] font-mono uppercase tracking-widest text-[#3F7C56]">
+              Node Onboarding
+            </span>
+          </div>
+          <CardTitle className="text-2xl font-serif font-bold text-[#1B2A20]">
+            Register Agricultural Farm
+          </CardTitle>
+          <CardDescription className="text-xs text-[#526357]">
             Initialize an agricultural production node with verified location and capability metadata.
-          </p>
-        </div>
+          </CardDescription>
+        </CardHeader>
 
-        {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-start gap-3">
-            <svg className="w-5 h-5 shrink-0 mt-0.5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <span>{error}</span>
-          </div>
-        )}
+        <CardContent className="pt-6">
+          {error && (
+            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0 text-red-600 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-              Farm Name *
-            </label>
-            <input
-              type="text"
-              name="name"
-              required
-              minLength={2}
-              maxLength={100}
-              value={form.name}
-              onChange={handleChange}
-              placeholder="e.g. Green Acres Organic Orchards"
-              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-              Physical Street Address *
-            </label>
-            <input
-              type="text"
-              name="address"
-              required
-              minLength={5}
-              maxLength={200}
-              value={form.address}
-              onChange={handleChange}
-              placeholder="e.g. Survey No. 42, NH-44 Sector 9"
-              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                City / District *
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                Farm Name *
               </label>
-              <input
+              <Input
                 type="text"
-                name="city"
+                name="name"
                 required
-                value={form.city}
+                minLength={2}
+                maxLength={100}
+                value={form.name}
                 onChange={handleChange}
-                placeholder="e.g. Nashik"
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+                placeholder="e.g. Green Acres Organic Orchards"
+                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                State *
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                Physical Street Address *
               </label>
-              <input
+              <Input
                 type="text"
-                name="state"
+                name="address"
                 required
-                value={form.state}
+                minLength={5}
+                maxLength={200}
+                value={form.address}
                 onChange={handleChange}
-                placeholder="e.g. Maharashtra"
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+                placeholder="e.g. Survey No. 42, NH-44 Sector 9"
+                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Pincode (6 digits) *
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  City / District *
+                </label>
+                <Input
+                  type="text"
+                  name="city"
+                  required
+                  value={form.city}
+                  onChange={handleChange}
+                  placeholder="e.g. Nashik"
+                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  State *
+                </label>
+                <Input
+                  type="text"
+                  name="state"
+                  required
+                  value={form.state}
+                  onChange={handleChange}
+                  placeholder="e.g. Maharashtra"
+                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Pincode (6 digits) *
+                </label>
+                <Input
+                  type="text"
+                  name="pincode"
+                  required
+                  pattern="^\d{6}$"
+                  value={form.pincode}
+                  onChange={handleChange}
+                  placeholder="422001"
+                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Area (Hectares)
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.1"
+                  name="area_hectares"
+                  value={form.area_hectares}
+                  onChange={handleChange}
+                  placeholder="15.5"
+                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Latitude
+                </label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  name="latitude"
+                  value={form.latitude}
+                  onChange={handleChange}
+                  placeholder="19.9975"
+                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                  Longitude
+                </label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  name="longitude"
+                  value={form.longitude}
+                  onChange={handleChange}
+                  placeholder="73.7898"
+                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                Certifications (comma separated)
               </label>
-              <input
+              <Input
                 type="text"
-                name="pincode"
-                required
-                pattern="^\d{6}$"
-                value={form.pincode}
+                name="certifications"
+                value={form.certifications}
                 onChange={handleChange}
-                placeholder="422001"
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+                placeholder="GLOBALG.A.P., India Organic, Rainforest Alliance"
+                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Area (Hectares)
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
+                Description / Notes
               </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.1"
-                name="area_hectares"
-                value={form.area_hectares}
+              <Textarea
+                name="description"
+                rows={3}
+                value={form.description}
                 onChange={handleChange}
-                placeholder="15.5"
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
+                placeholder="Soil type, primary crops, irrigation facilities..."
+                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Latitude
-              </label>
-              <input
-                type="number"
-                step="0.000001"
-                name="latitude"
-                value={form.latitude}
-                onChange={handleChange}
-                placeholder="19.9975"
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-              />
+
+            <div className="flex items-center gap-3 pt-4 border-t border-[#ECE7DA]">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate('/farms')}
+                className="flex-1 bg-white border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={loading}
+                className="flex-1 bg-[#244634] hover:bg-[#1A3326] text-white shadow-sm"
+              >
+                {loading ? 'Initializing Node...' : 'Register Farm Node'}
+              </Button>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-                Longitude
-              </label>
-              <input
-                type="number"
-                step="0.000001"
-                name="longitude"
-                value={form.longitude}
-                onChange={handleChange}
-                placeholder="73.7898"
-                className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-              Certifications (comma separated)
-            </label>
-            <input
-              type="text"
-              name="certifications"
-              value={form.certifications}
-              onChange={handleChange}
-              placeholder="GLOBALG.A.P., India Organic, Rainforest Alliance"
-              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-              Description / Notes
-            </label>
-            <textarea
-              name="description"
-              rows={3}
-              value={form.description}
-              onChange={handleChange}
-              placeholder="Soil type, primary crops, irrigation facilities..."
-              className="w-full bg-[rgba(2,6,23,0.5)] border border-slate-700/50 focus:border-cyan-500 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm font-mono resize-none"
-            />
-          </div>
-
-          <div className="flex gap-4 pt-4">
-            <button
-              type="button"
-              onClick={() => navigate('/farms')}
-              className="flex-1 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium text-sm transition-all"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-bold text-sm shadow-lg shadow-cyan-900/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-            >
-              {loading ? 'Initializing Node...' : 'Register Farm Node'}
-            </button>
-          </div>
-        </form>
-      </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }
-

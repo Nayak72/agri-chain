@@ -1,7 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
+import { ArrowLeft, ShoppingBag, ShieldCheck, AlertCircle, Calendar, Package, MapPin } from 'lucide-react'
 import { batchesApi } from '../../api/agriculture.api'
 import { formatDate, formatDateTime, formatWeight, getStatusColor, formatStatus } from '../../utils'
+import { Button } from '../../components/ui/button'
+import { Badge } from '../../components/ui/badge'
+import { Card, CardContent } from '../../components/ui/card'
+import { StatusBadge } from '../../components/common/StatusBadge'
 
 export default function BatchDetailPage() {
   const { id } = useParams()
@@ -14,9 +19,9 @@ export default function BatchDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin mb-4" />
-        <span className="text-slate-500 font-mono text-sm animate-pulse">Scanning batch provenance ledger...</span>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-3">
+        <div className="w-10 h-10 border-3 border-[#244634]/20 border-t-[#244634] rounded-full animate-spin" />
+        <span className="text-xs font-mono text-[#526357] animate-pulse">Scanning batch provenance ledger...</span>
       </div>
     )
   }
@@ -24,132 +29,142 @@ export default function BatchDetailPage() {
   if (error || !batch) {
     return (
       <div className="max-w-xl mx-auto py-20 text-center">
-        <div className="text-5xl mb-4">⚠️</div>
-        <h2 className="text-2xl font-bold text-white mb-2">Batch Record Not Found</h2>
-        <p className="text-slate-400 mb-6">Could not retrieve provenance record for batch identifier: {id}</p>
-        <button
+        <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="w-6 h-6" />
+        </div>
+        <h2 className="text-2xl font-serif font-bold text-[#1B2A20] mb-2">Batch Record Not Found</h2>
+        <p className="text-sm text-[#526357] mb-6">Could not retrieve provenance record for batch identifier: {id}</p>
+        <Button
+          variant="primary"
           onClick={() => navigate('/batches')}
-          className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium"
+          className="bg-[#244634] hover:bg-[#1A3326] text-white"
         >
           Return to Batches Registry
-        </button>
+        </Button>
       </div>
     )
   }
 
-  const statusColor = getStatusColor(batch.status)
-
   return (
-    <div className="max-w-5xl mx-auto px-4 lg:px-8 py-10 animate-fade-in-up">
-      <button
+    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in-up">
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => navigate('/batches')}
-        className="text-xs font-mono text-cyan-400 hover:text-cyan-300 mb-6 flex items-center gap-2 transition-colors"
+        className="gap-2 text-xs font-mono text-[#526357] hover:text-[#26312A] -ml-2"
       >
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
+        <ArrowLeft className="w-3.5 h-3.5" />
         BATCH_REGISTRY
-      </button>
+      </Button>
 
       {/* Header Deck */}
-      <div className="bg-[#0b1121] border border-slate-800 rounded-3xl p-8 mb-6 relative overflow-hidden shadow-2xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-                PRODUCE: {batch.produce_type}
-              </span>
-              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider border ${statusColor}`}>
-                {formatStatus(batch.status || 'AVAILABLE')}
-              </span>
+      <Card className="bg-white/95 border-[#E1DDD0] shadow-sm">
+        <CardContent className="p-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <Badge variant="sage" size="sm" className="font-mono uppercase tracking-widest text-[10px]">
+                  PRODUCE: {batch.produce_type}
+                </Badge>
+                <StatusBadge status={batch.status || 'AVAILABLE'} />
+              </div>
+              <h1 className="text-3xl font-mono font-bold text-[#1B2A20] tracking-tight">{batch.batch_id}</h1>
+              <p className="text-[#526357] text-sm mt-1.5 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[#7A887E] shrink-0" />
+                <span>Harvested at {batch.harvest_location} on {formatDate(batch.harvest_date)}</span>
+              </p>
             </div>
-            <h1 className="text-3xl font-bold font-mono text-white tracking-tight">{batch.batch_id}</h1>
-            <p className="text-slate-400 text-sm mt-1">
-              Harvested at {batch.harvest_location} on {formatDate(batch.harvest_date)}
-            </p>
-          </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={() => navigate('/purchase-orders/new', { state: { batchId: batch.batch_id } })}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-semibold text-xs shadow-lg shadow-cyan-900/20 transition-all flex items-center gap-2"
-            >
-              Create Purchase Order
-            </button>
+            <div className="flex gap-3">
+              <Button
+                variant="primary"
+                onClick={() => navigate('/purchase-orders/new', { state: { batchId: batch.batch_id } })}
+                className="gap-2 bg-[#244634] hover:bg-[#1A3326] text-white shadow-sm"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                <span>Create Purchase Order</span>
+              </Button>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* 2-Column Details Deck */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Quantity Breakdown */}
-        <div className="bg-[#0b1121] border border-slate-800 rounded-2xl p-6">
-          <h3 className="text-xs font-mono text-slate-500 uppercase tracking-widest mb-4">
-            Quantity Allocation Ledger
-          </h3>
-          <div className="space-y-4 font-mono text-xs">
-            <div className="flex justify-between items-center py-2 border-b border-slate-800">
-              <span className="text-slate-400">Initial Harvest</span>
-              <span className="text-white font-bold">{formatWeight(batch.initial_quantity_kg)}</span>
+        <Card className="bg-white/90 border-[#E1DDD0]">
+          <CardContent className="p-6">
+            <h3 className="text-xs font-mono text-[#526357] uppercase tracking-widest font-semibold mb-4">
+              Quantity Allocation Ledger
+            </h3>
+            <div className="space-y-3 font-mono text-xs">
+              <div className="flex justify-between items-center py-2 border-b border-[#ECE7DA]">
+                <span className="text-[#7A887E]">Initial Harvest</span>
+                <span className="text-[#1B2A20] font-bold">{formatWeight(batch.initial_quantity_kg)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-[#ECE7DA]">
+                <span className="text-[#7A887E]">Available In Stock</span>
+                <span className="text-[#244634] font-bold">{formatWeight(batch.available_quantity_kg ?? batch.initial_quantity_kg)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-[#ECE7DA]">
+                <span className="text-[#7A887E]">Reserved for Orders</span>
+                <span className="text-[#B36B21] font-semibold">{formatWeight(batch.reserved_quantity_kg ?? 0)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-[#ECE7DA]">
+                <span className="text-[#7A887E]">Dispatched in Transit</span>
+                <span className="text-[#2F6586] font-semibold">{formatWeight(batch.dispatched_quantity_kg ?? 0)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-[#7A887E]">Damaged / Rejected</span>
+                <span className="text-[#9E3A2B] font-semibold">{formatWeight(batch.rejected_quantity_kg ?? 0)}</span>
+              </div>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-slate-800">
-              <span className="text-slate-400">Available In Stock</span>
-              <span className="text-emerald-400 font-bold">{formatWeight(batch.available_quantity_kg ?? batch.initial_quantity_kg)}</span>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b border-slate-800">
-              <span className="text-slate-400">Reserved for Orders</span>
-              <span className="text-amber-400">{formatWeight(batch.reserved_quantity_kg ?? 0)}</span>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b border-slate-800">
-              <span className="text-slate-400">Dispatched in Transit</span>
-              <span className="text-cyan-400">{formatWeight(batch.dispatched_quantity_kg ?? 0)}</span>
-            </div>
-            <div className="flex justify-between items-center py-2">
-              <span className="text-slate-400">Damaged / Rejected</span>
-              <span className="text-red-400">{formatWeight(batch.rejected_quantity_kg ?? 0)}</span>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Quality & Shelf Life */}
-        <div className="bg-[#0b1121] border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-xs font-mono text-slate-500 uppercase tracking-widest mb-4">
-              Quality & Provenance Telemetry
-            </h3>
-            <dl className="space-y-3 font-mono text-xs">
-              <div className="flex justify-between py-2 border-b border-slate-800/80">
-                <dt className="text-slate-500">Quality Grade</dt>
-                <dd className="text-emerald-400 font-bold">{batch.quality_grade || 'GRADE_A'}</dd>
-              </div>
-              <div className="flex justify-between py-2 border-b border-slate-800/80">
-                <dt className="text-slate-500">Packaging Type</dt>
-                <dd className="text-slate-200">{batch.packaging_type}</dd>
-              </div>
-              <div className="flex justify-between py-2 border-b border-slate-800/80">
-                <dt className="text-slate-500">Estimated Shelf Life End</dt>
-                <dd className="text-amber-400">{formatDateTime(batch.estimated_shelf_life_end)}</dd>
-              </div>
-              <div className="flex justify-between py-2 border-b border-slate-800/80">
-                <dt className="text-slate-500">Origin Farm Node ID</dt>
-                <dd className="text-cyan-400 cursor-pointer hover:underline" onClick={() => navigate(`/farms/${batch.farm_id}`)}>
-                  {batch.farm_id}
-                </dd>
-              </div>
-              <div className="flex justify-between py-2">
-                <dt className="text-slate-500">Handling Protocol</dt>
-                <dd className="text-slate-300">{batch.handling_requirements || 'Standard agricultural handling'}</dd>
-              </div>
-            </dl>
-          </div>
+        <Card className="bg-white/90 border-[#E1DDD0] flex flex-col justify-between">
+          <CardContent className="p-6 flex flex-col justify-between h-full">
+            <div>
+              <h3 className="text-xs font-mono text-[#526357] uppercase tracking-widest font-semibold mb-4">
+                Quality & Provenance Telemetry
+              </h3>
+              <dl className="space-y-3 font-mono text-xs">
+                <div className="flex justify-between py-2 border-b border-[#ECE7DA]">
+                  <dt className="text-[#7A887E]">Quality Grade</dt>
+                  <dd className="text-[#244634] font-bold">{batch.quality_grade || 'GRADE_A'}</dd>
+                </div>
+                <div className="flex justify-between py-2 border-b border-[#ECE7DA]">
+                  <dt className="text-[#7A887E]">Packaging Type</dt>
+                  <dd className="text-[#26312A]">{batch.packaging_type}</dd>
+                </div>
+                <div className="flex justify-between py-2 border-b border-[#ECE7DA]">
+                  <dt className="text-[#7A887E]">Estimated Shelf Life End</dt>
+                  <dd className="text-[#B36B21] font-semibold">{formatDateTime(batch.estimated_shelf_life_end)}</dd>
+                </div>
+                <div className="flex justify-between py-2 border-b border-[#ECE7DA]">
+                  <dt className="text-[#7A887E]">Origin Farm Node ID</dt>
+                  <dd className="text-[#244634] cursor-pointer hover:underline font-semibold" onClick={() => navigate(`/farms/${batch.farm_id}`)}>
+                    {batch.farm_id}
+                  </dd>
+                </div>
+                <div className="flex justify-between py-2">
+                  <dt className="text-[#7A887E]">Handling Protocol</dt>
+                  <dd className="text-[#26312A]">{batch.handling_requirements || 'Standard agricultural handling'}</dd>
+                </div>
+              </dl>
+            </div>
 
-          <div className="pt-4 border-t border-slate-800 mt-4 text-[10px] font-mono text-slate-600 flex justify-between">
-            <span>Cryptographic Chain: VERIFIED</span>
-            <span>Created: {formatDateTime(batch.created_at)}</span>
-          </div>
-        </div>
+            <div className="pt-4 border-t border-[#ECE7DA] mt-4 text-[11px] font-mono text-[#526357] flex justify-between items-center">
+              <span className="flex items-center gap-1.5 text-[#3F7C56] font-medium">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Cryptographic Chain: VERIFIED
+              </span>
+              <span>Created: {formatDateTime(batch.created_at)}</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
 }
-

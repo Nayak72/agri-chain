@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import {
   Thermometer,
@@ -33,6 +33,8 @@ import {
 import { sensorsApi } from '../../api/monitoring.api'
 import { shipmentsApi } from '../../api/commerce.api'
 import { formatDate } from '../../utils'
+import PageHeader from '../../components/common/PageHeader'
+import StatusBadge from '../../components/common/StatusBadge'
 
 const SCENARIOS = [
   { value: 'NORMAL', label: 'Normal (Optimal 4°C - 8°C)' },
@@ -93,7 +95,6 @@ export default function ColdChainPage() {
         sensorsApi.readings(selectedShipmentId, { page_size: 60 }),
         sensorsApi.alerts(selectedShipmentId, { page_size: 20 }),
       ])
-      // Backend returns readings sorted descending (newest first). Reverse for chronological chart
       const rawReadings = readingsRes.data || []
       const chronological = [...rawReadings].reverse()
       setReadings(chronological)
@@ -259,72 +260,70 @@ export default function ColdChainPage() {
   }))
 
   return (
-    <div className="space-y-6">
-      {/* Header with Title and Prominent Simulated Data Badge */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-              <Thermometer className="h-6 w-6 text-cyan-400" />
-              Cold-Chain Monitoring & Telemetry
-            </h1>
-            <span className="px-2.5 py-1 text-xs font-mono font-semibold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded flex items-center gap-1.5 shadow-[0_0_12px_rgba(245,158,11,0.2)]">
-              <Radio className="h-3 w-3 animate-pulse text-amber-400" />
-              SIMULATED DATA
-            </span>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* Header */}
+      <PageHeader
+        breadcrumbs={[
+          { label: 'Monitoring', href: '/cold-chain' },
+          { label: 'Cold-Chain Telemetry' }
+        ]}
+        title="Cold-Chain Monitoring & Telemetry"
+        description="Real-time cold-chain condition telemetry, automated SLA excursion detection, and simulated IoT sensor controls."
+        badge={
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-amber-50 text-amber-800 border border-amber-200">
+            <Radio className="h-3 w-3 animate-pulse text-amber-600" />
+            SIMULATED DATA
+          </span>
+        }
+        actions={
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setAutoPoll(!autoPoll)}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono rounded-lg border shadow-xs transition-colors ${
+                autoPoll
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-stone-50 text-stone-600 border-stone-200'
+              }`}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${autoPoll ? 'animate-spin text-emerald-600' : 'text-stone-400'}`} />
+              <span>{autoPoll ? 'Live Polling (4s)' : 'Polling Paused'}</span>
+            </button>
+            <button
+              onClick={() => fetchTelemetry()}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 shadow-xs transition-colors"
+            >
+              Manual Sync
+            </button>
           </div>
-          <p className="mt-1 text-sm text-slate-400">
-            Real-time cold-chain condition telemetry, automated SLA excursion detection, and simulated IoT sensor controls
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setAutoPoll(!autoPoll)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-colors flex items-center gap-2 ${
-              autoPoll
-                ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
-                : 'bg-slate-800 text-slate-400 border-slate-700'
-            }`}
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${autoPoll ? 'animate-spin' : ''}`} />
-            {autoPoll ? 'Live Polling (4s)' : 'Polling Paused'}
-          </button>
-          <button
-            onClick={() => fetchTelemetry()}
-            disabled={loading}
-            className="px-3 py-1.5 rounded-lg text-xs font-mono bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
-          >
-            Manual Sync
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Alerts / Error Messages */}
       {error && (
-        <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-4 text-sm text-red-300 flex items-center gap-3">
-          <AlertTriangle className="h-5 w-5 text-red-400 shrink-0" />
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0" />
           <span>{error}</span>
         </div>
       )}
       {successMsg && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 text-sm text-emerald-300 flex items-center gap-3">
-          <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {/* Shipment Selector Banner */}
-      <div className="rounded-xl border border-slate-800 bg-[#0b1121]/80 backdrop-blur-sm p-4">
+      <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-3">
-            <label className="text-xs font-mono uppercase text-slate-400 shrink-0">
+            <label className="text-xs font-mono font-semibold uppercase text-stone-500 shrink-0">
               Select Active Shipment:
             </label>
             <select
               value={selectedShipmentId}
               onChange={(e) => setSelectedShipmentId(e.target.value)}
-              className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 w-full sm:w-80"
+              className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] w-full sm:w-80 font-mono"
             >
               {shipments.length === 0 ? (
                 <option value="">No shipments found</option>
@@ -339,43 +338,43 @@ export default function ColdChainPage() {
           </div>
 
           {selectedShipment && (
-            <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 text-cyan-400" />
+            <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-stone-600">
+              <span className="flex items-center gap-1.5 font-sans">
+                <MapPin className="h-3.5 w-3.5 text-[#244634]" />
                 {selectedShipment.origin_location || 'Origin'} &rarr; {selectedShipment.destination_location || 'Destination'}
               </span>
-              <span className="px-2 py-0.5 rounded bg-slate-800 text-cyan-300 border border-slate-700">
+              <span className="px-2 py-0.5 rounded bg-stone-100 text-stone-700 border border-stone-200">
                 Status: {selectedShipment.status}
               </span>
               <Link
                 to={`/shipments/${selectedShipment.id || selectedShipment._id}`}
-                className="text-cyan-400 hover:text-cyan-300 underline"
+                className="text-[#244634] hover:underline font-semibold"
               >
-                View Shipment Dossier &rarr;
+                View Dossier &rarr;
               </Link>
             </div>
           )}
         </div>
       </div>
 
-      {/* Simulation Control Deck (WarehouseOS Dark Console Styling) */}
-      <div className="rounded-xl border border-cyan-500/20 bg-[#0b1121] p-5 shadow-[0_0_20px_rgba(6,182,212,0.05)]">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/80">
+      {/* Simulation Control Deck */}
+      <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-stone-100">
           <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-cyan-400" />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-white">
+            <Activity className="h-4 w-4 text-[#244634]" />
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-900 font-mono">
               Simulated Telemetry Generator Controls
             </h2>
           </div>
-          <span className="text-xs font-mono text-slate-400">
+          <span className="text-xs font-mono text-stone-500">
             Engine State:{' '}
             <span
               className={`font-semibold ${
                 simStatus === 'RUNNING'
-                  ? 'text-emerald-400'
+                  ? 'text-emerald-700'
                   : simStatus === 'PAUSED'
-                  ? 'text-amber-400'
-                  : 'text-slate-400'
+                  ? 'text-amber-700'
+                  : 'text-stone-500'
               }`}
             >
               {simStatus}
@@ -386,13 +385,13 @@ export default function ColdChainPage() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
           {/* Scenario Selector */}
           <div className="md:col-span-4">
-            <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
+            <label className="block text-xs font-mono uppercase text-stone-600 font-semibold mb-1.5">
               Simulation Scenario Profile
             </label>
             <select
               value={scenario}
               onChange={(e) => setScenario(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+              className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono"
             >
               {SCENARIOS.map((sc) => (
                 <option key={sc.value} value={sc.value}>
@@ -404,13 +403,13 @@ export default function ColdChainPage() {
 
           {/* Interval Selector */}
           <div className="md:col-span-2">
-            <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
+            <label className="block text-xs font-mono uppercase text-stone-600 font-semibold mb-1.5">
               Interval (Sec)
             </label>
             <select
               value={intervalSec}
               onChange={(e) => setIntervalSec(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+              className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono"
             >
               <option value={5}>5 seconds</option>
               <option value={10}>10 seconds</option>
@@ -424,52 +423,52 @@ export default function ColdChainPage() {
             <button
               onClick={handleStart}
               disabled={actionLoading || !selectedShipmentId}
-              className="flex-1 min-w-[120px] px-3 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-mono font-semibold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+              className="flex-1 min-w-[110px] px-3.5 py-2 rounded-lg bg-[#244634] hover:bg-[#1b3527] disabled:opacity-50 text-white text-xs font-mono font-semibold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-xs transition-all"
             >
               <Play className="h-3.5 w-3.5 fill-current" />
-              Start
+              <span>Start</span>
             </button>
             <button
               onClick={handlePause}
               disabled={actionLoading || !selectedShipmentId}
-              className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-amber-300 border border-amber-500/30 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
+              className="px-3 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-800 border border-amber-200 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
             >
               <Pause className="h-3.5 w-3.5" />
-              Pause
+              <span>Pause</span>
             </button>
             <button
               onClick={handleResume}
               disabled={actionLoading || !selectedShipmentId}
-              className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-emerald-300 border border-emerald-500/30 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
+              className="px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-800 border border-emerald-200 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
             >
               <Play className="h-3.5 w-3.5" />
-              Resume
+              <span>Resume</span>
             </button>
             <button
               onClick={handleStop}
               disabled={actionLoading || !selectedShipmentId}
-              className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-red-300 border border-red-500/30 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
+              className="px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 disabled:opacity-50 text-rose-800 border border-rose-200 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
             >
               <Square className="h-3.5 w-3.5 fill-current" />
-              Stop
+              <span>Stop</span>
             </button>
             <button
               onClick={handleNextReading}
               disabled={actionLoading || !selectedShipmentId}
               title="Generate single reading"
-              className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
+              className="px-3 py-2 rounded-lg bg-stone-100 hover:bg-stone-200 disabled:opacity-50 text-stone-700 border border-stone-200 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
             >
               <FastForward className="h-3.5 w-3.5" />
-              Tick
+              <span>Tick</span>
             </button>
             <button
               onClick={handleReset}
               disabled={actionLoading || !selectedShipmentId}
               title="Reset simulation readings"
-              className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 border border-slate-700 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
+              className="px-3 py-2 rounded-lg bg-stone-100 hover:bg-stone-200 disabled:opacity-50 text-stone-600 border border-stone-200 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              Reset
+              <span>Reset</span>
             </button>
           </div>
         </div>
@@ -478,121 +477,121 @@ export default function ColdChainPage() {
       {/* Telemetry Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Temperature Card */}
-        <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-mono uppercase mb-2">
-            <span className="flex items-center gap-1.5">
-              <Thermometer className="h-4 w-4 text-cyan-400" />
+        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+          <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
+            <span className="flex items-center gap-1.5 font-semibold">
+              <Thermometer className="h-4 w-4 text-[#244634]" />
               Temperature
             </span>
             {latestReading?.status && (
               <span
                 className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                   latestReading.status === 'NORMAL'
-                    ? 'bg-emerald-500/20 text-emerald-400'
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                     : latestReading.status === 'WARNING'
-                    ? 'bg-amber-500/20 text-amber-400'
-                    : 'bg-red-500/20 text-red-400 animate-pulse'
+                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                    : 'bg-rose-50 text-rose-800 border border-rose-200 animate-pulse'
                 }`}
               >
                 {latestReading.status}
               </span>
             )}
           </div>
-          <div className="text-2xl font-bold font-mono text-white">
+          <div className="text-2xl font-bold font-mono text-stone-900">
             {latestReading?.temperature != null
               ? `${Number(latestReading.temperature).toFixed(1)}°C`
               : latestReading?.temperature_celsius != null
               ? `${Number(latestReading.temperature_celsius).toFixed(1)}°C`
               : '—'}
           </div>
-          <div className="text-xs text-slate-400 mt-1">
+          <div className="text-xs text-stone-500 mt-1 font-sans">
             Target SLA: 4.0°C – 8.0°C
           </div>
         </div>
 
         {/* Humidity Card */}
-        <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-mono uppercase mb-2">
-            <span className="flex items-center gap-1.5">
-              <Droplets className="h-4 w-4 text-emerald-400" />
+        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+          <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
+            <span className="flex items-center gap-1.5 font-semibold">
+              <Droplets className="h-4 w-4 text-emerald-700" />
               Relative Humidity
             </span>
-            <span className="text-[10px] text-slate-400">RH %</span>
+            <span className="text-[10px] text-stone-400">RH %</span>
           </div>
-          <div className="text-2xl font-bold font-mono text-white">
+          <div className="text-2xl font-bold font-mono text-stone-900">
             {latestReading?.humidity != null
               ? `${Number(latestReading.humidity).toFixed(1)}%`
               : latestReading?.humidity_percentage != null
               ? `${Number(latestReading.humidity_percentage).toFixed(1)}%`
               : '—'}
           </div>
-          <div className="text-xs text-slate-400 mt-1">
+          <div className="text-xs text-stone-500 mt-1 font-sans">
             Target Envelope: 85% – 95%
           </div>
         </div>
 
         {/* Total Readings */}
-        <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-mono uppercase mb-2">
-            <span className="flex items-center gap-1.5">
-              <Activity className="h-4 w-4 text-purple-400" />
+        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+          <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
+            <span className="flex items-center gap-1.5 font-semibold">
+              <Activity className="h-4 w-4 text-purple-700" />
               Readings Logged
             </span>
-            <span className="text-[10px] text-slate-400">Total</span>
+            <span className="text-[10px] text-stone-400">Total</span>
           </div>
-          <div className="text-2xl font-bold font-mono text-white">
+          <div className="text-2xl font-bold font-mono text-stone-900">
             {readings.length}
           </div>
-          <div className="text-xs text-slate-400 mt-1">
+          <div className="text-xs text-stone-500 mt-1 font-sans">
             Latest: {latestReading?.timestamp ? new Date(latestReading.timestamp).toLocaleTimeString() : 'N/A'}
           </div>
         </div>
 
         {/* Active Alerts */}
-        <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-4">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-mono uppercase mb-2">
-            <span className="flex items-center gap-1.5">
-              <ShieldAlert className="h-4 w-4 text-red-400" />
+        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+          <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
+            <span className="flex items-center gap-1.5 font-semibold">
+              <ShieldAlert className="h-4 w-4 text-rose-600" />
               Active Excursions
             </span>
-            <span className="text-[10px] text-slate-400">Ledger-Backed</span>
+            <span className="text-[10px] text-stone-400 font-mono">Ledger-Backed</span>
           </div>
-          <div className="text-2xl font-bold font-mono text-red-400">
+          <div className="text-2xl font-bold font-mono text-rose-700">
             {alerts.filter(a => a.status === 'ACTIVE').length}
           </div>
-          <div className="text-xs text-slate-400 mt-1">
+          <div className="text-xs text-stone-500 mt-1 font-sans">
             Total recorded: {alerts.length}
           </div>
         </div>
       </div>
 
       {/* Main Dual-Axis Recharts Telemetry Graph */}
-      <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+      <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-stone-100">
           <div>
-            <h2 className="text-base font-semibold text-white flex items-center gap-2">
-              <Activity className="h-4 w-4 text-cyan-400" />
+            <h2 className="text-base font-semibold text-stone-900 flex items-center gap-2">
+              <Activity className="h-4 w-4 text-[#244634]" />
               Live Sensor Telemetry Stream (Temperature & Humidity)
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-stone-500 mt-0.5">
               Continuous time-series tracking against cold-chain boundary thresholds
             </p>
           </div>
-          <div className="flex items-center gap-3 text-xs font-mono">
-            <span className="flex items-center gap-1 text-cyan-400">
-              <span className="h-2 w-2 rounded-full bg-cyan-400 inline-block" /> Temp (°C)
+          <div className="flex items-center gap-4 text-xs font-mono">
+            <span className="flex items-center gap-1.5 text-cyan-700 font-semibold">
+              <span className="h-2 w-2 rounded-full bg-cyan-600 inline-block" /> Temp (°C)
             </span>
-            <span className="flex items-center gap-1 text-emerald-400">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 inline-block" /> Humidity (%)
+            <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
+              <span className="h-2 w-2 rounded-full bg-emerald-600 inline-block" /> Humidity (%)
             </span>
           </div>
         </div>
 
         {chartData.length === 0 ? (
-          <div className="h-72 flex flex-col items-center justify-center text-slate-400 border border-dashed border-slate-800 rounded-lg">
-            <Radio className="h-8 w-8 text-slate-400 mb-2" />
-            <p className="text-sm font-mono">No telemetry readings recorded for this shipment</p>
-            <p className="text-xs text-slate-400 mt-1">
+          <div className="h-72 flex flex-col items-center justify-center text-stone-400 border border-dashed border-stone-200 rounded-xl">
+            <Radio className="h-8 w-8 text-stone-300 mb-2" />
+            <p className="text-sm font-mono text-stone-600">No telemetry readings recorded for this shipment</p>
+            <p className="text-xs text-stone-400 mt-1 font-sans">
               Select a scenario above and click &quot;Start&quot; or &quot;Tick&quot; to begin generating simulated sensor data
             </p>
           </div>
@@ -600,17 +599,17 @@ export default function ColdChainPage() {
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis
                   dataKey="time"
-                  stroke="#64748b"
+                  stroke="#94a3b8"
                   fontSize={11}
                   fontFamily="monospace"
                   tickLine={false}
                 />
                 <YAxis
                   yAxisId="temp"
-                  stroke="#06b6d4"
+                  stroke="#0284c7"
                   fontSize={11}
                   fontFamily="monospace"
                   domain={[-5, 35]}
@@ -619,7 +618,7 @@ export default function ColdChainPage() {
                 <YAxis
                   yAxisId="humidity"
                   orientation="right"
-                  stroke="#10b981"
+                  stroke="#16a34a"
                   fontSize={11}
                   fontFamily="monospace"
                   domain={[0, 100]}
@@ -627,12 +626,13 @@ export default function ColdChainPage() {
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#030712',
-                    borderColor: '#334155',
-                    borderRadius: '0.5rem',
-                    color: '#f8fafc',
+                    backgroundColor: '#ffffff',
+                    borderColor: '#e2e8f0',
+                    borderRadius: '0.75rem',
+                    color: '#0f172a',
                     fontFamily: 'monospace',
                     fontSize: '12px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                   }}
                 />
                 <Legend />
@@ -656,9 +656,9 @@ export default function ColdChainPage() {
                   type="monotone"
                   dataKey="temperature"
                   name="Temperature (°C)"
-                  stroke="#06b6d4"
+                  stroke="#0284c7"
                   strokeWidth={2}
-                  dot={{ r: 2, fill: '#06b6d4' }}
+                  dot={{ r: 2, fill: '#0284c7' }}
                   activeDot={{ r: 5 }}
                 />
                 <Line
@@ -666,9 +666,9 @@ export default function ColdChainPage() {
                   type="monotone"
                   dataKey="humidity"
                   name="Humidity (%)"
-                  stroke="#10b981"
+                  stroke="#16a34a"
                   strokeWidth={2}
-                  dot={{ r: 2, fill: '#10b981' }}
+                  dot={{ r: 2, fill: '#16a34a' }}
                   activeDot={{ r: 5 }}
                 />
               </LineChart>
@@ -678,73 +678,73 @@ export default function ColdChainPage() {
       </div>
 
       {/* Sensor SLA Excursion Alerts Section */}
-      <div className="rounded-xl border border-slate-800 bg-[#0b1121]/90 p-5">
-        <div className="flex items-center justify-between mb-4">
+      <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-stone-100">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-400" />
-            <h2 className="text-base font-semibold text-white">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <h2 className="text-base font-semibold text-stone-900">
               SLA Breach & Sensor Excursion Log
             </h2>
           </div>
-          <span className="text-xs font-mono text-slate-400">
+          <span className="text-xs font-mono text-stone-500 font-medium">
             {alerts.length} incidents recorded
           </span>
         </div>
 
         {alerts.length === 0 ? (
-          <div className="py-8 text-center text-slate-400 text-sm font-mono border border-dashed border-slate-800 rounded-lg">
+          <div className="py-8 text-center text-stone-500 text-xs font-mono border border-dashed border-stone-200 rounded-xl">
             No temperature or humidity excursions detected for this shipment. All parameters within SLA envelopes.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs font-mono">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-400 uppercase">
-                  <th className="py-2.5 px-3">Time</th>
-                  <th className="py-2.5 px-3">Type</th>
-                  <th className="py-2.5 px-3">Severity</th>
-                  <th className="py-2.5 px-3">Message</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3 text-right">Actions</th>
+                <tr className="border-b border-stone-200 text-stone-500 uppercase bg-stone-50/75">
+                  <th className="py-2.5 px-3 font-semibold">Time</th>
+                  <th className="py-2.5 px-3 font-semibold">Type</th>
+                  <th className="py-2.5 px-3 font-semibold">Severity</th>
+                  <th className="py-2.5 px-3 font-semibold">Message</th>
+                  <th className="py-2.5 px-3 font-semibold">Status</th>
+                  <th className="py-2.5 px-3 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              <tbody className="divide-y divide-stone-100 text-stone-700">
                 {alerts.map((alert) => {
                   const alertId = alert.id || alert._id
                   const isCritical = alert.severity === 'CRITICAL'
                   const isHigh = alert.severity === 'HIGH'
                   return (
-                    <tr key={alertId} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-3 text-slate-400 whitespace-nowrap">
+                    <tr key={alertId} className="hover:bg-stone-50/75 transition-colors">
+                      <td className="py-3 px-3 text-stone-500 whitespace-nowrap">
                         {formatDate(alert.created_at || alert.timestamp)}
                       </td>
-                      <td className="py-3 px-3 font-semibold text-white">
+                      <td className="py-3 px-3 font-semibold text-stone-900">
                         {alert.alert_type || 'EXCURSION'}
                       </td>
                       <td className="py-3 px-3">
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                             isCritical
-                              ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                              ? 'bg-rose-50 text-rose-800 border border-rose-200'
                               : isHigh
-                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                              : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                              : 'bg-yellow-50 text-yellow-800 border border-yellow-200'
                           }`}
                         >
                           {alert.severity}
                         </span>
                       </td>
-                      <td className="py-3 px-3 max-w-md truncate">
+                      <td className="py-3 px-3 max-w-md truncate font-sans">
                         {alert.message || alert.description || 'Condition breach detected'}
                       </td>
                       <td className="py-3 px-3">
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] ${
+                          className={`px-2 py-0.5 rounded text-[10px] font-medium ${
                             alert.status === 'ACTIVE'
-                              ? 'bg-red-500/20 text-red-300'
+                              ? 'bg-rose-50 text-rose-800 border border-rose-200'
                               : alert.status === 'ACKNOWLEDGED'
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-emerald-500/20 text-emerald-300'
+                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                              : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                           }`}
                         >
                           {alert.status}
@@ -757,7 +757,7 @@ export default function ColdChainPage() {
                               setActiveAlertModal({ alert, mode: 'ack' })
                               setCorrectiveAction('')
                             }}
-                            className="px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-colors"
+                            className="px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors"
                           >
                             Acknowledge
                           </button>
@@ -768,13 +768,13 @@ export default function ColdChainPage() {
                               setActiveAlertModal({ alert, mode: 'resolve' })
                               setCorrectiveAction('')
                             }}
-                            className="px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-colors"
+                            className="px-2.5 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors"
                           >
                             Resolve
                           </button>
                         )}
                         {alert.status === 'RESOLVED' && (
-                          <span className="text-slate-400 text-[11px]">Resolved</span>
+                          <span className="text-stone-400 text-[11px] font-sans">Resolved</span>
                         )}
                       </td>
                     </tr>
@@ -788,18 +788,18 @@ export default function ColdChainPage() {
 
       {/* Acknowledge / Resolve Modal */}
       {activeAlertModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#0b1121] p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl animate-fade-in-up">
+            <h3 className="text-lg font-bold text-stone-900 mb-1">
               {activeAlertModal.mode === 'ack' ? 'Acknowledge Sensor Alert' : 'Resolve Sensor Excursion'}
             </h3>
-            <p className="text-xs text-slate-400 mb-4">
+            <p className="text-xs text-stone-500 mb-4 font-sans">
               {activeAlertModal.alert.message || 'SLA threshold breach detected.'}
             </p>
 
             <form onSubmit={handleAlertActionSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
+                <label className="block text-xs font-mono uppercase text-stone-600 font-semibold mb-1.5">
                   Corrective Action Taken / Notes:
                 </label>
                 <textarea
@@ -807,23 +807,23 @@ export default function ColdChainPage() {
                   value={correctiveAction}
                   onChange={(e) => setCorrectiveAction(e.target.value)}
                   placeholder="e.g. Reefer temperature setpoint adjusted to 4°C, compressor reset verified."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-sans"
                   required
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-stone-100">
                 <button
                   type="button"
                   onClick={() => setActiveAlertModal(null)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono uppercase transition-colors"
+                  className="px-4 py-2 rounded-lg border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 text-xs font-mono uppercase transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-mono font-semibold uppercase tracking-wider transition-all"
+                  className="px-4 py-2 rounded-lg bg-[#244634] hover:bg-[#1b3527] disabled:opacity-50 text-white text-xs font-mono font-semibold uppercase tracking-wider transition-all"
                 >
                   {actionLoading ? 'Submitting...' : 'Confirm Action'}
                 </button>
