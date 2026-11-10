@@ -19,7 +19,7 @@ import {
 import { inventoryApi, warehousesApi, batchesApi } from '../../api/agriculture.api'
 import { useAuth } from '../../context/AuthContext'
 import { ROLES, normalizeRole } from '../../constants/roles'
-import { formatWeight, formatDate, formatDateTime, getStatusColor, formatStatus } from '../../utils'
+import { formatWeight, formatDate, formatDateTime, getStatusColor, formatStatus, getApiError } from '../../utils'
 
 export default function InventoryPage() {
   const queryClient = useQueryClient()
@@ -170,18 +170,32 @@ export default function InventoryPage() {
       setMovementForm({ movement_type: 'INTAKE', quantity_kg: '', reference_id: '', notes: '' })
     },
     onError: (err) => {
-      setMovementError(err.response?.data?.detail || err.message || 'Movement failed.')
+      setMovementError(getApiError(err, 'Movement failed.').message)
     },
   })
 
+  // Safe number parser preserving empty/invalid values
+  const parseNumericInput = (val) => {
+    if (val === '' || val == null) return null
+    const n = Number(val)
+    return Number.isFinite(n) ? n : null
+  }
+
   // Exact Weight reconciliation calculations
-  const receivedKg = parseFloat(receiptForm.received_weight_kg) || 0
-  const acceptedKg = parseFloat(receiptForm.accepted_weight_kg) || 0
-  const damagedKg = parseFloat(receiptForm.damaged_weight_kg) || 0
-  const rejectedKg = parseFloat(receiptForm.rejected_weight_kg) || 0
+  const rawReceived = parseNumericInput(receiptForm.received_weight_kg)
+  const rawAccepted = parseNumericInput(receiptForm.accepted_weight_kg)
+  const rawDamaged = parseNumericInput(receiptForm.damaged_weight_kg)
+  const rawRejected = parseNumericInput(receiptForm.rejected_weight_kg)
+
+  const receivedKg = rawReceived ?? 0
+  const acceptedKg = rawAccepted ?? 0
+  const damagedKg = rawDamaged ?? 0
+  const rejectedKg = rawRejected ?? 0
   const totalSum = acceptedKg + damagedKg + rejectedKg
   const weightDifference = Math.abs(receivedKg - totalSum)
-  const isWeightBalanced = receivedKg > 0 && weightDifference <= 0.01
+  const isWeightBalanced = rawReceived !== null && rawReceived > 0 &&
+                           rawAccepted !== null && rawDamaged !== null && rawRejected !== null &&
+                           weightDifference <= 0.01
 
   const handleReceiptSubmit = (e) => {
     e.preventDefault()
@@ -195,9 +209,17 @@ export default function InventoryPage() {
       setReceiptError('Please select a harvest batch to intake.')
       return
     }
+    if (rawReceived === null || rawReceived <= 0) {
+      setReceiptError('Please enter a valid received weight greater than 0.')
+      return
+    }
+    if (rawAccepted === null || rawAccepted < 0 || rawDamaged === null || rawDamaged < 0 || rawRejected === null || rawRejected < 0) {
+      setReceiptError('Accepted, damaged, and rejected weights must be valid numbers (0 or greater).')
+      return
+    }
     if (!isWeightBalanced) {
       setReceiptError(
-        `Received weight (${receivedKg} kg) must exactly equal sum of accepted (${acceptedKg}), damaged (${damagedKg}), and rejected (${rejectedKg}) weights = ${totalSum} kg.`
+        `Received weight (${rawReceived} kg) must exactly equal sum of accepted (${rawAccepted}), damaged (${rawDamaged}), and rejected (${rawRejected}) weights = ${totalSum} kg.`
       )
       return
     }
@@ -206,10 +228,10 @@ export default function InventoryPage() {
       warehouse_id: receiptForm.warehouse_id,
       batch_id: receiptForm.batch_id,
       farmer_id: receiptForm.farmer_id || user?.id || 'FARMER-AUTO',
-      received_weight_kg: receivedKg,
-      accepted_weight_kg: acceptedKg,
-      damaged_weight_kg: damagedKg,
-      rejected_weight_kg: rejectedKg,
+      received_weight_kg: rawReceived,
+      accepted_weight_kg: rawAccepted,
+      damaged_weight_kg: rawDamaged,
+      rejected_weight_kg: rawRejected,
       inspection_result: 'PASSED',
       quality_grade: receiptForm.quality_grade,
       packaging_condition: receiptForm.packaging_condition,

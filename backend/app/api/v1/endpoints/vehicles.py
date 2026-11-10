@@ -1,71 +1,73 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime, date, timezone
 from bson import ObjectId
+
 from app.db.mongodb import get_database
-from app.core.permissions import get_current_user, Role
-from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError
-from app.core.constants import (
-    VehicleCategory, VehicleType, VehicleStatus, UserRole
-)
+from app.core.permissions import get_current_user
+from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError, ConflictError
+from app.core.constants import VehicleCategory, VehicleType, VehicleStatus, UserRole
+from app.utils.serialization import to_response
+from app.utils.mongo import to_mongo, resolve_doc
+from app.schemas.validators import validate_temperature_range, normalize_identifier
 
 router = APIRouter()
 
 
 class VehicleCreate(BaseModel):
     transporter_id: Optional[str] = None
-    registration_number: str = Field(..., pattern=r"^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}$")
+    registration_number: str = Field(..., pattern=r"^[A-Z0-9]{5,20}$")
     category: VehicleCategory
     vehicle_type: VehicleType
-    max_payload_kg: float = Field(..., gt=0)
+    max_payload_kg: float = Field(..., gt=0, le=100000.0)
     refrigeration_available: bool = False
-    temperature_min: Optional[float] = None
-    temperature_max: Optional[float] = None
+    temperature_min: Optional[float] = Field(None, ge=-50.0, le=50.0)
+    temperature_max: Optional[float] = Field(None, ge=-50.0, le=50.0)
     registration_expiry: date
     insurance_expiry: date
     fitness_expiry: date
     last_maintenance_date: Optional[date] = None
     next_maintenance_date: Optional[date] = None
+    model_config = ConfigDict(extra="forbid")
 
 
 class VehicleUpdate(BaseModel):
     category: Optional[VehicleCategory] = None
     vehicle_type: Optional[VehicleType] = None
-    max_payload_kg: Optional[float] = Field(None, gt=0)
-    available_capacity_kg: Optional[float] = Field(None, ge=0)
+    max_payload_kg: Optional[float] = Field(None, gt=0, le=100000.0)
     refrigeration_available: Optional[bool] = None
-    temperature_min: Optional[float] = None
-    temperature_max: Optional[float] = None
-    status: Optional[VehicleStatus] = None
+    temperature_min: Optional[float] = Field(None, ge=-50.0, le=50.0)
+    temperature_max: Optional[float] = Field(None, ge=-50.0, le=50.0)
     registration_expiry: Optional[date] = None
     insurance_expiry: Optional[date] = None
     fitness_expiry: Optional[date] = None
     last_maintenance_date: Optional[date] = None
     next_maintenance_date: Optional[date] = None
+    model_config = ConfigDict(extra="forbid")
 
 
 class VehicleResponse(BaseModel):
     id: str
     vehicle_id: str
-    transporter_id: str
+    transporter_id: Optional[str] = None
     registration_number: str
     category: VehicleCategory
     vehicle_type: VehicleType
     max_payload_kg: float
     available_capacity_kg: float
     refrigeration_available: bool
-    temperature_min: Optional[float]
-    temperature_max: Optional[float]
+    temperature_min: Optional[float] = None
+    temperature_max: Optional[float] = None
     status: VehicleStatus
     registration_expiry: date
     insurance_expiry: date
     fitness_expiry: date
-    last_maintenance_date: Optional[date]
-    next_maintenance_date: Optional[date]
-    created_at: datetime
-    updated_at: datetime
+    last_maintenance_date: Optional[date] = None
+    next_maintenance_date: Optional[date] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 
 def generate_vehicle_id() -> str:
@@ -80,7 +82,7 @@ async def create_vehicle(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     if current_user["role"] not in [UserRole.TRANSPORTER, UserRole.ADMIN]:
-        raise ForbiddenError("Only transporters can create vehicles")
+        raise ForbiddenError("Only transporters or admins can register vehicles")
     
     trans_id = vehicle_data.transporter_id
     if not trans_id and current_user["role"] == UserRole.TRANSPORTER:
@@ -96,45 +98,35 @@ async def create_vehicle(
         raise NotFoundError("Transporter", trans_id)
     
     if current_user["role"] == UserRole.TRANSPORTER and transporter.get("user_id") != current_user["sub"]:
-        raise ForbiddenError("Not authorized for this transporter")
+        raise ForbiddenError("Not authorized to add vehicles for this transporter")
     
-    existing = await db.vehicles.find_one({"registration_number": vehicle_data.registration_number})
+    clean_reg = normalize_identifier(vehicle_data.registration_number)
+    existing = await db.vehicles.find_one({"registration_number": clean_reg})
     if existing:
-        raise ValidationError("Registration number already exists")
+        raise ConflictError(f"Vehicle with registration {clean_reg} is already registered")
+    
+    validate_temperature_range(vehicle_data.temperature_min, vehicle_data.temperature_max)
     
     vehicle_id = generate_vehicle_id()
-    existing = await db.vehicles.find_one({"vehicle_id": vehicle_id})
-    while existing:
+    while await db.vehicles.find_one({"vehicle_id": vehicle_id}):
         vehicle_id = generate_vehicle_id()
-        existing = await db.vehicles.find_one({"vehicle_id": vehicle_id})
     
-    from app.core.constants import VEHICLE_CAPACITY_KG, VEHICLE_REFRIGERATION, VEHICLE_TEMP_RANGES
-    
+    now = datetime.now(timezone.utc)
     vehicle_doc = {
+        **vehicle_data.model_dump(),
         "vehicle_id": vehicle_id,
         "transporter_id": trans_id,
-        "registration_number": vehicle_data.registration_number,
-        "category": vehicle_data.category,
-        "vehicle_type": vehicle_data.vehicle_type,
-        "max_payload_kg": vehicle_data.max_payload_kg,
+        "registration_number": clean_reg,
         "available_capacity_kg": vehicle_data.max_payload_kg,
-        "refrigeration_available": vehicle_data.refrigeration_available,
-        "temperature_min": vehicle_data.temperature_min,
-        "temperature_max": vehicle_data.temperature_max,
-        "status": VehicleStatus.AVAILABLE,
-        "registration_expiry": datetime.combine(vehicle_data.registration_expiry, datetime.min.time()),
-        "insurance_expiry": datetime.combine(vehicle_data.insurance_expiry, datetime.min.time()),
-        "fitness_expiry": datetime.combine(vehicle_data.fitness_expiry, datetime.min.time()),
-        "last_maintenance_date": datetime.combine(vehicle_data.last_maintenance_date, datetime.min.time()) if vehicle_data.last_maintenance_date else None,
-        "next_maintenance_date": datetime.combine(vehicle_data.next_maintenance_date, datetime.min.time()) if vehicle_data.next_maintenance_date else None,
-        "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
+        "status": VehicleStatus.AVAILABLE.value,
+        "created_at": now,
+        "updated_at": now,
     }
     
-    result = await db.vehicles.insert_one(vehicle_doc)
+    result = await db.vehicles.insert_one(to_mongo(vehicle_doc))
     vehicle_doc["_id"] = result.inserted_id
     
-    return VehicleResponse(id=str(result.inserted_id), **vehicle_doc)
+    return to_response(VehicleResponse, vehicle_doc)
 
 
 @router.get("", response_model=List[VehicleResponse])
@@ -144,29 +136,28 @@ async def list_vehicles(
     transporter_id: Optional[str] = None,
     category: Optional[VehicleCategory] = None,
     status: Optional[VehicleStatus] = None,
-    refrigeration_available: Optional[bool] = None,
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     query = {}
     if current_user["role"] == UserRole.TRANSPORTER:
-        transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
-        if transporter:
-            query["transporter_id"] = str(transporter["_id"])
-    
-    if transporter_id and current_user["role"] == UserRole.ADMIN:
+        t_doc = await db.transporters.find_one({"user_id": current_user["sub"]})
+        if t_doc:
+            query["transporter_id"] = str(t_doc["_id"])
+        else:
+            return []
+    elif transporter_id:
         if not ObjectId.is_valid(transporter_id):
             raise ValidationError("Invalid transporter ID")
         query["transporter_id"] = transporter_id
+    
     if category:
-        query["category"] = category
+        query["category"] = category.value if hasattr(category, "value") else str(category)
     if status:
-        query["status"] = status
-    if refrigeration_available is not None:
-        query["refrigeration_available"] = refrigeration_available
+        query["status"] = status.value if hasattr(status, "value") else str(status)
     
     vehicles = await db.vehicles.find(query).sort("created_at", -1).skip((page - 1) * page_size).limit(page_size).to_list(page_size)
-    return [VehicleResponse(id=str(v["_id"]), **v) for v in vehicles]
+    return [to_response(VehicleResponse, v) for v in vehicles]
 
 
 @router.get("/{vehicle_id}", response_model=VehicleResponse)
@@ -175,21 +166,14 @@ async def get_vehicle(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if ObjectId.is_valid(vehicle_id):
-        vehicle = await db.vehicles.find_one({"_id": ObjectId(vehicle_id)})
-    else:
-        vehicle = await db.vehicles.find_one({
-            "$or": [{"vehicle_id": vehicle_id}, {"registration_number": vehicle_id}]
-        })
-    if not vehicle:
-        raise NotFoundError("Vehicle", vehicle_id)
+    vehicle = await resolve_doc(db.vehicles, vehicle_id, "Vehicle", business_key="vehicle_id")
     
     if current_user["role"] == UserRole.TRANSPORTER:
-        transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
-        if not transporter or vehicle["transporter_id"] != str(transporter["_id"]):
+        t_doc = await db.transporters.find_one({"user_id": current_user["sub"]})
+        if not t_doc or vehicle["transporter_id"] != str(t_doc["_id"]):
             raise ForbiddenError("Not authorized to view this vehicle")
     
-    return VehicleResponse(id=str(vehicle["_id"]), **vehicle)
+    return to_response(VehicleResponse, vehicle)
 
 
 @router.patch("/{vehicle_id}", response_model=VehicleResponse)
@@ -199,28 +183,31 @@ async def update_vehicle(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(vehicle_id):
-        raise ValidationError("Invalid vehicle ID")
-    
-    vehicle = await db.vehicles.find_one({"_id": ObjectId(vehicle_id)})
-    if not vehicle:
-        raise NotFoundError("Vehicle", vehicle_id)
+    if current_user["role"] not in [UserRole.TRANSPORTER, UserRole.ADMIN]:
+        raise ForbiddenError("Only transporters or admins can update vehicles")
+
+    vehicle = await resolve_doc(db.vehicles, vehicle_id, "Vehicle", business_key="vehicle_id")
     
     if current_user["role"] == UserRole.TRANSPORTER:
         transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
         if not transporter or vehicle["transporter_id"] != str(transporter["_id"]):
             raise ForbiddenError("Not authorized to update this vehicle")
     
-    update_data = {k: v for k, v in vehicle_data.model_dump().items() if v is not None}
+    update_data = vehicle_data.model_dump(exclude_unset=True)
     if not update_data:
         raise ValidationError("No valid fields to update")
     
+    temp_min = update_data.get("temperature_min", vehicle.get("temperature_min"))
+    temp_max = update_data.get("temperature_max", vehicle.get("temperature_max"))
+    validate_temperature_range(temp_min, temp_max)
+    
     update_data["updated_at"] = datetime.now(timezone.utc)
     
+    # Crucial: to_mongo encodes datetime.date to datetime(UTC midnight)
     await db.vehicles.update_one(
-        {"_id": ObjectId(vehicle_id)},
-        {"$set": update_data}
+        {"_id": vehicle["_id"]},
+        {"$set": to_mongo(update_data)}
     )
     
-    updated = await db.vehicles.find_one({"_id": ObjectId(vehicle_id)})
-    return VehicleResponse(id=str(updated["_id"]), **updated)
+    updated = await db.vehicles.find_one({"_id": vehicle["_id"]})
+    return to_response(VehicleResponse, updated)

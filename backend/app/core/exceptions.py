@@ -2,6 +2,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from typing import Any, Dict
+from pymongo.errors import DuplicateKeyError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -108,38 +109,55 @@ class LedgerError(AgriChainException):
 
 
 async def agri_chain_exception_handler(request: Request, exc: AgriChainException) -> JSONResponse:
+    request_id = getattr(request.state, "request_id", None)
     logger.warning(f"AgriChainException: {exc.message}", extra={"details": exc.details})
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": {"code": exc.code, "message": exc.message, "details": exc.details,
-                            "field_errors": [], "request_id": request.state.request_id}}
+                            "field_errors": [], "request_id": request_id}}
     )
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    request_id = getattr(request.state, "request_id", None)
     logger.warning(f"ValidationError: {exc.errors()}")
     field_errors = [{"field": ".".join(str(part) for part in error["loc"]), "message": error["msg"]}
                     for error in exc.errors()]
     return JSONResponse(
         status_code=422,
         content={"error": {"code": "VALIDATION_ERROR", "message": "Validation failed", "details": {},
-                            "field_errors": field_errors, "request_id": request.state.request_id}}
+                            "field_errors": field_errors, "request_id": request_id}}
     )
 
 
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    request_id = getattr(request.state, "request_id", None)
     logger.warning(f"HTTPException: {exc.detail}")
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": {"code": f"HTTP_{exc.status_code}", "message": str(exc.detail), "details": {},
-                            "field_errors": [], "request_id": request.state.request_id}}
+                            "field_errors": [], "request_id": request_id}}
+    )
+
+
+async def duplicate_key_exception_handler(request: Request, exc: DuplicateKeyError) -> JSONResponse:
+    request_id = getattr(request.state, "request_id", None)
+    logger.warning(f"DuplicateKeyError: {exc}")
+    return JSONResponse(
+        status_code=409,
+        content={"error": {"code": "DUPLICATE_KEY_CONFLICT",
+                            "message": "A resource with this key or identifier already exists.",
+                            "details": {"details": str(exc)},
+                            "field_errors": [],
+                            "request_id": request_id}}
     )
 
 
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    request_id = getattr(request.state, "request_id", None)
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"error": {"code": "INTERNAL_SERVER_ERROR", "message": "Internal server error", "details": {},
-                            "field_errors": [], "request_id": request.state.request_id}}
+                            "field_errors": [], "request_id": request_id}}
     )

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { driversApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
+import { formatApiErrorMessage } from '../../utils'
 
 export default function DriverCreatePage() {
   const navigate = useNavigate()
@@ -30,6 +31,13 @@ export default function DriverCreatePage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+
+    const exp = parseInt(form.experience_years, 10)
+    if (isNaN(exp) || exp < 0) {
+      setError('Experience years must be a valid non-negative number.')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -44,7 +52,7 @@ export default function DriverCreatePage() {
         city: form.city.trim(),
         state: form.state.trim(),
         pincode: form.pincode.trim(),
-        experience_years: parseInt(form.experience_years, 10),
+        experience_years: exp,
       }
 
       const res = await driversApi.create(payload)
@@ -52,8 +60,7 @@ export default function DriverCreatePage() {
       navigate(`/drivers/${newId}`)
     } catch (err) {
       console.error('Driver enrollment error:', err)
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to enroll driver.'
-      setError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setError(formatApiErrorMessage(err, 'Failed to enroll driver.'))
     } finally {
       setLoading(false)
     }

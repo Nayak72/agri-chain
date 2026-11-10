@@ -58,3 +58,14 @@ def convert_objectids_to_strings(doc: dict) -> dict:
         else:
             result[key] = value
     return result
+
+
+def to_response(model_class: Any, doc: dict | None) -> Any:
+    """
+    Safely convert a MongoDB document into a typed Pydantic response model.
+    Converts _id to id and stringifies ObjectIds without fabricating fake timestamps.
+    """
+    if doc is None:
+        return None
+    normalized = convert_objectids_to_strings(doc)
+    return model_class.model_validate(normalized)

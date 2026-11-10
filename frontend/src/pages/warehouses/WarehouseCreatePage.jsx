@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { warehousesApi } from '../../api/agriculture.api'
 import { useAuth } from '../../context/AuthContext'
+import { getApiError } from '../../utils'
 
 export default function WarehouseCreatePage() {
   const navigate = useNavigate()
@@ -34,6 +35,23 @@ export default function WarehouseCreatePage() {
     setLoading(true)
 
     try {
+      const cap = Number(form.capacity_kg)
+      if (isNaN(cap) || cap <= 0) {
+        setError('Total capacity must be a valid positive number.')
+        setLoading(false)
+        return
+      }
+
+      const coldCap = form.cold_storage_capacity_kg ? Number(form.cold_storage_capacity_kg) : 0
+      if (isNaN(coldCap) || coldCap < 0) {
+        setError('Cold storage capacity must be a non-negative number.')
+        setLoading(false)
+        return
+      }
+
+      const tempMin = form.temperature_range_min ? Number(form.temperature_range_min) : null
+      const tempMax = form.temperature_range_max ? Number(form.temperature_range_max) : null
+
       const payload = {
         name: form.name.trim(),
         manager_id: user?.id || user?._id || 'admin',
@@ -41,11 +59,11 @@ export default function WarehouseCreatePage() {
         city: form.city.trim(),
         state: form.state.trim(),
         pincode: form.pincode.trim(),
-        capacity_kg: parseFloat(form.capacity_kg),
-        cold_storage_capacity_kg: parseFloat(form.cold_storage_capacity_kg || 0),
+        capacity_kg: cap,
+        cold_storage_capacity_kg: coldCap,
         has_refrigeration: Boolean(form.has_refrigeration),
-        temperature_range_min: form.temperature_range_min ? parseFloat(form.temperature_range_min) : null,
-        temperature_range_max: form.temperature_range_max ? parseFloat(form.temperature_range_max) : null,
+        temperature_range_min: tempMin,
+        temperature_range_max: tempMax,
         certifications: form.certifications
           ? form.certifications.split(',').map(s => s.trim()).filter(Boolean)
           : [],
@@ -56,8 +74,7 @@ export default function WarehouseCreatePage() {
       navigate(`/warehouses/${newId}`)
     } catch (err) {
       console.error('Warehouse deployment error:', err)
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to deploy storage node.'
-      setError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setError(getApiError(err, 'Failed to deploy storage node.').message)
     } finally {
       setLoading(false)
     }

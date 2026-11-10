@@ -1,5 +1,6 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from app.core.config import get_settings
+from pymongo.uri_parser import parse_uri
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,10 +12,22 @@ _database: AsyncIOMotorDatabase = None
 _supports_transactions = False
 
 
+def get_sanitized_uri(uri: str) -> str:
+    """Return MongoDB URI with credentials stripped."""
+    try:
+        parsed = parse_uri(uri)
+        nodelist = ",".join(f"{host}:{port}" for host, port in parsed["nodelist"])
+        database = parsed.get("database") or settings.database_name
+        return f"mongodb://[REDACTED]@{nodelist}/{database}"
+    except Exception:
+        return "mongodb://[REDACTED]"
+
+
 async def connect_to_mongo() -> bool:
     global _client, _database, _supports_transactions
-    logger.info(f"Connecting to MongoDB at {settings.mongodb_uri}")
-    _client = AsyncIOMotorClient(settings.mongodb_uri)
+    sanitized_uri = get_sanitized_uri(settings.mongodb_uri)
+    logger.info(f"Connecting to MongoDB at {sanitized_uri}")
+    _client = AsyncIOMotorClient(settings.mongodb_uri, tz_aware=True)
     _database = _client[settings.database_name]
     
     try:

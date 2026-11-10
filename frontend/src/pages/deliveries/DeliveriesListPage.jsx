@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { deliveryApi } from '../../api/monitoring.api'
 import { shipmentsApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
-import { formatWeight, formatDate, formatDateTime, getStatusColor, formatStatus } from '../../utils'
+import { formatWeight, formatDate, formatDateTime, getStatusColor, formatStatus, getApiError } from '../../utils'
 
 export default function DeliveriesListPage() {
   const location = useLocation()
@@ -53,8 +53,7 @@ export default function DeliveriesListPage() {
       setFormError('')
     },
     onError: (err) => {
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Report creation failed.'
-      setFormError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setFormError(getApiError(err, 'Report creation failed.').message)
     },
   })
 
@@ -66,8 +65,7 @@ export default function DeliveriesListPage() {
       setFormSuccess('Delivery confirmed and hash locked on cryptographic audit ledger!')
     },
     onError: (err) => {
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Confirmation failed.'
-      setFormError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setFormError(getApiError(err, 'Confirmation failed.').message)
     },
   })
 
@@ -75,15 +73,44 @@ export default function DeliveriesListPage() {
     e.preventDefault()
     setFormError('')
 
+    const parseNumber = (val) => {
+      if (val === '' || val == null) return null
+      const n = Number(val)
+      return Number.isFinite(n) ? n : null
+    }
+
+    const deliveredQty = parseNumber(reportForm.delivered_quantity_kg)
+    if (deliveredQty === null || deliveredQty < 0) {
+      setFormError('Please enter a valid delivered quantity.')
+      return
+    }
+
+    const damagedQty = parseNumber(reportForm.damaged_quantity_kg)
+    if (damagedQty === null || damagedQty < 0) {
+      setFormError('Please enter a valid damaged quantity (0 or greater).')
+      return
+    }
+
+    const missingQty = parseNumber(reportForm.missing_quantity_kg)
+    if (missingQty === null || missingQty < 0) {
+      setFormError('Please enter a valid missing quantity (0 or greater).')
+      return
+    }
+
+    if (!reportForm.received_by.trim()) {
+      setFormError('Receiver name is required.')
+      return
+    }
+
     const payload = {
       shipment_id: reportForm.shipment_id.trim(),
-      delivered_quantity_kg: parseFloat(reportForm.delivered_quantity_kg),
-      damaged_quantity_kg: parseFloat(reportForm.damaged_quantity_kg || 0),
-      missing_quantity_kg: parseFloat(reportForm.missing_quantity_kg || 0),
+      delivered_quantity_kg: deliveredQty,
+      damaged_quantity_kg: damagedQty,
+      missing_quantity_kg: missingQty,
       received_by: reportForm.received_by.trim(),
       received_at: new Date().toISOString(),
       notes: reportForm.notes ? reportForm.notes.trim() : null,
-      status: 'DELIVERED',
+      status: (damagedQty > 0 || missingQty > 0) ? 'PARTIAL' : 'DELIVERED',
     }
 
     createReportMutation.mutate(payload)

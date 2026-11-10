@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     refresh_cookie_name: str = "refresh_token"
     cookie_secure: bool = False
     
-    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000", "http://localhost:5173"]
     
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":
-        if self.app_env != "development":
+        if self.app_env not in ("development", "test"):
             if self.jwt_secret_key == "dev-secret-change-in-production" or len(self.jwt_secret_key) < 32:
                 raise ValueError("JWT_SECRET_KEY must be at least 32 characters outside development")
         return self

@@ -21,7 +21,7 @@ import {
 import { shipmentsApi, checkpointsApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
 import { ROLES, normalizeRole } from '../../constants/roles'
-import { formatWeight, formatDate, formatDateTime, getStatusColor, formatStatus } from '../../utils'
+import { formatWeight, formatDate, formatDateTime, getStatusColor, formatStatus, getApiError } from '../../utils'
 
 const TIMELINE_STAGES = [
   { key: 'BOOKING_CONFIRMED', label: 'Booking Confirmed', desc: 'Freight quotation accepted and dispatch authorized' },
@@ -30,8 +30,9 @@ const TIMELINE_STAGES = [
   { key: 'LOADED', label: 'Cargo Loaded', desc: 'Scale weight verified and manifests signed' },
   { key: 'DISPATCHED', label: 'Dispatched', desc: 'Outbound departure logged on cryptographic audit ledger' },
   { key: 'IN_TRANSIT', label: 'In Transit', desc: 'Active cold-chain telemetry and corridor checkpoint tracking active' },
-  { key: 'CHECKPOINT_REACHED', label: 'Checkpoint Logged', desc: 'En route corridor checkpoint verification' },
-  { key: 'DELIVERED', label: 'Delivered Hub', desc: 'Destination delivery inspection and sign-off' },
+  { key: 'ARRIVED_AT_DESTINATION', label: 'Arrived at Destination', desc: 'Consignment arrived at destination facility' },
+  { key: 'OUT_FOR_DELIVERY', label: 'Out for Delivery', desc: 'Local delivery transit and receiver inspection' },
+  { key: 'DELIVERED', label: 'Delivered', desc: 'Destination delivery inspection and sign-off' },
 ]
 
 export default function ShipmentDetailPage() {
@@ -78,8 +79,55 @@ export default function ShipmentDetailPage() {
       setActionError('')
     },
     onError: (err) => {
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Dispatch failed.'
-      setActionError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setActionError(getApiError(err, 'Dispatch failed.').message)
+    },
+  })
+
+  // Start Transit mutation
+  const startTransitMutation = useMutation({
+    mutationFn: () => shipmentsApi.startTransit(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shipment', id] })
+      setActionError('')
+    },
+    onError: (err) => {
+      setActionError(getApiError(err, 'Failed to start transit.').message)
+    },
+  })
+
+  // Arrive mutation
+  const arriveMutation = useMutation({
+    mutationFn: () => shipmentsApi.arrive(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shipment', id] })
+      setActionError('')
+    },
+    onError: (err) => {
+      setActionError(getApiError(err, 'Failed to record arrival.').message)
+    },
+  })
+
+  // Out for Delivery mutation
+  const outForDeliveryMutation = useMutation({
+    mutationFn: () => shipmentsApi.outForDelivery(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shipment', id] })
+      setActionError('')
+    },
+    onError: (err) => {
+      setActionError(getApiError(err, 'Failed to transition to out for delivery.').message)
+    },
+  })
+
+  // Cancel mutation
+  const cancelMutation = useMutation({
+    mutationFn: (reason) => shipmentsApi.cancel(id, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shipment', id] })
+      setActionError('')
+    },
+    onError: (err) => {
+      setActionError(getApiError(err, 'Failed to cancel shipment.').message)
     },
   })
 
@@ -92,8 +140,7 @@ export default function ShipmentDetailPage() {
       setActionError('')
     },
     onError: (err) => {
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Loading failed.'
-      setActionError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setActionError(getApiError(err, 'Loading failed.').message)
     },
   })
 
@@ -107,8 +154,7 @@ export default function ShipmentDetailPage() {
       setActionError('')
     },
     onError: (err) => {
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Checkpoint creation failed.'
-      setActionError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setActionError(getApiError(err, 'Checkpoint creation failed.').message)
     },
   })
 
@@ -242,13 +288,61 @@ export default function ShipmentDetailPage() {
               </button>
             )}
 
+            {/* Start Transit Action */}
+            {['DISPATCHED'].includes(shipment.status) && (
+              <button
+                onClick={() => startTransitMutation.mutate()}
+                disabled={startTransitMutation.isPending}
+                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold transition-all disabled:opacity-50"
+              >
+                {startTransitMutation.isPending ? 'Starting Transit...' : 'Start Transit'}
+              </button>
+            )}
+
+            {/* Arrive at Destination Action */}
+            {['IN_TRANSIT', 'CHECKPOINT_REACHED', 'AT_CHECKPOINT'].includes(shipment.status) && (
+              <button
+                onClick={() => arriveMutation.mutate()}
+                disabled={arriveMutation.isPending}
+                className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-mono text-xs font-bold transition-all disabled:opacity-50"
+              >
+                {arriveMutation.isPending ? 'Recording Arrival...' : 'Mark Arrived at Destination'}
+              </button>
+            )}
+
+            {/* Out for Delivery Action */}
+            {['ARRIVED_AT_DESTINATION'].includes(shipment.status) && (
+              <button
+                onClick={() => outForDeliveryMutation.mutate()}
+                disabled={outForDeliveryMutation.isPending}
+                className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs font-bold transition-all disabled:opacity-50"
+              >
+                {outForDeliveryMutation.isPending ? 'Updating...' : 'Set Out for Delivery'}
+              </button>
+            )}
+
             {/* Delivery Action */}
-            {['DISPATCHED', 'IN_TRANSIT', 'CHECKPOINT_REACHED'].includes(shipment.status) && (
+            {['OUT_FOR_DELIVERY'].includes(shipment.status) && (
               <button
                 onClick={() => navigate('/deliveries', { state: { shipmentId: sId } })}
                 className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold transition-all"
               >
                 Record Delivery Inspection
+              </button>
+            )}
+
+            {/* Cancel Action */}
+            {['BOOKING_CONFIRMED', 'DRIVER_ASSIGNED', 'LOADING', 'LOADED'].includes(shipment.status) && (
+              <button
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to cancel this shipment consignment?')) {
+                    cancelMutation.mutate('Cancelled via management console')
+                  }
+                }}
+                disabled={cancelMutation.isPending}
+                className="px-4 py-2.5 rounded-xl bg-red-600/20 border border-red-500/40 hover:bg-red-600/30 text-red-300 font-mono text-xs font-bold transition-all disabled:opacity-50"
+              >
+                {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Shipment'}
               </button>
             )}
           </div>

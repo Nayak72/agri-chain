@@ -142,3 +142,6 @@ export function formatTemp(celsius) {
   return `${celsius.toFixed(1)}°C`
 }
 
+export { getApiError, formatApiErrorMessage } from './apiError'
+
+

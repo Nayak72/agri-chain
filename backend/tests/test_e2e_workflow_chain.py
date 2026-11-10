@@ -39,7 +39,8 @@ from app.api.v1.endpoints.freight_quotes import (
 from app.api.v1.endpoints.shipments import (
     create_shipment, ShipmentCreate,
     load_shipment, ShipmentLoad,
-    dispatch_shipment
+    dispatch_shipment, start_transit,
+    arrive_at_destination, set_out_for_delivery
 )
 from app.api.v1.endpoints.checkpoints import (
     create_checkpoint, CheckpointCreate
@@ -98,6 +99,8 @@ async def test_full_lifecycle_workflow_chain():
                 "_id": ObjectId(transporter_record_id),
                 "transporter_id": "TR-001",
                 "user_id": transporter_user_id,
+                "approval_status": "APPROVED",
+                "is_active": True,
             }
         },
         "vehicles": {},
@@ -112,12 +115,17 @@ async def test_full_lifecycle_workflow_chain():
         "_id": ObjectId(vehicle_id),
         "vehicle_id": "VEH-MH-001",
         "transporter_id": transporter_record_id,
+        "max_payload_kg": 5000.0,
+        "capacity_kg": 5000.0,
+        "refrigeration_available": True,
+        "is_refrigerated": True,
         "status": "AVAILABLE",
     }
 
     state["drivers"][driver_id] = {
         "_id": ObjectId(driver_id),
         "driver_id": "DRV-MH-001",
+        "user_id": driver_id,
         "transporter_id": transporter_record_id,
         "status": "AVAILABLE",
     }
@@ -141,12 +149,20 @@ async def test_full_lifecycle_workflow_chain():
     mock_db.warehouse_receipts.find_one = AsyncMock(side_effect=lambda q, *a, **k: state["receipts"].get(str(q.get("_id"))))
     mock_db.warehouse_receipts.update_one = AsyncMock()
     mock_db.inventory_items.insert_one = AsyncMock(return_value=MagicMock(inserted_id=ObjectId()))
+    mock_db.inventory_items.find_one = AsyncMock(return_value=None)
     mock_db.inventory_items.update_one = AsyncMock()
-    mock_db.ledger_heads.find_one_and_update = AsyncMock(return_value={"last_index": 1, "last_hash": "0" * 64})
+    mock_db.ledger_heads.find_one = AsyncMock(return_value={"chain_id": "agrichain_main", "last_index": 1, "last_hash": "0" * 64})
+    mock_db.ledger_heads.find_one_and_update = AsyncMock(return_value={"chain_id": "agrichain_main", "last_index": 1, "last_hash": "0" * 64})
     mock_db.ledger_heads.update_one = AsyncMock()
     mock_db.ledger_blocks.insert_one = AsyncMock(return_value=MagicMock(inserted_id=ObjectId()))
     mock_db.ledger_blocks.find_one = AsyncMock(return_value=None)
     mock_db.audit_logs.insert_one = AsyncMock(return_value=MagicMock(inserted_id=ObjectId()))
+    mock_db.outbox_events.insert_one = AsyncMock(return_value=MagicMock(inserted_id=ObjectId()))
+    mock_db.outbox_events.find_one = AsyncMock(return_value=None)
+    mock_db.sensor_sessions.update_many = AsyncMock()
+    mock_db.freight_bookings.find_one = AsyncMock(
+        side_effect=lambda q, *a, **k: state["bookings"].get(str(q.get("_id"))) if "_id" in q else None
+    )
     mock_db.freight_bookings.update_one = AsyncMock(
         side_effect=lambda q, u, *a, **k: state["bookings"].get(str(q.get("_id")), {}).update(u.get("$set", {}))
     )
@@ -298,7 +314,15 @@ async def test_full_lifecycle_workflow_chain():
     # 8. Transporter Initializes Shipment Consignment
     mock_db.vehicles.find_one = AsyncMock(side_effect=lambda q, *a, **k: state["vehicles"].get(str(q.get("_id"))))
     mock_db.vehicles.update_one = AsyncMock(side_effect=lambda q, u, *a, **k: state["vehicles"][str(q["_id"])].update(u.get("$set", {})))
-    mock_db.drivers.find_one = AsyncMock(side_effect=lambda q, *a, **k: state["drivers"].get(str(q.get("_id"))))
+    def find_driver(q, *a, **k):
+        if "_id" in q:
+            return state["drivers"].get(str(q["_id"]))
+        if "user_id" in q:
+            for d in state["drivers"].values():
+                if d.get("user_id") == q["user_id"]:
+                    return d
+        return None
+    mock_db.drivers.find_one = AsyncMock(side_effect=find_driver)
     mock_db.drivers.update_one = AsyncMock(side_effect=lambda q, u, *a, **k: state["drivers"][str(q["_id"])].update(u.get("$set", {})))
     shipment_oid = ObjectId()
     mock_db.shipments.insert_one = AsyncMock(return_value=MagicMock(inserted_id=shipment_oid))
@@ -327,10 +351,13 @@ async def test_full_lifecycle_workflow_chain():
     dispatch_res = await dispatch_shipment(shipment_res.id, current_user=transporter_user, db=mock_db)
     assert dispatch_res.status == ShipmentStatus.DISPATCHED
 
-    # 11. Driver Logs Corridor Checkpoint
+    # 11. Driver Starts Transit & Logs Corridor Checkpoint
+    driver_user = {"sub": driver_id, "role": UserRole.DRIVER}
+    transit_res = await start_transit(shipment_res.id, current_user=driver_user, db=mock_db)
+    assert transit_res.status == ShipmentStatus.IN_TRANSIT
+
     mock_db.route_checkpoints.insert_one = AsyncMock(return_value=MagicMock(inserted_id=ObjectId()))
     mock_db.route_checkpoints.find_one = AsyncMock(return_value=None)
-    driver_user = {"sub": driver_id, "role": UserRole.DRIVER}
     cp_in = CheckpointCreate(
         shipment_id=shipment_res.id,
         name="Igatpuri Ghath Milestone",
@@ -342,6 +369,13 @@ async def test_full_lifecycle_workflow_chain():
     cp_res = await create_checkpoint(cp_in, current_user=driver_user, db=mock_db)
     assert cp_res.sequence == 1
     assert cp_res.status == "PENDING"
+
+    # Driver Arrives and sets Out for Delivery
+    arrive_res = await arrive_at_destination(shipment_res.id, current_user=driver_user, db=mock_db)
+    assert arrive_res.status == ShipmentStatus.ARRIVED_AT_DESTINATION
+
+    ofd_res = await set_out_for_delivery(shipment_res.id, current_user=driver_user, db=mock_db)
+    assert ofd_res.status == ShipmentStatus.OUT_FOR_DELIVERY
 
     # 12. Driver Submits Delivery Report
     mock_db.delivery_reports.find_one = AsyncMock(return_value=None)
@@ -367,4 +401,4 @@ async def test_full_lifecycle_workflow_chain():
     mock_db.delivery_reports.find_one = AsyncMock(return_value=r_doc)
     confirm_res = await confirm_delivery(shipment_res.id, current_user=buyer_user, db=mock_db)
     assert confirm_res["message"] == "Delivery confirmed"
-    assert state["shipments"][shipment_res.id]["status"] == ShipmentStatus.DELIVERED
+    assert state["shipments"][shipment_res.id]["status"] == ShipmentStatus.PARTIALLY_DELIVERED

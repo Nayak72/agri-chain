@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Truck, AlertTriangle, Layers, Calendar, Thermometer, ShieldCheck } from 'lucide-react'
 import { freightBookingsApi, ordersApi } from '../../api/commerce.api'
 import { batchesApi } from '../../api/agriculture.api'
+import { formatApiErrorMessage } from '../../utils'
 
 export default function FreightBookingCreatePage() {
   const navigate = useNavigate()
@@ -98,15 +99,56 @@ export default function FreightBookingCreatePage() {
       return
     }
 
+    const cargoQty = parseFloat(form.cargo_quantity_kg)
+    if (isNaN(cargoQty) || cargoQty <= 0) {
+      setError('Cargo quantity must be a positive number.')
+      return
+    }
+
+    const totalWeight = parseFloat(form.total_cargo_weight_kg)
+    if (isNaN(totalWeight) || totalWeight <= 0) {
+      setError('Total cargo weight must be a positive number.')
+      return
+    }
+
+    const pkgCount = parseInt(form.package_count, 10)
+    if (isNaN(pkgCount) || pkgCount <= 0) {
+      setError('Package count must be at least 1.')
+      return
+    }
+
+    let tempMin = null
+    let tempMax = null
+    if (form.refrigeration_required) {
+      if (form.temperature_min !== '' && form.temperature_min !== null) {
+        tempMin = parseFloat(form.temperature_min)
+        if (isNaN(tempMin)) {
+          setError('Minimum temperature must be a valid number.')
+          return
+        }
+      }
+      if (form.temperature_max !== '' && form.temperature_max !== null) {
+        tempMax = parseFloat(form.temperature_max)
+        if (isNaN(tempMax)) {
+          setError('Maximum temperature must be a valid number.')
+          return
+        }
+      }
+      if (tempMin !== null && tempMax !== null && tempMin > tempMax) {
+        setError('Minimum temperature cannot be greater than maximum temperature.')
+        return
+      }
+    }
+
     setLoading(true)
 
     try {
       const payload = {
         purchase_order_id: form.purchase_order_id.trim(),
         batch_ids: Array.isArray(form.batch_ids) ? form.batch_ids : [form.batch_ids],
-        cargo_quantity_kg: parseFloat(form.cargo_quantity_kg),
-        total_cargo_weight_kg: parseFloat(form.total_cargo_weight_kg),
-        package_count: parseInt(form.package_count, 10),
+        cargo_quantity_kg: cargoQty,
+        total_cargo_weight_kg: totalWeight,
+        package_count: pkgCount,
         pickup_address: form.pickup_address.trim(),
         pickup_city: form.pickup_city.trim(),
         pickup_state: form.pickup_state.trim(),
@@ -117,8 +159,8 @@ export default function FreightBookingCreatePage() {
         required_delivery_date: form.required_delivery_date,
         preferred_vehicle_category: form.preferred_vehicle_category,
         refrigeration_required: Boolean(form.refrigeration_required),
-        temperature_min: form.refrigeration_required && form.temperature_min ? parseFloat(form.temperature_min) : null,
-        temperature_max: form.refrigeration_required && form.temperature_max ? parseFloat(form.temperature_max) : null,
+        temperature_min: tempMin,
+        temperature_max: tempMax,
         packaging_details: form.packaging_details ? form.packaging_details.trim() : null,
         special_handling_instructions: form.special_handling_instructions ? form.special_handling_instructions.trim() : null,
       }
@@ -128,8 +170,7 @@ export default function FreightBookingCreatePage() {
       navigate(`/freight-bookings/${newKey}`)
     } catch (err) {
       console.error('Freight booking creation error:', err)
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to create freight booking.'
-      setError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setError(formatApiErrorMessage(err, 'Failed to create freight booking.'))
     } finally {
       setLoading(false)
     }

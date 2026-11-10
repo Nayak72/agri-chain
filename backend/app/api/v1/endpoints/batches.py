@@ -1,44 +1,50 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from motor.motor_asyncio import AsyncIOMotorDatabase
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import datetime, date, timezone, timedelta
-from bson import ObjectId
-from app.db.mongodb import get_database
-from app.core.permissions import get_current_user, Role
-from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError
-from app.core.constants import ProduceType, QualityGrade, PackagingType, BatchStatus, UserRole
-from app.services.ledger_service import append_ledger_block
-from app.core.constants import LedgerEventType
+import re
 import uuid
+from datetime import datetime, date, timezone, timedelta
+from typing import Optional, List
+from fastapi import APIRouter, Depends, Query
+from motor.motor_asyncio import AsyncIOMotorDatabase
+from pydantic import BaseModel, Field, ConfigDict
+from bson import ObjectId
+
+from app.db.mongodb import get_database
+from app.core.permissions import get_current_user
+from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError
+from app.core.constants import ProduceType, QualityGrade, PackagingType, BatchStatus, UserRole, LedgerEventType
+from app.services.ledger_service import append_ledger_block
+from app.utils.serialization import to_response
+from app.utils.mongo import to_mongo, resolve_doc
+from app.schemas.validators import validate_shelf_life
 
 router = APIRouter()
 
 
 def generate_batch_id(produce_type: ProduceType, farm_location: str) -> str:
-    prefix = produce_type[:3].upper()
-    location_code = farm_location[:3].upper()
+    prefix = str(produce_type)[:3].upper()
+    cleaned = re.sub(r"[^A-Za-z0-9]", "", farm_location)
+    loc_code = cleaned[:3].upper() if len(cleaned) >= 3 else (cleaned.upper() + "XXX")[:3]
     unique = uuid.uuid4().hex[:6].upper()
-    return f"{prefix}-{location_code}-{unique}"
+    return f"{prefix}-{loc_code}-{unique}"
 
 
 class BatchCreate(BaseModel):
     produce_type: ProduceType
     farm_id: str
     harvest_date: date
-    harvest_location: str
-    initial_quantity_kg: float = Field(..., gt=0)
+    harvest_location: str = Field(..., min_length=1, max_length=100)
+    initial_quantity_kg: float = Field(..., gt=0, le=1000000.0, allow_inf_nan=False)
     quality_grade: QualityGrade = QualityGrade.GRADE_A
     packaging_type: PackagingType = PackagingType.CRATE
-    estimated_shelf_life_days: int = Field(..., gt=0)
-    handling_requirements: Optional[str] = None
+    estimated_shelf_life_days: int = Field(..., gt=0, le=3650)
+    handling_requirements: Optional[str] = Field(None, max_length=1000)
+    model_config = ConfigDict(extra="forbid")
 
 
 class BatchUpdate(BaseModel):
     quality_grade: Optional[QualityGrade] = None
     packaging_type: Optional[PackagingType] = None
-    handling_requirements: Optional[str] = None
-    status: Optional[BatchStatus] = None
+    handling_requirements: Optional[str] = Field(None, max_length=1000)
+    model_config = ConfigDict(extra="forbid")
 
 
 class BatchResponse(BaseModel):
@@ -58,10 +64,10 @@ class BatchResponse(BaseModel):
     quality_grade: QualityGrade
     packaging_type: PackagingType
     estimated_shelf_life_end: date
-    handling_requirements: Optional[str]
+    handling_requirements: Optional[str] = None
     status: BatchStatus
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 
 @router.post("", response_model=BatchResponse)
@@ -71,59 +77,59 @@ async def create_batch(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     if current_user["role"] not in [UserRole.FARMER, UserRole.ADMIN]:
-        raise ForbiddenError("Only farmers can create batches")
+        raise ForbiddenError("Only farmers or admins can create batches")
     
-    farmer_id = current_user["sub"] if current_user["role"] == UserRole.FARMER else None
-    if not farmer_id:
-        raise ValidationError("Farmer ID required")
+    farm = await resolve_doc(db.farms, batch_data.farm_id, "Farm")
+    if not farm.get("is_active", True):
+        raise ValidationError("Farm is inactive")
     
-    if not ObjectId.is_valid(batch_data.farm_id):
-        raise ValidationError("Invalid farm ID")
+    if current_user["role"] == UserRole.FARMER:
+        farmer_id = current_user["sub"]
+        if farm["farmer_id"] != farmer_id:
+            raise ForbiddenError("Farm does not belong to this farmer")
+    else:
+        # Admin creation: derive farmer_id from the farm
+        farmer_id = farm["farmer_id"]
     
-    farm = await db.farms.find_one({"_id": ObjectId(batch_data.farm_id)})
-    if not farm:
-        raise NotFoundError("Farm", batch_data.farm_id)
+    # Check catalogue if entry exists
+    produce_type_val = batch_data.produce_type.value if hasattr(batch_data.produce_type, "value") else str(batch_data.produce_type)
+    cat = await db.produce_catalogue.find_one({"produce_type": produce_type_val})
+    if cat and cat.get("is_active") is False:
+        raise ValidationError(f"Produce type {produce_type_val} is deactivated in the catalogue")
     
-    if farm["farmer_id"] != farmer_id and current_user["role"] != UserRole.ADMIN:
-        raise ForbiddenError("Farm does not belong to this farmer")
-    
-    from app.core.constants import PRODUCE_HANDLING_PROFILES
-    profile = PRODUCE_HANDLING_PROFILES.get(batch_data.produce_type, {})
-    shelf_life_days = batch_data.estimated_shelf_life_days or profile.get("shelf_life_days", 30)
-    
-    harvest_datetime = datetime.combine(batch_data.harvest_date, datetime.min.time())
-    shelf_life_end = harvest_datetime + timedelta(days=shelf_life_days)
+    shelf_life_days = validate_shelf_life(batch_data.estimated_shelf_life_days)
+    harvest_datetime = datetime.combine(batch_data.harvest_date, datetime.min.time(), tzinfo=timezone.utc)
+    shelf_life_end = (harvest_datetime + timedelta(days=shelf_life_days)).date()
     
     batch_id = generate_batch_id(batch_data.produce_type, batch_data.harvest_location)
-    
-    existing = await db.produce_batches.find_one({"batch_id": batch_id})
-    while existing:
+    while await db.produce_batches.find_one({"batch_id": batch_id}):
         batch_id = generate_batch_id(batch_data.produce_type, batch_data.harvest_location)
-        existing = await db.produce_batches.find_one({"batch_id": batch_id})
     
+    now = datetime.now(timezone.utc)
     batch_doc = {
         "batch_id": batch_id,
-        "produce_type": batch_data.produce_type,
+        "produce_type": produce_type_val,
         "farmer_id": farmer_id,
-        "farm_id": batch_data.farm_id,
-        "harvest_date": harvest_datetime,
-        "harvest_location": batch_data.harvest_location,
+        "farm_id": str(farm["_id"]),
+        "harvest_date": batch_data.harvest_date,
+        "harvest_location": batch_data.harvest_location.strip(),
         "initial_quantity_kg": batch_data.initial_quantity_kg,
         "available_quantity_kg": batch_data.initial_quantity_kg,
         "reserved_quantity_kg": 0.0,
         "dispatched_quantity_kg": 0.0,
         "accepted_quantity_kg": 0.0,
         "rejected_quantity_kg": 0.0,
-        "quality_grade": batch_data.quality_grade,
-        "packaging_type": batch_data.packaging_type,
+        "quality_grade": batch_data.quality_grade.value if hasattr(batch_data.quality_grade, "value") else batch_data.quality_grade,
+        "packaging_type": batch_data.packaging_type.value if hasattr(batch_data.packaging_type, "value") else batch_data.packaging_type,
         "estimated_shelf_life_end": shelf_life_end,
-        "handling_requirements": batch_data.handling_requirements or profile.get("special_handling"),
-        "status": BatchStatus.CREATED,
-        "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
+        "handling_requirements": batch_data.handling_requirements,
+        "status": BatchStatus.CREATED.value,
+        "created_by": current_user["sub"],
+        "created_at": now,
+        "updated_at": now,
     }
     
-    result = await db.produce_batches.insert_one(batch_doc)
+    result = await db.produce_batches.insert_one(to_mongo(batch_doc))
     batch_doc["_id"] = result.inserted_id
     
     await append_ledger_block(
@@ -131,18 +137,13 @@ async def create_batch(
         event_type=LedgerEventType.PRODUCE_BATCH_CREATED,
         entity_type="PRODUCE_BATCH",
         entity_id=str(result.inserted_id),
-        actor_id=farmer_id,
+        actor_id=current_user["sub"],
         actor_role=current_user["role"],
-        event_summary=f"Harvest batch {batch_id} created for {batch_data.produce_type}",
-        payload={
-            "batch_id": batch_id,
-            "produce_type": batch_data.produce_type,
-            "initial_quantity_kg": batch_data.initial_quantity_kg,
-            "farm_id": batch_data.farm_id,
-        }
+        event_summary=f"Batch {batch_id} created for {produce_type_val}",
+        payload={"batch_id": batch_id, "initial_quantity_kg": batch_data.initial_quantity_kg}
     )
     
-    return BatchResponse(id=str(result.inserted_id), **batch_doc)
+    return to_response(BatchResponse, batch_doc)
 
 
 @router.get("", response_model=List[BatchResponse])
@@ -155,23 +156,29 @@ async def list_batches(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    query = {}
+    conditions = []
     if current_user["role"] == UserRole.FARMER:
-        query["farmer_id"] = current_user["sub"]
+        conditions.append({"farmer_id": current_user["sub"]})
     elif current_user["role"] in [UserRole.WAREHOUSE_MANAGER, UserRole.BUYER]:
-        query["status"] = {"$in": [BatchStatus.AT_WAREHOUSE, BatchStatus.INSPECTED, BatchStatus.PACKAGED]}
+        conditions.append({"status": {"$in": [
+            BatchStatus.AT_WAREHOUSE.value, BatchStatus.INSPECTED.value, BatchStatus.PACKAGED.value,
+            BatchStatus.AT_WAREHOUSE, BatchStatus.INSPECTED, BatchStatus.PACKAGED
+        ]}})
     
     if produce_type:
-        query["produce_type"] = produce_type
+        p_val = produce_type.value if hasattr(produce_type, "value") else str(produce_type)
+        conditions.append({"produce_type": p_val})
     if status:
-        query["status"] = status
+        s_val = status.value if hasattr(status, "value") else str(status)
+        conditions.append({"status": s_val})
     if farm_id:
         if not ObjectId.is_valid(farm_id):
             raise ValidationError("Invalid farm ID")
-        query["farm_id"] = farm_id
+        conditions.append({"farm_id": farm_id})
     
+    query = {"$and": conditions} if conditions else {}
     batches = await db.produce_batches.find(query).sort("created_at", -1).skip((page - 1) * page_size).limit(page_size).to_list(page_size)
-    return [BatchResponse(id=str(b["_id"]), **b) for b in batches]
+    return [to_response(BatchResponse, b) for b in batches]
 
 
 @router.get("/{batch_id}", response_model=BatchResponse)
@@ -180,17 +187,12 @@ async def get_batch(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if ObjectId.is_valid(batch_id):
-        batch = await db.produce_batches.find_one({"_id": ObjectId(batch_id)})
-    else:
-        batch = await db.produce_batches.find_one({"batch_id": batch_id})
-    if not batch:
-        raise NotFoundError("Batch", batch_id)
+    batch = await resolve_doc(db.produce_batches, batch_id, "Batch", business_key="batch_id")
     
     if current_user["role"] == UserRole.FARMER and batch["farmer_id"] != current_user["sub"]:
         raise ForbiddenError("Not authorized to view this batch")
     
-    return BatchResponse(id=str(batch["_id"]), **batch)
+    return to_response(BatchResponse, batch)
 
 
 @router.patch("/{batch_id}", response_model=BatchResponse)
@@ -200,40 +202,39 @@ async def update_batch(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(batch_id):
-        raise ValidationError("Invalid batch ID")
+    if current_user["role"] not in [UserRole.FARMER, UserRole.ADMIN]:
+        raise ForbiddenError("Only farmers or admins can update batches")
     
-    batch = await db.produce_batches.find_one({"_id": ObjectId(batch_id)})
-    if not batch:
-        raise NotFoundError("Batch", batch_id)
+    batch = await resolve_doc(db.produce_batches, batch_id, "Batch", business_key="batch_id")
     
     if current_user["role"] == UserRole.FARMER and batch["farmer_id"] != current_user["sub"]:
         raise ForbiddenError("Not authorized to update this batch")
     
-    update_data = {k: v for k, v in batch_data.model_dump().items() if v is not None}
+    update_data = batch_data.model_dump(exclude_unset=True)
     if not update_data:
         raise ValidationError("No valid fields to update")
     
-    update_data["updated_at"] = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    update_data["updated_at"] = now
     
     await db.produce_batches.update_one(
-        {"_id": ObjectId(batch_id)},
-        {"$set": update_data}
+        {"_id": batch["_id"]},
+        {"$set": to_mongo(update_data)}
     )
     
     await append_ledger_block(
         db,
         event_type=LedgerEventType.PRODUCE_BATCH_UPDATED,
         entity_type="PRODUCE_BATCH",
-        entity_id=batch_id,
+        entity_id=str(batch["_id"]),
         actor_id=current_user["sub"],
         actor_role=current_user["role"],
         event_summary=f"Batch {batch['batch_id']} updated",
-        payload=update_data
+        payload=to_mongo(update_data)
     )
     
-    updated = await db.produce_batches.find_one({"_id": ObjectId(batch_id)})
-    return BatchResponse(id=str(updated["_id"]), **updated)
+    updated = await db.produce_batches.find_one({"_id": batch["_id"]})
+    return to_response(BatchResponse, updated)
 
 
 @router.get("/{batch_id}/history")
@@ -242,15 +243,10 @@ async def get_batch_history(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(batch_id):
-        raise ValidationError("Invalid batch ID")
-    
-    batch = await db.produce_batches.find_one({"_id": ObjectId(batch_id)})
-    if not batch:
-        raise NotFoundError("Batch", batch_id)
+    batch = await resolve_doc(db.produce_batches, batch_id, "Batch", business_key="batch_id")
     
     if current_user["role"] == UserRole.FARMER and batch["farmer_id"] != current_user["sub"]:
         raise ForbiddenError("Not authorized to view this batch")
     
     from app.services.ledger_service import get_entity_history
-    return await get_entity_history(db, "PRODUCE_BATCH", batch_id)
+    return await get_entity_history(db, "PRODUCE_BATCH", str(batch["_id"]))

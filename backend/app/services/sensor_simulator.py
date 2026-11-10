@@ -30,6 +30,13 @@ class SensorSimulationSession:
         self.last_reading = None
         self.rng = random.Random(session_id)
 
+    def stop(self) -> None:
+        """Gracefully stop simulation session and cancel background task (SN-01)."""
+        self._stop_event.set()
+        self.status = "STOPPED"
+        if self.task and not self.task.done():
+            self.task.cancel()
+
 
 class SensorSimulatorManager:
     def __init__(self):
@@ -98,75 +105,72 @@ class SensorSimulatorManager:
         session = self.sessions.get(shipment_id)
         if not session:
             return None
-        
-        reading = self._generate_reading(session)
-        session.last_reading = reading
-        session.reading_count += 1
-        return reading
+        return self._generate_reading(session)
     
-    def get_session_status(self, shipment_id: str) -> Optional[dict]:
-        session = self.sessions.get(shipment_id)
-        if not session:
-            return None
-        return {
-            "session_id": session.session_id,
-            "shipment_id": session.shipment_id,
-            "scenario": session.scenario,
-            "interval_seconds": session.interval_seconds,
-            "status": session.status,
-            "reading_count": session.reading_count,
-        }
+    def _get_handling_profile(self, produce_type: str) -> dict:
+        return PRODUCE_HANDLING_PROFILES.get(
+            produce_type,
+            PRODUCE_HANDLING_PROFILES.get("TOMATO", {
+                "optimum_temp_min": 10.0,
+                "optimum_temp_max": 15.0,
+                "optimum_humidity_min": 85.0,
+                "optimum_humidity_max": 95.0,
+            })
+        )
     
     def _generate_reading(self, session: SensorSimulationSession) -> dict:
-        elapsed = (datetime.now(timezone.utc) - session._time_start).total_seconds()
+        profile = self._get_handling_profile(session.produce_type)
+        temp_min = profile.get("optimum_temp_min", 10.0)
+        temp_max = profile.get("optimum_temp_max", 15.0)
+        hum_min = profile.get("optimum_humidity_min", 85.0)
+        hum_max = profile.get("optimum_humidity_max", 95.0)
         
-        # Resolve handling profile based on session produce type
-        try:
-            produce_type_enum = ProduceType(session.produce_type)
-            profile = PRODUCE_HANDLING_PROFILES.get(produce_type_enum, PRODUCE_HANDLING_PROFILES.get(ProduceType.TOMATO, {}))
-        except (ValueError, KeyError):
-            profile = PRODUCE_HANDLING_PROFILES.get(ProduceType.TOMATO, {})
-            
-        temp_min = profile.get("min_temp_c", 7)
-        temp_max = profile.get("max_temp_c", 13)
-        hum_min = profile.get("min_humidity_pct", 85)
-        hum_max = profile.get("max_humidity_pct", 95)
+        target_temp = (temp_min + temp_max) / 2
+        target_hum = (hum_min + hum_max) / 2
         
-        base_temp = (temp_min + temp_max) / 2
-        base_hum = (hum_min + hum_max) / 2
+        if session._base_temp is None:
+            session._base_temp = target_temp
+            session._base_humidity = target_hum
         
-        scenario = session.scenario
+        base_temp = session._base_temp
+        base_hum = session._base_humidity
+        step = session.reading_count
         
-        if scenario == SensorScenario.NORMAL:
-            temp = base_temp + session.rng.uniform(-0.5, 0.5)
-            humidity = base_hum + session.rng.uniform(-2, 2)
+        scenario_val = session.scenario.value if hasattr(session.scenario, "value") else str(session.scenario)
+        if scenario_val == SensorScenario.NORMAL or scenario_val == "NORMAL":
+            noise_t = session.rng.gauss(0, 0.3)
+            noise_h = session.rng.gauss(0, 1.0)
+            temp = base_temp + noise_t
+            humidity = base_hum + noise_h
             status = SensorStatus.NORMAL
         
-        elif scenario == SensorScenario.TEMP_EXCURSION:
-            temp = base_temp + session.rng.uniform(3, 8)
-            humidity = base_hum + session.rng.uniform(-2, 2)
-            status = SensorStatus.CRITICAL if temp > temp_max else SensorStatus.WARNING
+        elif scenario_val == SensorScenario.COOLING_FAILURE or scenario_val == "COOLING_FAILURE":
+            drift = min(step * 0.8, 20.0)
+            noise = session.rng.gauss(0, 0.4)
+            temp = base_temp + drift + noise
+            humidity = base_hum - min(step * 0.5, 30.0) + session.rng.gauss(0, 1.0)
+            status = SensorStatus.CRITICAL if temp > temp_max + 3 else SensorStatus.WARNING
         
-        elif scenario == SensorScenario.HUMIDITY_EXCURSION:
-            temp = base_temp + session.rng.uniform(-0.5, 0.5)
-            humidity = base_hum + session.rng.uniform(5, 15)
-            status = SensorStatus.CRITICAL if humidity > hum_max else SensorStatus.WARNING
+        elif scenario_val == SensorScenario.HIGH_HUMIDITY or scenario_val == "HIGH_HUMIDITY":
+            drift = min(step * 1.0, 15.0)
+            temp = base_temp + session.rng.gauss(0, 0.3)
+            humidity = min(base_hum + drift, 99.5)
+            status = SensorStatus.CRITICAL if humidity > hum_max else SensorStatus.NORMAL
         
-        elif scenario == SensorScenario.BOTH_EXCURSION:
-            temp = base_temp + session.rng.uniform(3, 8)
-            humidity = base_hum + session.rng.uniform(5, 15)
-            status = SensorStatus.CRITICAL
+        elif scenario_val == SensorScenario.FREEZING_EVENT or scenario_val == "FREEZING_EVENT":
+            drop = min(step * 1.5, 18.0)
+            temp = base_temp - drop + session.rng.gauss(0, 0.3)
+            humidity = base_hum + session.rng.gauss(0, 1.0)
+            status = SensorStatus.CRITICAL if temp < 0 else SensorStatus.WARNING
         
-        elif scenario == SensorScenario.FLUCTUATION:
-            temp = base_temp + 5 * math.sin(elapsed / 100) + session.rng.uniform(-1, 1)
-            humidity = base_hum + 5 * math.cos(elapsed / 100) + session.rng.uniform(-2, 2)
-            status = SensorStatus.WARNING if abs(temp - base_temp) > 3 else SensorStatus.NORMAL
-        
-        elif scenario == SensorScenario.RECOVERY:
-            recovery_progress = min(elapsed / 300, 1.0)
-            temp = base_temp + (5 * (1 - recovery_progress)) + session.rng.uniform(-0.5, 0.5)
-            humidity = base_hum + (8 * (1 - recovery_progress)) + session.rng.uniform(-2, 2)
-            status = SensorStatus.NORMAL if recovery_progress > 0.7 else SensorStatus.WARNING
+        elif scenario_val == SensorScenario.HEAT_SPIKE or scenario_val == "HEAT_SPIKE":
+            if 3 <= step <= 8:
+                spike = 15.0 * math.sin((step - 3) / 5.0 * math.pi)
+            else:
+                spike = 0.0
+            temp = base_temp + spike + session.rng.gauss(0, 0.4)
+            humidity = base_hum - (spike * 0.5) + session.rng.gauss(0, 1.0)
+            status = SensorStatus.CRITICAL if spike > 5 else SensorStatus.NORMAL
         
         else:
             temp = base_temp
@@ -181,6 +185,7 @@ class SensorSimulatorManager:
         elif humidity < hum_min or humidity > hum_max:
             status = SensorStatus.CRITICAL
         
+        status_val = status.value if hasattr(status, "value") else str(status)
         return {
             "session_id": session.session_id,
             "shipment_id": session.shipment_id,
@@ -192,12 +197,11 @@ class SensorSimulatorManager:
             "configured_temp_max": temp_max,
             "configured_humidity_min": hum_min,
             "configured_humidity_max": hum_max,
-            "status": status,
+            "status": status_val,
             "simulated": True,
         }
 
     async def resume_running(self, db: Any) -> int:
-        """Resume persisted RUNNING sessions after a process restart."""
         from app.core.config import get_settings
         if not get_settings().simulator_enabled:
             return 0
@@ -223,17 +227,20 @@ class SensorSimulatorManager:
     
     async def _simulation_loop(self, session: SensorSimulationSession, db: Any):
         while not session._stop_event.is_set():
-            await session._pause_event.wait()
-            if session._stop_event.is_set():
-                break
-            
-            reading = self._generate_reading(session)
-            session.last_reading = reading
-            session.reading_count += 1
-            
             try:
+                await session._pause_event.wait()
+                if session._stop_event.is_set():
+                    break
+                
+                reading = self._generate_reading(session)
+                session.last_reading = reading
+                session.reading_count += 1
+                
+                reading_id = f"SR-{session.session_id}-{session.reading_count:06d}"
+                reading["reading_id"] = reading_id  # Fix SN-02
+                
                 reading_doc = {
-                    "reading_id": f"SR-{session.session_id}-{session.reading_count:06d}",
+                    "reading_id": reading_id,
                     "session_id": session.session_id,
                     "shipment_id": session.shipment_id,
                     "simulated_device_id": reading["device_id"],
@@ -251,15 +258,19 @@ class SensorSimulatorManager:
                 }
                 await db.sensor_readings.insert_one(reading_doc)
                 
-                if reading["status"] in [SensorStatus.WARNING, SensorStatus.CRITICAL]:
+                if reading["status"] in ["WARNING", "CRITICAL", SensorStatus.WARNING, SensorStatus.CRITICAL]:
                     await self._create_alert(db, session, reading)
+            except asyncio.CancelledError:
+                break
             except Exception as e:
-                logger.error(f"Error persisting sensor reading: {e}")
+                logger.error(f"Error persisting sensor reading in simulation loop: {e}")
             
             try:
                 await asyncio.wait_for(session._stop_event.wait(), timeout=session.interval_seconds)
             except asyncio.TimeoutError:
                 pass
+            except asyncio.CancelledError:
+                break
     
     async def _create_alert(self, db: Any, session: SensorSimulationSession, reading: dict):
         alert_type = "TEMPERATURE" if (
@@ -267,12 +278,13 @@ class SensorSimulatorManager:
             reading["temperature"] > reading["configured_temp_max"]
         ) else "HUMIDITY"
         
-        severity = SensorStatus.CRITICAL if reading["status"] == SensorStatus.CRITICAL else SensorStatus.WARNING
+        severity = "CRITICAL" if reading["status"] in ["CRITICAL", SensorStatus.CRITICAL] else "WARNING"
         
+        alert_id = f"ALERT-{session.session_id}-{session.reading_count:06d}"
         alert_doc = {
-            "alert_id": f"ALERT-{session.session_id}-{session.reading_count:06d}",
+            "alert_id": alert_id,
             "shipment_id": session.shipment_id,
-            "reading_id": reading["reading_id"],
+            "reading_id": reading.get("reading_id", f"SR-{session.session_id}-{session.reading_count:06d}"),
             "alert_type": alert_type,
             "severity": severity,
             "observed_value": reading["temperature"] if alert_type == "TEMPERATURE" else reading["humidity"],

@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime, timezone
 from bson import ObjectId
+
 from app.db.mongodb import get_database
-from app.core.permissions import Role, get_current_user, get_current_admin_user, require_permission
-from app.core.exceptions import NotFoundError, ValidationError
+from app.core.permissions import get_current_admin_user
+from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError
 from app.core.constants import UserRole
+from app.schemas.validators import escape_search
 
 router = APIRouter()
 
@@ -16,6 +18,7 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=2, max_length=100)
     phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")
     is_active: Optional[bool] = None
+    model_config = ConfigDict(extra="forbid")
 
 
 class UserListResponse(BaseModel):
@@ -37,13 +40,14 @@ async def list_users(
 ):
     query = {}
     if role:
-        query["role"] = role
+        query["role"] = role.value if hasattr(role, "value") else str(role)
     if is_active is not None:
         query["is_active"] = is_active
     if search:
+        escaped = escape_search(search)
         query["$or"] = [
-            {"full_name": {"$regex": search, "$options": "i"}},
-            {"email": {"$regex": search, "$options": "i"}},
+            {"full_name": {"$regex": escaped, "$options": "i"}},
+            {"email": {"$regex": escaped, "$options": "i"}},
         ]
     
     total = await db.users.count_documents(query)
@@ -53,13 +57,13 @@ async def list_users(
         users=[{
             "id": str(u["_id"]),
             "email": u["email"],
-            "full_name": u["full_name"],
+            "full_name": u.get("full_name", ""),
             "phone": u.get("phone"),
             "role": u["role"],
             "is_active": u.get("is_active", True),
             "is_approved": u.get("is_approved", True),
-            "created_at": u["created_at"],
-            "updated_at": u["updated_at"],
+            "created_at": u.get("created_at"),
+            "updated_at": u.get("updated_at"),
         } for u in users],
         total=total,
         page=page,
@@ -83,13 +87,13 @@ async def get_user(
     return {
         "id": str(user["_id"]),
         "email": user["email"],
-        "full_name": user["full_name"],
+        "full_name": user.get("full_name", ""),
         "phone": user.get("phone"),
         "role": user["role"],
         "is_active": user.get("is_active", True),
         "is_approved": user.get("is_approved", True),
-        "created_at": user["created_at"],
-        "updated_at": user["updated_at"],
+        "created_at": user.get("created_at"),
+        "updated_at": user.get("updated_at"),
     }
 
 
@@ -103,19 +107,28 @@ async def update_user(
     if not ObjectId.is_valid(user_id):
         raise ValidationError("Invalid user ID")
     
-    update_data = {k: v for k, v in user_data.model_dump().items() if v is not None}
+    target = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not target:
+        raise NotFoundError("User", user_id)
+    
+    update_data = user_data.model_dump(exclude_unset=True)
     if not update_data:
         raise ValidationError("No valid fields to update")
     
+    if update_data.get("is_active") is False:
+        if user_id == current_user["sub"]:
+            raise ValidationError("Cannot deactivate your own account")
+        if target.get("role") == UserRole.ADMIN:
+            active_admins = await db.users.count_documents({"role": UserRole.ADMIN, "is_active": True})
+            if active_admins <= 1:
+                raise ValidationError("Cannot deactivate the last active administrator")
+
     update_data["updated_at"] = datetime.now(timezone.utc)
     
-    result = await db.users.update_one(
+    await db.users.update_one(
         {"_id": ObjectId(user_id)},
         {"$set": update_data}
     )
-    
-    if result.matched_count == 0:
-        raise NotFoundError("User", user_id)
     
     return {"message": "User updated successfully"}
 
@@ -129,11 +142,11 @@ async def approve_user(
     if not ObjectId.is_valid(user_id):
         raise ValidationError("Invalid user ID")
     
+    now = datetime.now(timezone.utc)
     result = await db.users.update_one(
         {"_id": ObjectId(user_id)},
-        {"$set": {"is_approved": True, "updated_at": datetime.now(timezone.utc)}}
+        {"$set": {"is_approved": True, "updated_at": now}}
     )
-    
     if result.matched_count == 0:
         raise NotFoundError("User", user_id)
     
@@ -152,14 +165,17 @@ async def suspend_user(
     if user_id == current_user["sub"]:
         raise ValidationError("Cannot suspend yourself")
     
-    result = await db.users.update_one(
-        {"_id": ObjectId(user_id)},
-        {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
-    )
-    
-    if result.matched_count == 0:
+    target = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not target:
         raise NotFoundError("User", user_id)
+    if target.get("role") == UserRole.ADMIN:
+        raise ForbiddenError("Cannot suspend another administrator")
     
+    now = datetime.now(timezone.utc)
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"is_active": False, "updated_at": now}}
+    )
     return {"message": "User suspended successfully"}
 
 
@@ -172,11 +188,11 @@ async def activate_user(
     if not ObjectId.is_valid(user_id):
         raise ValidationError("Invalid user ID")
     
+    now = datetime.now(timezone.utc)
     result = await db.users.update_one(
         {"_id": ObjectId(user_id)},
-        {"$set": {"is_active": True, "updated_at": datetime.now(timezone.utc)}}
+        {"$set": {"is_active": True, "updated_at": now}}
     )
-    
     if result.matched_count == 0:
         raise NotFoundError("User", user_id)
     

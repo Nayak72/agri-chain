@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { farmsApi } from '../../api/agriculture.api'
+import { formatApiErrorMessage } from '../../utils'
 
 export default function FarmCreatePage() {
   const navigate = useNavigate()
@@ -27,6 +28,34 @@ export default function FarmCreatePage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+
+    let lat = null
+    if (form.latitude && form.latitude.trim()) {
+      lat = parseFloat(form.latitude)
+      if (isNaN(lat) || lat < -90 || lat > 90) {
+        setError('Latitude must be a valid number between -90 and 90.')
+        return
+      }
+    }
+
+    let lon = null
+    if (form.longitude && form.longitude.trim()) {
+      lon = parseFloat(form.longitude)
+      if (isNaN(lon) || lon < -180 || lon > 180) {
+        setError('Longitude must be a valid number between -180 and 180.')
+        return
+      }
+    }
+
+    let area = null
+    if (form.area_hectares && form.area_hectares.trim()) {
+      area = parseFloat(form.area_hectares)
+      if (isNaN(area) || area <= 0) {
+        setError('Area in hectares must be a positive number.')
+        return
+      }
+    }
+
     setLoading(true)
 
     try {
@@ -36,9 +65,9 @@ export default function FarmCreatePage() {
         city: form.city.trim(),
         state: form.state.trim(),
         pincode: form.pincode.trim(),
-        latitude: form.latitude ? parseFloat(form.latitude) : null,
-        longitude: form.longitude ? parseFloat(form.longitude) : null,
-        area_hectares: form.area_hectares ? parseFloat(form.area_hectares) : null,
+        latitude: lat,
+        longitude: lon,
+        area_hectares: area,
         certifications: form.certifications
           ? form.certifications.split(',').map(s => s.trim()).filter(Boolean)
           : [],
@@ -50,8 +79,7 @@ export default function FarmCreatePage() {
       navigate(`/farms/${newId}`)
     } catch (err) {
       console.error('Farm creation error:', err)
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to register farm node.'
-      setError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setError(formatApiErrorMessage(err, 'Failed to register farm node.'))
     } finally {
       setLoading(false)
     }

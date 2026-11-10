@@ -5,6 +5,7 @@ import { ArrowLeft, ShoppingBag, AlertTriangle, Layers, Calendar, DollarSign, Ma
 import { ordersApi } from '../../api/commerce.api'
 import { produceApi, batchesApi } from '../../api/agriculture.api'
 import { usersApi } from '../../api/users.api'
+import { formatApiErrorMessage } from '../../utils'
 
 export default function OrderCreatePage() {
   const navigate = useNavigate()
@@ -84,16 +85,28 @@ export default function OrderCreatePage() {
       return
     }
 
+    const qty = parseFloat(form.requested_quantity_kg)
+    if (isNaN(qty) || qty <= 0) {
+      setError('Requested quantity must be greater than 0 kg.')
+      return
+    }
+
+    const price = parseFloat(form.unit_price_inr)
+    if (isNaN(price) || price <= 0) {
+      setError('Unit price must be greater than 0 INR.')
+      return
+    }
+
     setLoading(true)
 
     try {
-      const unitPricePaise = Math.round(parseFloat(form.unit_price_inr) * 100)
+      const unitPricePaise = Math.round(price * 100)
 
       const payload = {
         seller_id: form.seller_id.trim(),
         produce_type: form.produce_type.trim(),
         batch_id: form.batch_id ? form.batch_id.trim() : null,
-        requested_quantity_kg: parseFloat(form.requested_quantity_kg),
+        requested_quantity_kg: qty,
         unit_price_paise: unitPricePaise,
         preferred_delivery_date: form.preferred_delivery_date,
         pickup_address: form.pickup_address.trim(),
@@ -106,8 +119,7 @@ export default function OrderCreatePage() {
       navigate(`/purchase-orders/${newKey}`)
     } catch (err) {
       console.error('Order creation error:', err)
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to place purchase order.'
-      setError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setError(formatApiErrorMessage(err, 'Failed to place purchase order.'))
     } finally {
       setLoading(false)
     }

@@ -70,6 +70,20 @@ async def get_dashboard_metrics(
         transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
         if transporter:
             query["transporter_id"] = str(transporter["_id"])
+        else:
+            query["transporter_id"] = "none"
+    elif current_user["role"] == UserRole.DRIVER:
+        driver = await db.drivers.find_one({"user_id": current_user["sub"]})
+        d_ids = [current_user["sub"]]
+        if driver:
+            d_ids.extend([str(driver["_id"]), driver.get("driver_id")])
+        query["$or"] = [{"driver_id": {"$in": d_ids}}, {"driver_user_id": current_user["sub"]}]
+    elif current_user["role"] == UserRole.WAREHOUSE_MANAGER:
+        warehouses = await db.warehouses.find({"manager_id": current_user["sub"]}).to_list(100)
+        wh_ids = [str(w["_id"]) for w in warehouses]
+        receipts = await db.warehouse_receipts.find({"warehouse_id": {"$in": wh_ids}}).to_list(500)
+        b_ids = [r["batch_id"] for r in receipts]
+        query["batch_ids"] = {"$in": b_ids}
     
     total = await db.shipments.count_documents(query)
     active = await db.shipments.count_documents({**query, "status": {"$in": [ShipmentStatus.IN_TRANSIT, ShipmentStatus.AT_CHECKPOINT, ShipmentStatus.OUT_FOR_DELIVERY]}})
@@ -124,6 +138,20 @@ async def get_shipment_analytics(
         transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
         if transporter:
             query["transporter_id"] = str(transporter["_id"])
+        else:
+            query["transporter_id"] = "none"
+    elif current_user["role"] == UserRole.DRIVER:
+        driver = await db.drivers.find_one({"user_id": current_user["sub"]})
+        d_ids = [current_user["sub"]]
+        if driver:
+            d_ids.extend([str(driver["_id"]), driver.get("driver_id")])
+        query["$or"] = [{"driver_id": {"$in": d_ids}}, {"driver_user_id": current_user["sub"]}]
+    elif current_user["role"] == UserRole.WAREHOUSE_MANAGER:
+        warehouses = await db.warehouses.find({"manager_id": current_user["sub"]}).to_list(100)
+        wh_ids = [str(w["_id"]) for w in warehouses]
+        receipts = await db.warehouse_receipts.find({"warehouse_id": {"$in": wh_ids}}).to_list(500)
+        b_ids = [r["batch_id"] for r in receipts]
+        query["batch_ids"] = {"$in": b_ids}
     
     if start_date or end_date:
         date_query = {}

@@ -1,9 +1,12 @@
 import hashlib
 import json
-from datetime import datetime, timezone
+import asyncio
+from datetime import date, datetime, timezone
+from enum import Enum
 from typing import Dict, Any, Optional
 from motor.motor_asyncio import AsyncIOMotorDatabase, AsyncIOMotorClientSession
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 from bson import ObjectId
 from app.core.config import get_settings
 from app.core.constants import LedgerEventType
@@ -18,12 +21,27 @@ GENESIS_HASH = "0" * 64
 CHAIN_ID = settings.ledger_chain_id
 
 
+def truncate_datetime_to_ms(dt: datetime) -> datetime:
+    """Ensure datetime has millisecond precision matching MongoDB BSON storage."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    ms = (dt.microsecond // 1000) * 1000
+    return dt.replace(microsecond=ms).astimezone(timezone.utc)
+
+
 def canonical_json(data: Dict[str, Any]) -> str:
     def default_serializer(obj):
         if isinstance(obj, datetime):
-            return obj.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            truncated = truncate_datetime_to_ms(obj)
+            if truncated.microsecond == 0:
+                return truncated.strftime("%Y-%m-%dT%H:%M:%SZ")
+            return truncated.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        if isinstance(obj, date):
+            return obj.isoformat()
         if isinstance(obj, ObjectId):
             return str(obj)
+        if isinstance(obj, Enum):
+            return obj.value
         if hasattr(obj, "__dict__"):
             return obj.__dict__
         raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
@@ -38,7 +56,7 @@ def canonical_json(data: Dict[str, Any]) -> str:
 
 
 def calculate_block_hash(block_data: Dict[str, Any]) -> str:
-    hashable_data = {k: v for k, v in block_data.items() if k != "hash"}
+    hashable_data = {k: v for k, v in block_data.items() if k not in ("hash", "_id")}
     canonical = canonical_json(hashable_data)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -79,43 +97,89 @@ async def append_ledger_block(
     payload: Dict[str, Any],
     session: AsyncIOMotorClientSession = None
 ) -> Dict[str, Any]:
-    head = await db.ledger_heads.find_one_and_update(
-        {"chain_id": CHAIN_ID},
-        {"$inc": {"last_index": 1}, "$setOnInsert": {"last_hash": GENESIS_HASH, "chain_id": CHAIN_ID}},
-        upsert=True, return_document=ReturnDocument.AFTER, session=session,
-    )
-    new_index = head["last_index"]
-    previous_hash = head.get("last_hash", GENESIS_HASH)
-    
-    block_id = f"{CHAIN_ID}-{new_index:06d}"
-    
+    norm_entity_id = str(entity_id) if entity_id is not None else ""
+    event_type_val = event_type.value if hasattr(event_type, "value") else str(event_type)
+    now_ms = truncate_datetime_to_ms(datetime.now(timezone.utc))
+
     payload_hash = hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
-    
-    block_data = {
-        "chain_id": CHAIN_ID,
-        "index": new_index,
-        "block_id": block_id,
-        "timestamp": datetime.now(timezone.utc),
-        "event_type": event_type,
-        "entity_type": entity_type,
-        "entity_id": entity_id,
-        "actor_id": actor_id,
-        "actor_role": actor_role,
-        "event_summary": event_summary,
-        "payload_hash": payload_hash,
-        "payload_snapshot": payload,
-        "previous_hash": previous_hash,
-        "hash_algorithm": "SHA-256",
-        "schema_version": "1.0",
-    }
-    
-    block_data["hash"] = calculate_block_hash(block_data)
-    
-    await db.ledger_blocks.insert_one(block_data, session=session)
-    await update_ledger_head(db, new_index, block_data["hash"], session)
-    
-    logger.info(f"Ledger block {block_id} appended at index {new_index}")
-    return block_data
+
+    # If running within an explicit transaction session, use atomic find_one_and_update
+    if session is not None:
+        head = await db.ledger_heads.find_one({"chain_id": CHAIN_ID}, session=session)
+        if not head:
+            new_index = 1
+            previous_hash = GENESIS_HASH
+        else:
+            new_index = head.get("last_index", 0) + 1
+            previous_hash = head.get("last_hash", GENESIS_HASH)
+
+        block_id = f"{CHAIN_ID}-{new_index:06d}"
+        block_data = {
+            "chain_id": CHAIN_ID,
+            "index": new_index,
+            "block_id": block_id,
+            "timestamp": now_ms,
+            "event_type": event_type_val,
+            "entity_type": entity_type,
+            "entity_id": norm_entity_id,
+            "actor_id": str(actor_id),
+            "actor_role": str(actor_role),
+            "event_summary": event_summary,
+            "payload_hash": payload_hash,
+            "payload_snapshot": payload,
+            "previous_hash": previous_hash,
+            "hash_algorithm": "SHA-256",
+            "schema_version": "1.0",
+        }
+        block_data["hash"] = calculate_block_hash(block_data)
+        await db.ledger_blocks.insert_one(block_data, session=session)
+        await update_ledger_head(db, new_index, block_data["hash"], session=session)
+        logger.info(f"Ledger block {block_id} appended at index {new_index}")
+        return block_data
+
+    # Optimistic retry loop when transactions are not active
+    for attempt in range(20):
+        head = await db.ledger_heads.find_one({"chain_id": CHAIN_ID})
+        if not head:
+            new_index = 1
+            previous_hash = GENESIS_HASH
+        else:
+            new_index = head.get("last_index", 0) + 1
+            previous_hash = head.get("last_hash", GENESIS_HASH)
+
+        block_id = f"{CHAIN_ID}-{new_index:06d}"
+        block_data = {
+            "chain_id": CHAIN_ID,
+            "index": new_index,
+            "block_id": block_id,
+            "timestamp": now_ms,
+            "event_type": event_type_val,
+            "entity_type": entity_type,
+            "entity_id": norm_entity_id,
+            "actor_id": str(actor_id),
+            "actor_role": str(actor_role),
+            "event_summary": event_summary,
+            "payload_hash": payload_hash,
+            "payload_snapshot": payload,
+            "previous_hash": previous_hash,
+            "hash_algorithm": "SHA-256",
+            "schema_version": "1.0",
+        }
+        block_data["hash"] = calculate_block_hash(block_data)
+        try:
+            await db.ledger_blocks.insert_one(block_data)
+            await db.ledger_heads.update_one(
+                {"chain_id": CHAIN_ID},
+                {"$set": {"last_index": new_index, "last_hash": block_data["hash"], "updated_at": now_ms}},
+                upsert=True
+            )
+            logger.info(f"Ledger block {block_id} appended at index {new_index}")
+            return block_data
+        except DuplicateKeyError:
+            await asyncio.sleep(0.01)
+            continue
+
+    raise LedgerError("Failed to append ledger block after concurrent retry attempts")
 
 
 async def verify_ledger_integrity(db: AsyncIOMotorDatabase) -> Dict[str, Any]:

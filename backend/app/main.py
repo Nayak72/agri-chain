@@ -7,8 +7,10 @@ from fastapi.responses import JSONResponse
 from app.core.config import get_settings
 from app.core.exceptions import (
     AgriChainException, agri_chain_exception_handler,
-    validation_exception_handler, http_exception_handler, generic_exception_handler
+    validation_exception_handler, http_exception_handler, generic_exception_handler,
+    duplicate_key_exception_handler
 )
+from pymongo.errors import DuplicateKeyError
 from app.db.mongodb import connect_to_mongo, close_mongo_connection, supports_transactions
 from app.db.indexes import create_indexes, seed_initial_data
 from app.api.v1.router import api_router
@@ -82,6 +84,7 @@ def create_app() -> FastAPI:
     application.add_exception_handler(AgriChainException, agri_chain_exception_handler)
     application.add_exception_handler(HTTPException, http_exception_handler)
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
+    application.add_exception_handler(DuplicateKeyError, duplicate_key_exception_handler)
     application.add_exception_handler(Exception, generic_exception_handler)
     application.include_router(api_router, prefix="/api/v1")
 

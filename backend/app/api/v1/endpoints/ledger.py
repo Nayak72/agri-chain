@@ -6,16 +6,15 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from app.db.mongodb import get_database
 from app.core.permissions import get_current_user, Role
-from app.core.exceptions import NotFoundError, ValidationError
+from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError
 from app.core.constants import UserRole
+from app.utils.serialization import to_response
 from app.services.ledger_service import (
     verify_ledger_integrity,
     verify_entity_history,
     get_entity_history,
     GENESIS_HASH,
     CHAIN_ID,
-    canonical_json,
-    calculate_block_hash,
 )
 
 router = APIRouter()
@@ -43,6 +42,7 @@ class BlockResponse(BaseModel):
 async def get_ledger_blocks(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    sort: str = Query("desc", pattern="^(asc|desc)$"),
     event_type: Optional[str] = None,
     entity_type: Optional[str] = None,
     entity_id: Optional[str] = None,
@@ -50,18 +50,19 @@ async def get_ledger_blocks(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    query = {}
+    query = {"chain_id": CHAIN_ID}
     if event_type:
         query["event_type"] = event_type
     if entity_type:
         query["entity_type"] = entity_type
     if entity_id:
-        query["entity_id"] = entity_id
+        query["entity_id"] = str(entity_id)
     if actor_id:
-        query["actor_id"] = actor_id
+        query["actor_id"] = str(actor_id)
     
-    blocks = await db.ledger_blocks.find(query).sort("index", 1).skip((page - 1) * page_size).limit(page_size).to_list(page_size)
-    return [BlockResponse(id=str(b["_id"]), **b) for b in blocks]
+    sort_dir = -1 if sort == "desc" else 1
+    blocks = await db.ledger_blocks.find(query).sort("index", sort_dir).skip((page - 1) * page_size).limit(page_size).to_list(page_size)
+    return [to_response(BlockResponse, b) for b in blocks]
 
 
 @router.get("/blocks/{block_index}", response_model=BlockResponse)
@@ -74,7 +75,7 @@ async def get_ledger_block(
     if not block:
         raise NotFoundError("Ledger Block", str(block_index))
     
-    return BlockResponse(id=str(block["_id"]), **block)
+    return to_response(BlockResponse, block)
 
 
 @router.get("/verify")
@@ -82,6 +83,8 @@ async def verify_ledger(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
+    if current_user["role"] != UserRole.ADMIN:
+        raise ForbiddenError("Only administrators can trigger full ledger verification")
     result = await verify_ledger_integrity(db)
     return result
 

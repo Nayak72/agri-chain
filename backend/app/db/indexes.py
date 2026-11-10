@@ -58,7 +58,7 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     # Warehouses
     await _create_index_safe(db.warehouses, "manager_id")
     await _create_index_safe(db.warehouses, "name", unique=True)
-    await _create_index_safe(db.warehouses, "location.city")
+    await _create_index_safe(db.warehouses, "city")
     await _create_index_safe(db.warehouses, "is_active")
     
     # Warehouse receipts
@@ -77,7 +77,7 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     await _create_index_safe(db.quality_inspections, "result")
     
     # Inventory items
-    await _create_index_safe(db.inventory_items, "inventory_id", unique=True)
+    await _create_index_safe(db.inventory_items, "inventory_id", unique=True, partialFilterExpression={"inventory_id": {"$type": "string"}})
     await _create_index_safe(db.inventory_items, "warehouse_id")
     await _create_index_safe(db.inventory_items, "batch_id")
     await _create_index_safe(db.inventory_items, "produce_type")
@@ -101,14 +101,14 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     await _create_index_safe(db.purchase_orders, "produce_type")
     await _create_index_safe(db.purchase_orders, "batch_id")
     await _create_index_safe(db.purchase_orders, "status")
-    await _create_index_safe(db.purchase_orders, "order_date")
+    await _create_index_safe(db.purchase_orders, "created_at")
     await _create_index_safe(db.purchase_orders, [("buyer_id", 1), ("status", 1)])
     await _create_index_safe(db.purchase_orders, [("seller_id", 1), ("status", 1)])
     
     # Transporters
     await _create_index_safe(db.transporters, "transporter_id", unique=True, sparse=True)
     await _create_index_safe(db.transporters, "company_name", unique=True, sparse=True)
-    await _create_index_safe(db.transporters, "user_id", unique=True, sparse=True)
+    await _create_index_safe(db.transporters, "user_id", unique=True, partialFilterExpression={"user_id": {"$type": "string"}})
     await _create_index_safe(db.transporters, "approval_status")
     await _create_index_safe(db.transporters, "is_active")
     
@@ -126,6 +126,7 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     # Drivers
     await _create_index_safe(db.drivers, "driver_id", unique=True, sparse=True)
     await _create_index_safe(db.drivers, "license_number", unique=True, sparse=True)
+    await _create_index_safe(db.drivers, "user_id", unique=True, partialFilterExpression={"user_id": {"$type": "string"}})
     await _create_index_safe(db.drivers, "transporter_id")
     await _create_index_safe(db.drivers, "status")
     await _create_index_safe(db.drivers, [("transporter_id", 1), ("status", 1)])
@@ -150,7 +151,18 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     
     # Shipments
     await _create_index_safe(db.shipments, "shipment_id", unique=True)
-    await _create_index_safe(db.shipments, "booking_id")
+    await _create_index_safe(
+        db.shipments, "booking_id", unique=True,
+        partialFilterExpression={
+            "status": {
+                "$in": [
+                    "BOOKING_REQUESTED", "BOOKING_CONFIRMED", "VEHICLE_ASSIGNED",
+                    "DRIVER_ASSIGNED", "LOADING", "LOADED", "DISPATCHED",
+                    "IN_TRANSIT", "AT_CHECKPOINT", "DELAYED", "ARRIVED_AT_DESTINATION", "OUT_FOR_DELIVERY"
+                ]
+            }
+        }
+    )
     await _create_index_safe(db.shipments, "purchase_order_id")
     await _create_index_safe(db.shipments, "farmer_id")
     await _create_index_safe(db.shipments, "buyer_id")
@@ -158,8 +170,6 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     await _create_index_safe(db.shipments, "vehicle_id")
     await _create_index_safe(db.shipments, "driver_id")
     await _create_index_safe(db.shipments, "status")
-    await _create_index_safe(db.shipments, "dispatch_date")
-    await _create_index_safe(db.shipments, "expected_arrival_date")
     await _create_index_safe(db.shipments, [("transporter_id", 1), ("status", 1)])
     await _create_index_safe(db.shipments, [("driver_id", 1), ("status", 1)])
     await _create_index_safe(db.shipments, [("vehicle_id", 1), ("status", 1)])
@@ -211,7 +221,7 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     await _create_index_safe(db.delivery_reports, "report_id", unique=True)
     await _create_index_safe(db.delivery_reports, "shipment_id", unique=True)
     await _create_index_safe(db.delivery_reports, "status")
-    await _create_index_safe(db.delivery_reports, "delivery_date")
+    await _create_index_safe(db.delivery_reports, "created_at")
     
     # Damage claims
     await _create_index_safe(db.damage_claims, "claim_id", unique=True)
@@ -244,6 +254,16 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     
     # System settings
     await _create_index_safe(db.system_settings, "key", unique=True)
+    
+    # Driver invitations
+    await _create_index_safe(db.driver_invitations, "invitation_id", unique=True)
+    await _create_index_safe(db.driver_invitations, "token_hash", unique=True)
+    await _create_index_safe(db.driver_invitations, "email")
+    await _create_index_safe(db.driver_invitations, "status")
+
+    # Transactional Outbox
+    await _create_index_safe(db.outbox_events, "event_id", unique=True)
+    await _create_index_safe(db.outbox_events, [("status", 1), ("created_at", 1)])
     
     logger.info("Database indexes created successfully")
 
@@ -323,15 +343,6 @@ async def seed_produce_catalogue(db: AsyncIOMotorDatabase) -> None:
             {"$setOnInsert": doc},
             upsert=True
         )
-    
-    await db.produce_catalogue.update_many(
-        {"$or": [{"created_at": {"$exists": False}}, {"created_at": None}]},
-        {"$set": {"created_at": now, "updated_at": now, "is_active": True}}
-    )
-    await db.produce_catalogue.update_many(
-        {"$or": [{"updated_at": {"$exists": False}}, {"updated_at": None}]},
-        {"$set": {"updated_at": now}}
-    )
 
 
 async def seed_handling_profiles(db: AsyncIOMotorDatabase) -> None:

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fleetApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
+import { formatApiErrorMessage } from '../../utils'
 
 export default function VehicleCreatePage() {
   const navigate = useNavigate()
@@ -31,6 +32,36 @@ export default function VehicleCreatePage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+
+    const payloadKg = parseFloat(form.max_payload_kg)
+    if (isNaN(payloadKg) || payloadKg <= 0) {
+      setError('Max payload capacity must be greater than 0 kg.')
+      return
+    }
+
+    let tempMin = null
+    let tempMax = null
+    if (form.refrigeration_available) {
+      if (form.temperature_min !== '' && form.temperature_min !== null) {
+        tempMin = parseFloat(form.temperature_min)
+        if (isNaN(tempMin)) {
+          setError('Minimum temperature must be a valid number.')
+          return
+        }
+      }
+      if (form.temperature_max !== '' && form.temperature_max !== null) {
+        tempMax = parseFloat(form.temperature_max)
+        if (isNaN(tempMax)) {
+          setError('Maximum temperature must be a valid number.')
+          return
+        }
+      }
+      if (tempMin !== null && tempMax !== null && tempMin > tempMax) {
+        setError('Minimum temperature cannot be greater than maximum temperature.')
+        return
+      }
+    }
+
     setLoading(true)
 
     try {
@@ -39,10 +70,10 @@ export default function VehicleCreatePage() {
         registration_number: form.registration_number.trim().toUpperCase(),
         category: form.category,
         vehicle_type: form.vehicle_type.trim(),
-        max_payload_kg: parseFloat(form.max_payload_kg),
+        max_payload_kg: payloadKg,
         refrigeration_available: Boolean(form.refrigeration_available),
-        temperature_min: form.refrigeration_available && form.temperature_min ? parseFloat(form.temperature_min) : null,
-        temperature_max: form.refrigeration_available && form.temperature_max ? parseFloat(form.temperature_max) : null,
+        temperature_min: tempMin,
+        temperature_max: tempMax,
         registration_expiry: form.registration_expiry,
         insurance_expiry: form.insurance_expiry,
         fitness_expiry: form.fitness_expiry,
@@ -52,8 +83,7 @@ export default function VehicleCreatePage() {
       navigate('/fleet')
     } catch (err) {
       console.error('Vehicle registration error:', err)
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to register vehicle.'
-      setError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setError(formatApiErrorMessage(err, 'Failed to register vehicle.'))
     } finally {
       setLoading(false)
     }

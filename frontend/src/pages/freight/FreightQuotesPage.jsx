@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { freightQuotesApi, freightBookingsApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
-import { formatCurrency, formatDate, formatDateTime, formatStatus } from '../../utils'
+import { formatCurrency, formatDate, formatDateTime, formatStatus, getApiError } from '../../utils'
 
 export default function FreightQuotesPage() {
   const location = useLocation()
@@ -56,8 +56,7 @@ export default function FreightQuotesPage() {
       setFormError('')
     },
     onError: (err) => {
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Quotation submission failed.'
-      setFormError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setFormError(getApiError(err, 'Quotation submission failed.').message)
       setSuccessMsg('')
     },
   })
@@ -71,20 +70,41 @@ export default function FreightQuotesPage() {
     setFormError('')
     setSuccessMsg('')
 
-    const basePaise = Math.round(parseFloat(form.freight_base_charge_inr || 0) * 100)
-    const handlingPaise = Math.round(parseFloat(form.handling_charge_inr || 0) * 100)
-    const fuelPaise = Math.round(parseFloat(form.fuel_surcharge_inr || 0) * 100)
-    const otherPaise = Math.round(parseFloat(form.other_charges_inr || 0) * 100)
+    const baseInr = Number(form.freight_base_charge_inr)
+    if (isNaN(baseInr) || baseInr <= 0) {
+      setFormError('Base freight charge must be a positive amount.')
+      return
+    }
+
+    const handlingInr = form.handling_charge_inr ? Number(form.handling_charge_inr) : 0
+    const fuelInr = form.fuel_surcharge_inr ? Number(form.fuel_surcharge_inr) : 0
+    const otherInr = form.other_charges_inr ? Number(form.other_charges_inr) : 0
+    if (isNaN(handlingInr) || isNaN(fuelInr) || isNaN(otherInr)) {
+      setFormError('Additional charges must be valid numeric amounts.')
+      return
+    }
+
+    const distanceKm = Number(form.planned_distance_km)
+    if (isNaN(distanceKm) || distanceKm <= 0) {
+      setFormError('Planned distance must be a positive number.')
+      return
+    }
+
+    const transitHours = Number(form.estimated_transit_hours)
+    if (isNaN(transitHours) || transitHours <= 0) {
+      setFormError('Estimated transit hours must be a positive number.')
+      return
+    }
 
     const payload = {
       booking_id: form.booking_id.trim(),
       proposed_vehicle_category: form.proposed_vehicle_category,
-      freight_base_charge_paise: basePaise,
-      handling_charge_paise: handlingPaise,
-      fuel_surcharge_paise: fuelPaise,
-      other_charges_paise: otherPaise,
-      planned_distance_km: parseFloat(form.planned_distance_km),
-      estimated_transit_hours: parseFloat(form.estimated_transit_hours),
+      freight_base_charge_paise: Math.round(baseInr * 100),
+      handling_charge_paise: Math.round(handlingInr * 100),
+      fuel_surcharge_paise: Math.round(fuelInr * 100),
+      other_charges_paise: Math.round(otherInr * 100),
+      planned_distance_km: distanceKm,
+      estimated_transit_hours: transitHours,
       expected_pickup_date: form.expected_pickup_date,
       expected_delivery_date: form.expected_delivery_date,
       validity_days: parseInt(form.validity_days, 10),

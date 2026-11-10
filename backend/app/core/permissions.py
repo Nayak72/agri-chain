@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Set, List
+from typing import Set, List, Optional
 from fastapi import Depends, HTTPException
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -8,7 +8,7 @@ from app.db.mongodb import get_database
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.exceptions import UnauthorizedError, ForbiddenError, AccountPendingApprovalError, AccountDisabledError
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 class Role(str, Enum):
@@ -123,9 +123,11 @@ def require_permission(permission: str):
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ) -> dict:
+    if not credentials or not credentials.credentials:
+        raise UnauthorizedError("Authentication required")
     payload = decode_token(credentials.credentials)
     if not payload or payload.get("type") != "access":
         raise UnauthorizedError("Invalid access token")

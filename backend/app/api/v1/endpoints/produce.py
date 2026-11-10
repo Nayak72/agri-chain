@@ -1,14 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from motor.motor_asyncio import AsyncIOMotorDatabase
-from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime, timezone
+import re
+from fastapi import APIRouter, Depends, Query
+from motor.motor_asyncio import AsyncIOMotorDatabase
+from pydantic import BaseModel, Field, ConfigDict
 from bson import ObjectId
+
 from app.db.mongodb import get_database
-from app.core.permissions import get_current_user, get_current_admin_user, Role
-from app.core.exceptions import NotFoundError, ValidationError
+from app.core.permissions import get_current_user, get_current_admin_user
+from app.core.exceptions import NotFoundError, ValidationError, ConflictError
 from app.core.constants import ProduceCategory, ProduceType
 from app.schemas.common import Page
+from app.utils.serialization import to_response
+from app.utils.mongo import to_mongo, resolve_doc
 
 router = APIRouter()
 
@@ -17,16 +21,18 @@ class ProduceCreate(BaseModel):
     produce_type: ProduceType
     name: str = Field(..., min_length=2, max_length=100)
     category: ProduceCategory
-    unit: str = Field(..., min_length=1, max_length=20)
-    description: Optional[str] = None
+    unit: str = Field("kg", min_length=1, max_length=20)
+    description: Optional[str] = Field(None, max_length=1000)
+    model_config = ConfigDict(extra="forbid")
 
 
 class ProduceUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=100)
     category: Optional[ProduceCategory] = None
     unit: Optional[str] = Field(None, min_length=1, max_length=20)
-    description: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=1000)
     is_active: Optional[bool] = None
+    model_config = ConfigDict(extra="forbid")
 
 
 class ProduceResponse(BaseModel):
@@ -47,27 +53,29 @@ async def create_produce(
     current_user: dict = Depends(get_current_admin_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    existing = await db.produce_catalogue.find_one({"produce_type": produce_data.produce_type})
+    type_val = produce_data.produce_type.value if hasattr(produce_data.produce_type, "value") else str(produce_data.produce_type)
+    existing = await db.produce_catalogue.find_one({"produce_type": type_val})
     if existing:
-        raise ValidationError(f"Produce type {produce_data.produce_type} already exists")
+        raise ConflictError(f"Produce type {type_val} already exists")
     
+    now = datetime.now(timezone.utc)
     produce_doc = {
         **produce_data.model_dump(),
         "is_active": True,
-        "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
+        "created_at": now,
+        "updated_at": now,
     }
     
-    result = await db.produce_catalogue.insert_one(produce_doc)
+    result = await db.produce_catalogue.insert_one(to_mongo(produce_doc))
     produce_doc["_id"] = result.inserted_id
     
-    return ProduceResponse(id=str(result.inserted_id), **produce_doc)
+    return to_response(ProduceResponse, produce_doc)
 
 
 @router.get("", response_model=Page[ProduceResponse])
 async def list_produce(
     category: Optional[ProduceCategory] = None,
-    is_active: Optional[bool] = True,
+    is_active: Optional[bool] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     q: Optional[str] = Query(None, max_length=100),
@@ -76,25 +84,19 @@ async def list_produce(
 ):
     query = {}
     if category:
-        query["category"] = category
+        query["category"] = category.value if hasattr(category, "value") else str(category)
     if is_active is not None:
         query["is_active"] = is_active
     if q:
-        import re
-        query["$or"] = [{"name": {"$regex": re.escape(q), "$options": "i"}}, {"produce_type": {"$regex": re.escape(q.upper())}}]
+        escaped_q = re.escape(q.strip())
+        query["$or"] = [
+            {"name": {"$regex": escaped_q, "$options": "i"}},
+            {"produce_type": {"$regex": escaped_q.upper()}}
+        ]
+        
     total = await db.produce_catalogue.count_documents(query)
     produce = await db.produce_catalogue.find(query).sort("name", 1).skip((page - 1) * page_size).limit(page_size).to_list(page_size)
-    items = []
-    now = datetime.now(timezone.utc)
-    for p in produce:
-        doc = dict(p)
-        doc_id = str(doc.pop("_id", doc.get("id", "")))
-        doc.pop("id", None)
-        doc.setdefault("created_at", now)
-        doc.setdefault("updated_at", now)
-        doc.setdefault("is_active", True)
-        doc.setdefault("description", None)
-        items.append(ProduceResponse(id=doc_id, **doc))
+    items = [to_response(ProduceResponse, p) for p in produce]
     return Page(items=items, total=total, page=page, page_size=page_size, has_next=page * page_size < total)
 
 
@@ -104,20 +106,8 @@ async def get_produce(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    from app.repositories.produce_repository import ProduceRepository
-    produce = await ProduceRepository(db).get_by_any_id(produce_id)
-    if not produce:
-        raise NotFoundError("Produce", produce_id)
-    
-    doc = dict(produce)
-    doc_id = str(doc.pop("_id", doc.get("id", "")))
-    doc.pop("id", None)
-    now = datetime.now(timezone.utc)
-    doc.setdefault("created_at", now)
-    doc.setdefault("updated_at", now)
-    doc.setdefault("is_active", True)
-    doc.setdefault("description", None)
-    return ProduceResponse(id=doc_id, **doc)
+    produce = await resolve_doc(db.produce_catalogue, produce_id, "Produce", business_key="produce_type")
+    return to_response(ProduceResponse, produce)
 
 
 @router.patch("/{produce_id}", response_model=ProduceResponse)
@@ -127,34 +117,19 @@ async def update_produce(
     current_user: dict = Depends(get_current_admin_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    from app.repositories.produce_repository import ProduceRepository
-    existing = await ProduceRepository(db).get_by_any_id(produce_id)
-    if not existing:
-        raise NotFoundError("Produce", produce_id)
+    produce = await resolve_doc(db.produce_catalogue, produce_id, "Produce", business_key="produce_type")
     
-    update_data = {k: v for k, v in produce_data.model_dump().items() if v is not None}
+    update_data = produce_data.model_dump(exclude_unset=True)
     if not update_data:
         raise ValidationError("No valid fields to update")
     
-    update_data["updated_at"] = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    update_data["updated_at"] = now
     
-    result = await db.produce_catalogue.update_one(
-        {"_id": existing["_id"]},
-        {"$set": update_data}
+    await db.produce_catalogue.update_one(
+        {"_id": produce["_id"]},
+        {"$set": to_mongo(update_data)}
     )
     
-    if result.matched_count == 0:
-        raise NotFoundError("Produce", produce_id)
-    
-    updated = await db.produce_catalogue.find_one({"_id": existing["_id"]})
-    if not updated:
-        raise NotFoundError("Produce", produce_id)
-    doc = dict(updated)
-    doc_id = str(doc.pop("_id", doc.get("id", "")))
-    doc.pop("id", None)
-    now = datetime.now(timezone.utc)
-    doc.setdefault("created_at", now)
-    doc.setdefault("updated_at", now)
-    doc.setdefault("is_active", True)
-    doc.setdefault("description", None)
-    return ProduceResponse(id=doc_id, **doc)
+    updated = await db.produce_catalogue.find_one({"_id": produce["_id"]})
+    return to_response(ProduceResponse, updated)

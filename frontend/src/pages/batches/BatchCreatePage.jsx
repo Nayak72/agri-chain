@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { batchesApi, farmsApi, produceApi } from '../../api/agriculture.api'
+import { formatApiErrorMessage } from '../../utils'
 
 export default function BatchCreatePage() {
   const navigate = useNavigate()
@@ -54,6 +55,19 @@ export default function BatchCreatePage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+
+    const qty = parseFloat(form.initial_quantity_kg)
+    if (isNaN(qty) || qty <= 0) {
+      setError('Initial quantity must be greater than 0 kg.')
+      return
+    }
+
+    const days = parseInt(form.estimated_shelf_life_days, 10)
+    if (isNaN(days) || days <= 0) {
+      setError('Estimated shelf life must be at least 1 day.')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -62,10 +76,10 @@ export default function BatchCreatePage() {
         produce_type: form.produce_type,
         harvest_date: form.harvest_date,
         harvest_location: form.harvest_location.trim(),
-        initial_quantity_kg: parseFloat(form.initial_quantity_kg),
+        initial_quantity_kg: qty,
         quality_grade: form.quality_grade,
         packaging_type: form.packaging_type,
-        estimated_shelf_life_days: parseInt(form.estimated_shelf_life_days, 10),
+        estimated_shelf_life_days: days,
         handling_requirements: form.handling_requirements ? form.handling_requirements.trim() : null,
       }
 
@@ -74,8 +88,7 @@ export default function BatchCreatePage() {
       navigate(`/batches/${newKey}`)
     } catch (err) {
       console.error('Batch creation error:', err)
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to create harvest batch.'
-      setError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setError(formatApiErrorMessage(err, 'Failed to create harvest batch.'))
     } finally {
       setLoading(false)
     }

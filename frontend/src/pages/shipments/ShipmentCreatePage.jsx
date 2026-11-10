@@ -5,7 +5,7 @@ import { ArrowLeft, Truck, AlertTriangle, UserCheck, ShieldAlert, CheckCircle2, 
 import { shipmentsApi, freightBookingsApi, fleetApi, driversApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
 import { ROLES, normalizeRole } from '../../constants/roles'
-import { formatWeight } from '../../utils'
+import { formatWeight, formatApiErrorMessage } from '../../utils'
 
 export default function ShipmentCreatePage() {
   const navigate = useNavigate()
@@ -127,8 +127,7 @@ export default function ShipmentCreatePage() {
       navigate(`/shipments/${newId}`)
     } catch (err) {
       console.error('Shipment creation error:', err)
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to initialize shipment.'
-      setError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setError(formatApiErrorMessage(err, 'Failed to initialize shipment.'))
     } finally {
       setLoading(false)
     }

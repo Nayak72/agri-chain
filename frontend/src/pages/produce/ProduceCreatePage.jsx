@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { produceApi } from '../../api/agriculture.api'
+import { formatApiErrorMessage } from '../../utils'
 
 export default function ProduceCreatePage() {
   const navigate = useNavigate()
@@ -38,8 +39,7 @@ export default function ProduceCreatePage() {
       navigate(`/produce/${newId}`)
     } catch (err) {
       console.error('Produce creation error:', err)
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to create produce item.'
-      setError(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      setError(formatApiErrorMessage(err, 'Failed to create produce item.'))
     } finally {
       setLoading(false)
     }

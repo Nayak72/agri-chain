@@ -53,6 +53,10 @@ export const shipmentsApi = {
   assignDriver: (id, driverId) => apiClient.post(`/shipments/${id}/assign-driver`, { driver_id: driverId }),
   load: (id, data) => apiClient.post(`/shipments/${id}/load`, data),
   dispatch: (id) => apiClient.post(`/shipments/${id}/dispatch`),
+  startTransit: (id) => apiClient.post(`/shipments/${id}/start-transit`),
+  arrive: (id) => apiClient.post(`/shipments/${id}/arrive`),
+  outForDelivery: (id) => apiClient.post(`/shipments/${id}/out-for-delivery`),
+  cancel: (id, reason) => apiClient.post(`/shipments/${id}/cancel`, { reason }),
 }
 
 export const checkpointsApi = {
