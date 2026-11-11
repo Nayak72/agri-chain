@@ -132,9 +132,6 @@ class DriverModel:
         return await db[DriverModel.collection].find_one({"_id": ObjectId(driver_id)})
 
     @staticmethod
-    async def get_by_license(license_number: str):
-        db = get_database()
-        return await db[DriverModel.collection].find_one({"license_number": license_number})
 
     @staticmethod
     async def list(filters: dict = None, skip: int = 0, limit: int = 20):

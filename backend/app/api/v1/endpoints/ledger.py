@@ -41,8 +41,8 @@ class BlockResponse(BaseModel):
 @router.get("/blocks", response_model=List[BlockResponse])
 async def get_ledger_blocks(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    sort: str = Query("desc", pattern="^(asc|desc)$"),
+    page_size: int = Query(20, ge=1),
+    sort: str = Query("desc"),
     event_type: Optional[str] = None,
     entity_type: Optional[str] = None,
     entity_id: Optional[str] = None,
@@ -65,19 +65,6 @@ async def get_ledger_blocks(
     return [to_response(BlockResponse, b) for b in blocks]
 
 
-@router.get("/blocks/{block_index}", response_model=BlockResponse)
-async def get_ledger_block(
-    block_index: int,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    block = await db.ledger_blocks.find_one({"chain_id": CHAIN_ID, "index": block_index})
-    if not block:
-        raise NotFoundError("Ledger Block", str(block_index))
-    
-    return to_response(BlockResponse, block)
-
-
 @router.get("/verify")
 async def verify_ledger(
     current_user: dict = Depends(get_current_user),
@@ -86,17 +73,6 @@ async def verify_ledger(
     if current_user["role"] != UserRole.ADMIN:
         raise ForbiddenError("Only administrators can trigger full ledger verification")
     result = await verify_ledger_integrity(db)
-    return result
-
-
-@router.get("/verify/{entity_type}/{entity_id}")
-async def verify_entity_ledger_history(
-    entity_type: str,
-    entity_id: str,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    result = await verify_entity_history(db, entity_type, entity_id)
     return result
 
 
@@ -113,28 +89,4 @@ async def get_entity_audit_history(
         "entity_id": entity_id,
         "total_events": len(history),
         "events": history,
-    }
-
-
-@router.get("/statistics")
-async def get_ledger_statistics(
-    current_user: dict = Depends(get_current_user),
-    db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    total_blocks = await db.ledger_blocks.count_documents({"chain_id": CHAIN_ID})
-    
-    pipeline = [
-        {"$group": {"_id": "$event_type", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-    ]
-    event_counts = await db.ledger_blocks.aggregate(pipeline).to_list(None)
-    
-    head = await db.ledger_heads.find_one({"chain_id": CHAIN_ID})
-    
-    return {
-        "chain_id": CHAIN_ID,
-        "total_blocks": total_blocks,
-        "last_index": head.get("last_index", 0) if head else 0,
-        "last_hash": head.get("last_hash", GENESIS_HASH) if head else GENESIS_HASH,
-        "event_type_distribution": event_counts,
     }

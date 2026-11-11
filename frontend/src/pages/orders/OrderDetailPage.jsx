@@ -121,7 +121,7 @@ export default function OrderDetailPage() {
 
             <div className="flex flex-wrap gap-3">
               {/* Action buttons based on status & role */}
-              {order.status === 'SUBMITTED' && isSeller && (
+              {order.status === 'PLACED' && isSeller && (
                 <>
                   <Button
                     variant="primary"
@@ -154,8 +154,6 @@ export default function OrderDetailPage() {
                     state: {
                       purchaseOrderId: orderKey,
                       cargoWeightKg: order.requested_quantity_kg,
-                      pickupAddress: order.pickup_address,
-                      deliveryAddress: order.delivery_address,
                       produceType: order.produce_type,
                       batchId: order.batch_id,
                     }
@@ -167,7 +165,7 @@ export default function OrderDetailPage() {
                 </Button>
               )}
 
-              {['SUBMITTED', 'ACCEPTED'].includes(order.status) && isBuyer && (
+              {['PLACED', 'ACCEPTED'].includes(order.status) && isBuyer && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -234,18 +232,6 @@ export default function OrderDetailPage() {
                 <div>
                   <span className="text-[#7A887E] block text-[10px] uppercase font-semibold">Provenance Batch ID</span>
                   <span className="text-[#244634] font-bold">{order.batch_id || 'Not linked to single harvest lot'}</span>
-                </div>
-                <div>
-                  <span className="text-[#7A887E] block text-[10px] uppercase font-semibold">Pickup Origin Location</span>
-                  <span className="text-[#26312A] font-sans">{order.pickup_address}</span>
-                </div>
-                <div>
-                  <span className="text-[#7A887E] block text-[10px] uppercase font-semibold">Destination Delivery Address</span>
-                  <span className="text-[#26312A] font-sans">{order.delivery_address}</span>
-                </div>
-                <div>
-                  <span className="text-[#7A887E] block text-[10px] uppercase font-semibold">Handling Requirements</span>
-                  <span className="text-[#526357] font-sans">{order.handling_requirements || 'Standard agricultural handling'}</span>
                 </div>
               </div>
             </div>

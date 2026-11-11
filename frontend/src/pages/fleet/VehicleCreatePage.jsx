@@ -24,9 +24,6 @@ export default function VehicleCreatePage() {
     refrigeration_available: true,
     temperature_min: '2.0',
     temperature_max: '8.0',
-    registration_expiry: new Date(Date.now() + 86400000 * 365).toISOString().split('T')[0],
-    insurance_expiry: new Date(Date.now() + 86400000 * 300).toISOString().split('T')[0],
-    fitness_expiry: new Date(Date.now() + 86400000 * 180).toISOString().split('T')[0],
   })
 
   const handleChange = (e) => {
@@ -79,9 +76,6 @@ export default function VehicleCreatePage() {
         refrigeration_available: Boolean(form.refrigeration_available),
         temperature_min: tempMin,
         temperature_max: tempMax,
-        registration_expiry: form.registration_expiry,
-        insurance_expiry: form.insurance_expiry,
-        fitness_expiry: form.fitness_expiry,
       }
 
       await fleetApi.createVehicle(payload)
@@ -239,48 +233,6 @@ export default function VehicleCreatePage() {
                   </div>
                 </div>
               )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
-                  Registration Expiry *
-                </label>
-                <Input
-                  type="date"
-                  required
-                  name="registration_expiry"
-                  value={form.registration_expiry}
-                  onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
-                  Insurance Expiry *
-                </label>
-                <Input
-                  type="date"
-                  required
-                  name="insurance_expiry"
-                  value={form.insurance_expiry}
-                  onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
-                  Fitness Certificate *
-                </label>
-                <Input
-                  type="date"
-                  required
-                  name="fitness_expiry"
-                  value={form.fitness_expiry}
-                  onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
-                />
-              </div>
             </div>
 
             <div className="flex items-center gap-3 pt-4 border-t border-[#ECE7DA]">

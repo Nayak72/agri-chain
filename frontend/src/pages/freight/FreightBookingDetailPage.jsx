@@ -109,7 +109,7 @@ export default function FreightBookingDetailPage() {
             </div>
 
             <div className="flex gap-3">
-              {isTransporter && booking.status !== 'BOOKING_CONFIRMED' && (
+              {isTransporter && booking.status !== 'CONFIRMED' && (
                 <Button
                   variant="primary"
                   onClick={() => navigate('/freight-quotes', { state: { bookingId: booking.booking_id || bookingKey } })}
@@ -140,7 +140,7 @@ export default function FreightBookingDetailPage() {
             <dl className="space-y-3 font-mono text-xs">
               <div className="flex justify-between py-2 border-b border-[#ECE7DA]">
                 <dt className="text-[#7A887E]">Total Cargo Weight</dt>
-                <dd className="text-[#1B2A20] font-bold">{formatWeight(booking.total_cargo_weight_kg || booking.cargo_quantity_kg)}</dd>
+                <dd className="text-[#1B2A20] font-bold">{formatWeight(booking.cargo_quantity_kg)}</dd>
               </div>
               <div className="flex justify-between py-2 border-b border-[#ECE7DA]">
                 <dt className="text-[#7A887E]">Package / Crate Count</dt>
@@ -176,18 +176,15 @@ export default function FreightBookingDetailPage() {
                 <div className="p-3.5 rounded-xl bg-[#F2EFE7]/60 border border-[#ECE7DA]">
                   <span className="text-[10px] text-[#244634] block font-bold uppercase mb-1">Origin Pickup</span>
                   <div className="text-[#1B2A20] font-semibold font-sans">{booking.pickup_city}, {booking.pickup_state}</div>
-                  <div className="text-[#526357] text-[11px] mt-0.5 font-sans">{booking.pickup_address}</div>
                 </div>
                 <div className="p-3.5 rounded-xl bg-[#F2EFE7]/60 border border-[#ECE7DA]">
                   <span className="text-[10px] text-[#3F7C56] block font-bold uppercase mb-1">Destination Hub</span>
                   <div className="text-[#1B2A20] font-semibold font-sans">{booking.destination_city}, {booking.destination_state}</div>
-                  <div className="text-[#526357] text-[11px] mt-0.5 font-sans">{booking.destination_address}</div>
                 </div>
               </div>
             </div>
 
             <div className="pt-4 border-t border-[#ECE7DA] mt-4 text-[11px] font-mono text-[#526357]">
-              Special Instructions: {booking.special_handling_instructions || 'Standard freight handling'}
             </div>
           </CardContent>
         </Card>
@@ -262,7 +259,7 @@ export default function FreightBookingDetailPage() {
                       <StatusBadge status={q.status || 'PENDING'} />
                     </TableCell>
                     <TableCell className="text-right">
-                      {isBuyerOrFarmer && !isAccepted && booking.status !== 'BOOKING_CONFIRMED' && (
+                      {isBuyerOrFarmer && !isAccepted && booking.status !== 'CONFIRMED' && (
                         <Button
                           variant="primary"
                           size="sm"

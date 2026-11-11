@@ -1,28 +1,24 @@
 import uuid
-import logging
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field, ConfigDict
-from bson import ObjectId
 
 from app.db.mongodb import get_database
 from app.core.permissions import get_current_user
 from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError, ConflictError
 from app.core.constants import (
-    ShipmentStatus, UserRole, ShipmentExceptionType, VehicleCategory, FreightBookingStatus, LedgerEventType
+    ShipmentStatus, UserRole, FreightBookingStatus, LedgerEventType
 )
 from app.services.ledger_service import append_ledger_block
-from app.db.unit_of_work import uow
+from app.db.unit_of_work import run_in_txn
 from app.utils.serialization import to_response
 from app.utils.mongo import to_mongo, resolve_doc
 from app.core.access import get_transporter_for_user, get_driver_for_user, assert_can_view_shipment
-from app.services.shipment_workflow import transition_shipment, cancel_shipment, finalize_shipment
-from app.services.inventory_service import dispatch_stock, reserve_stock, release_stock
+from app.services.shipment_workflow import transition_shipment, cancel_shipment
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 class ShipmentCreate(BaseModel):
@@ -30,41 +26,18 @@ class ShipmentCreate(BaseModel):
     accepted_quotation_id: str
     vehicle_id: str
     driver_id: str
-    planned_checkpoints: List[dict] = Field(default_factory=list)
-    model_config = ConfigDict(extra="forbid")
-
-
-class ShipmentAssignVehicle(BaseModel):
-    vehicle_id: str
-    model_config = ConfigDict(extra="forbid")
-
-
-class ShipmentAssignDriver(BaseModel):
-    driver_id: str
-    model_config = ConfigDict(extra="forbid")
-
-
-class ShipmentStatusUpdate(BaseModel):
-    status: ShipmentStatus
-    model_config = ConfigDict(extra="forbid")
-
-
-class ShipmentExceptionReport(BaseModel):
-    exception_type: ShipmentExceptionType
-    description: str = Field(..., min_length=2, max_length=1000)
-    severity: str = Field(..., pattern="^(LOW|MEDIUM|HIGH|CRITICAL)$")
     model_config = ConfigDict(extra="forbid")
 
 
 class ShipmentLoad(BaseModel):
-    actual_weight_kg: float = Field(..., gt=0, le=1000000.0)
-    actual_package_count: int = Field(..., gt=0, le=100000)
+    actual_weight_kg: float = Field(..., gt=0)
+    actual_package_count: int = Field(..., gt=0)
     batch_quantities: List[dict] = Field(default_factory=list)
     model_config = ConfigDict(extra="forbid")
 
 
 class ShipmentCancelRequest(BaseModel):
-    reason: str = Field(..., min_length=2, max_length=500)
+    reason: str = Field(...)
     model_config = ConfigDict(extra="forbid")
 
 
@@ -72,6 +45,7 @@ class ShipmentResponse(BaseModel):
     id: str
     shipment_id: str
     booking_id: str
+    accepted_quotation_id: str
     purchase_order_id: str
     farmer_id: str
     buyer_id: str
@@ -81,23 +55,25 @@ class ShipmentResponse(BaseModel):
     driver_user_id: Optional[str] = None
     batch_ids: List[str] = Field(default_factory=list)
     cargo_quantity_kg: float
-    total_cargo_weight_kg: float
+    loaded_weight_kg: Optional[float] = None
     package_count: int
-    pickup_address: str
-    pickup_city: str
-    pickup_state: str
-    destination_address: str
-    destination_city: str
-    destination_state: str
     planned_dispatch_time: Optional[datetime] = None
     expected_arrival_time: Optional[datetime] = None
     actual_dispatch_time: Optional[datetime] = None
     actual_arrival_time: Optional[datetime] = None
     status: ShipmentStatus
-    exception_flags: List[str] = Field(default_factory=list)
+    is_delayed: bool = False
+    status_history: List[dict] = Field(default_factory=list)
     cancellation_reason: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
+def _shipment_response(shipment):
+    doc = dict(shipment)
+    arrival, expected = doc.get("actual_arrival_time"), doc.get("expected_arrival_time")
+    doc["is_delayed"] = bool(arrival and expected and arrival > expected)
+    return doc
 
 
 def generate_shipment_id(pickup_state: str, destination_state: str) -> str:
@@ -115,32 +91,30 @@ async def create_shipment(
 ):
     if current_user["role"] != UserRole.TRANSPORTER:
         raise ForbiddenError("Only transporters can create shipments")
-    
+
     booking = await resolve_doc(db.freight_bookings, shipment_data.booking_id, "Freight Booking", business_key="booking_id")
-    
+
     if booking.get("status") not in [FreightBookingStatus.CONFIRMED.value, FreightBookingStatus.CONFIRMED]:
         raise ValidationError("Booking must be confirmed before creating shipment")
-    
+
     quotation = await resolve_doc(db.freight_quotations, shipment_data.accepted_quotation_id, "Freight Quotation", business_key="quotation_id")
-    if booking.get("accepted_quotation_id") and booking.get("accepted_quotation_id") != str(quotation["_id"]):
+    if booking.get("accepted_quotation_id") != str(quotation["_id"]) or quotation.get("status") != "ACCEPTED":
         raise ValidationError("Quotation ID does not match accepted quotation on booking")
-    
+
     transporter = await get_transporter_for_user(db, current_user["sub"])
     if not transporter and current_user["role"] != UserRole.ADMIN:
         raise NotFoundError("Transporter profile", current_user["sub"])
-    
+
     t_id = str(transporter["_id"]) if transporter else quotation["transporter_id"]
     if quotation["transporter_id"] != t_id and current_user["role"] != UserRole.ADMIN:
         raise ForbiddenError("Quotation does not belong to this transporter")
-    
+
     vehicle = await resolve_doc(db.vehicles, shipment_data.vehicle_id, "Vehicle", business_key="vehicle_id")
     if vehicle.get("transporter_id") != t_id and current_user["role"] != UserRole.ADMIN:
         raise ForbiddenError("Vehicle does not belong to this transporter")
-    if vehicle.get("status") != "AVAILABLE":
-        raise ValidationError(f"Vehicle is not available (status: {vehicle.get('status')})")
-    
+
     # W-03: Vehicle capacity and refrigeration suitability check
-    total_cargo = float(booking.get("total_cargo_weight_kg", booking.get("cargo_quantity_kg", 0.0)))
+    total_cargo = float(booking.get("cargo_quantity_kg", 0.0))
     payload_cap = float(vehicle.get("max_payload_kg") or vehicle.get("capacity_kg") or 0.0)
     if payload_cap < total_cargo:
         raise ValidationError(
@@ -148,25 +122,24 @@ async def create_shipment(
         )
     if booking.get("refrigeration_required", False) and not vehicle.get("refrigeration_available", False):
         raise ValidationError("Booking requires refrigerated vehicle, but selected vehicle does not support refrigeration")
-    
+
     driver = await resolve_doc(db.drivers, shipment_data.driver_id, "Driver", business_key="driver_id")
     if driver.get("transporter_id") != t_id and current_user["role"] != UserRole.ADMIN:
         raise ForbiddenError("Driver does not belong to this transporter")
-    if driver.get("status") != "AVAILABLE":
-        raise ValidationError(f"Driver is not available (status: {driver.get('status')})")
-    
+
     po = await resolve_doc(db.purchase_orders, booking["purchase_order_id"], "Purchase Order", business_key="order_id")
-    
+
     pickup_st = booking.get("pickup_state", "MH")
     dest_st = booking.get("destination_state", "MH")
     shipment_id = generate_shipment_id(pickup_st, dest_st)
     while await db.shipments.find_one({"shipment_id": shipment_id}):
         shipment_id = generate_shipment_id(pickup_st, dest_st)
-    
+
     now = datetime.now(timezone.utc)
     shipment_doc = {
         "shipment_id": shipment_id,
         "booking_id": str(booking["_id"]),
+        "accepted_quotation_id": str(quotation["_id"]),
         "purchase_order_id": str(po["_id"]),
         "farmer_id": po["seller_id"],
         "buyer_id": po["buyer_id"],
@@ -176,59 +149,49 @@ async def create_shipment(
         "driver_user_id": driver.get("user_id"),
         "batch_ids": booking.get("batch_ids", []),
         "cargo_quantity_kg": booking.get("cargo_quantity_kg", 0.0),
-        "total_cargo_weight_kg": booking.get("total_cargo_weight_kg", 0.0),
+        "loaded_weight_kg": None,
         "package_count": booking.get("package_count", 1),
-        "pickup_address": booking["pickup_address"],
-        "pickup_city": booking["pickup_city"],
-        "pickup_state": booking["pickup_state"],
-        "destination_address": booking["destination_address"],
-        "destination_city": booking["destination_city"],
-        "destination_state": booking["destination_state"],
         "planned_dispatch_time": None,
         "expected_arrival_time": None,
         "actual_dispatch_time": None,
         "actual_arrival_time": None,
         "status": ShipmentStatus.DRIVER_ASSIGNED.value,
-        "exception_flags": [],
+        "status_history": [{"status": "DRIVER_ASSIGNED", "at": now}],
         "created_at": now,
         "updated_at": now,
     }
-    
-    async with uow() as session:
+
+    async def _transaction(session):
+        # Serialize shipment creation with cancellation of the same order.
+        order_claim = await db.purchase_orders.update_one(
+            {"_id": po["_id"], "status": "ACCEPTED"},
+            {"$set": {"updated_at": now}}, session=session,
+        )
+        if order_claim.matched_count == 0:
+            raise ConflictError("Purchase order is no longer accepted")
         result = await db.shipments.insert_one(to_mongo(shipment_doc), session=session)
         shipment_doc["_id"] = result.inserted_id
-        
+
         # Lock vehicle
-        await db.vehicles.update_one(
-            {"_id": vehicle["_id"]},
-            {"$set": {"status": "ASSIGNED", "updated_at": now}},
-            session=session
-        )
-        
-        # Lock driver
-        await db.drivers.update_one(
-            {"_id": driver["_id"]},
+        vehicle_lock = await db.vehicles.update_one(
+            {"_id": vehicle["_id"], "status": "AVAILABLE"},
             {"$set": {"status": "ASSIGNED", "current_assignment": str(result.inserted_id), "updated_at": now}},
             session=session
         )
-        
-        for cp in shipment_data.planned_checkpoints:
-            cp_doc = {
-                "checkpoint_id": f"CP-{uuid.uuid4().hex[:8].upper()}",
-                "shipment_id": str(result.inserted_id),
-                "name": cp.get("name", "Checkpoint"),
-                "city": cp.get("city", ""),
-                "state": cp.get("state", ""),
-                "sequence": cp.get("sequence", 0),
-                "planned_arrival": cp.get("planned_arrival"),
-                "planned_departure": cp.get("planned_departure"),
-                "status": "PENDING",
-                "created_at": now,
-            }
-            await db.route_checkpoints.insert_one(to_mongo(cp_doc), session=session)
-        
+        if vehicle_lock.matched_count == 0:
+            raise ConflictError("Vehicle is no longer available")
+
+        # Lock driver
+        driver_lock = await db.drivers.update_one(
+            {"_id": driver["_id"], "status": "AVAILABLE"},
+            {"$set": {"status": "ASSIGNED", "current_assignment": str(result.inserted_id), "updated_at": now}},
+            session=session
+        )
+        if driver_lock.matched_count == 0:
+            raise ConflictError("Driver is no longer available")
+
         batch_ids = booking.get("batch_ids", [])
-        total_cargo = float(booking.get("total_cargo_weight_kg", booking.get("cargo_quantity_kg", 0.0)))
+        total_cargo = float(booking.get("cargo_quantity_kg", 0.0))
         per_batch_qty = (total_cargo / len(batch_ids)) if batch_ids else total_cargo
 
         for b_id in batch_ids:
@@ -241,24 +204,6 @@ async def create_shipment(
             }
             await db.shipment_items.insert_one(to_mongo(item_doc), session=session)
 
-            # Reserve stock in inventory item if present and not already reserved by PO
-            inv = await db.inventory_items.find_one({"batch_id": b_id}, session=session)
-            if inv:
-                res_already = float(inv.get("reserved_quantity_kg", 0.0))
-                needed_res = max(0.0, per_batch_qty - res_already)
-                avail_qty = float(inv.get("available_quantity_kg", 0.0))
-                reserve_amt = min(needed_res, avail_qty)
-                if reserve_amt > 0:
-                    try:
-                        await reserve_stock(
-                            db, str(inv["_id"]), reserve_amt,
-                            actor_id=current_user["sub"], actor_role=current_user["role"],
-                            reference_id=str(result.inserted_id),
-                            session=session
-                        )
-                    except Exception as e:
-                        logger.warning(f"Stock reservation non-critical failure: {type(e)} {e}")
-        
         await append_ledger_block(
             db,
             event_type=LedgerEventType.SHIPMENT_CREATED,
@@ -275,14 +220,15 @@ async def create_shipment(
             },
             session=session
         )
-    
-    return to_response(ShipmentResponse, shipment_doc)
+    await run_in_txn(_transaction)
+
+    return to_response(ShipmentResponse, _shipment_response(shipment_doc))
 
 
 @router.get("", response_model=List[ShipmentResponse])
 async def list_shipments(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1),
     status: Optional[ShipmentStatus] = None,
     transporter_id: Optional[str] = None,
     driver_id: Optional[str] = None,
@@ -312,7 +258,7 @@ async def list_shipments(
             ]
         else:
             query["$or"] = [{"driver_id": current_user["sub"]}, {"driver_user_id": current_user["sub"]}]
-    
+
     if status:
         query["status"] = status.value if hasattr(status, "value") else str(status)
     if transporter_id and current_user["role"] == UserRole.ADMIN:
@@ -321,9 +267,9 @@ async def list_shipments(
         query["driver_id"] = driver_id
     if vehicle_id:
         query["vehicle_id"] = vehicle_id
-    
+
     shipments = await db.shipments.find(query).sort("created_at", -1).skip((page - 1) * page_size).limit(page_size).to_list(page_size)
-    return [to_response(ShipmentResponse, s) for s in shipments]
+    return [to_response(ShipmentResponse, _shipment_response(s)) for s in shipments]
 
 
 @router.get("/{shipment_id}", response_model=ShipmentResponse)
@@ -334,7 +280,7 @@ async def get_shipment(
 ):
     shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
     await assert_can_view_shipment(db, current_user, shipment)
-    return to_response(ShipmentResponse, shipment)
+    return to_response(ShipmentResponse, _shipment_response(shipment))
 
 
 @router.post("/{shipment_id}/load", response_model=ShipmentResponse)
@@ -346,21 +292,23 @@ async def load_shipment(
 ):
     if current_user["role"] not in [UserRole.DRIVER, UserRole.TRANSPORTER, UserRole.WAREHOUSE_MANAGER, UserRole.ADMIN]:
         raise ForbiddenError("Only driver, transporter, warehouse manager, or admin can load shipment")
-    
+
     shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
     await assert_can_view_shipment(db, current_user, shipment)
-    
+
     cur_status = shipment.get("status")
     if hasattr(cur_status, "value"):
         cur_status = cur_status.value
-    if cur_status not in ["DRIVER_ASSIGNED", "LOADING"]:
-        raise ValidationError(f"Shipment can only be loaded from DRIVER_ASSIGNED or LOADING status (current: {cur_status})")
-    
-    now = datetime.now(timezone.utc)
-    planned_cargo = float(shipment.get("total_cargo_weight_kg", shipment.get("cargo_quantity_kg", 0.0)))
-    actual_weight = float(load_data.actual_weight_kg)
+    if cur_status != "DRIVER_ASSIGNED":
+        raise ValidationError(f"Shipment can only be loaded from DRIVER_ASSIGNED status (current: {cur_status})")
 
-    async with uow() as session:
+    if load_data.actual_weight_kg > shipment["cargo_quantity_kg"]:
+        raise ValidationError("Loaded weight cannot exceed planned cargo")
+    if load_data.batch_quantities:
+        if abs(sum(float(item.get("quantity_kg", 0)) for item in load_data.batch_quantities) - load_data.actual_weight_kg) > 0.01:
+            raise ValidationError("Batch quantities must equal loaded weight")
+    now = datetime.now(timezone.utc)
+    async def _transaction(session):
         for item in load_data.batch_quantities:
             b_id = item.get("batch_id")
             qty = item.get("quantity_kg", 0)
@@ -370,36 +318,17 @@ async def load_shipment(
                 session=session
             )
 
-        # Loading discrepancy: release unused reservation back to available
-        if actual_weight < planned_cargo:
-            diff = planned_cargo - actual_weight
-            batch_ids = shipment.get("batch_ids", [])
-            per_batch_diff = diff / len(batch_ids) if batch_ids else diff
-            for b_id in batch_ids:
-                inv = await db.inventory_items.find_one({"batch_id": b_id}, session=session)
-                if inv:
-                    res_in_inv = float(inv.get("reserved_quantity_kg", 0.0))
-                    release_amt = min(per_batch_diff, res_in_inv)
-                    if release_amt > 0:
-                        try:
-                            await release_stock(
-                                db, str(inv["_id"]), release_amt,
-                                actor_id=current_user["sub"], actor_role=current_user["role"],
-                                reference_id=str(shipment["_id"]),
-                                session=session
-                            )
-                        except Exception as e:
-                            logger.warning(f"Error releasing excess reserved stock for shipment {shipment_id}: {e}")
-        
         updated = await transition_shipment(
             db, str(shipment["_id"]), ShipmentStatus.LOADED.value,
             actor_id=current_user["sub"], actor_role=current_user["role"],
             session=session,
-            extra_updates={"actual_dispatch_time": None, "total_cargo_weight_kg": load_data.actual_weight_kg, "package_count": load_data.actual_package_count},
+            extra_updates={"actual_dispatch_time": None, "loaded_weight_kg": load_data.actual_weight_kg, "package_count": load_data.actual_package_count},
             event_summary=f"Shipment {shipment.get('shipment_id')} loaded with {load_data.actual_weight_kg}kg"
         )
-    
-    return to_response(ShipmentResponse, updated)
+        return updated
+    updated = await run_in_txn(_transaction)
+
+    return to_response(ShipmentResponse, _shipment_response(updated))
 
 
 @router.post("/{shipment_id}/dispatch", response_model=ShipmentResponse)
@@ -410,49 +339,25 @@ async def dispatch_shipment(
 ):
     if current_user["role"] not in [UserRole.DRIVER, UserRole.TRANSPORTER, UserRole.ADMIN]:
         raise ForbiddenError("Only driver, transporter, or admin can dispatch shipment")
-    
+
     shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
     await assert_can_view_shipment(db, current_user, shipment)
-    
+
     now = datetime.now(timezone.utc)
-    async with uow() as session:
+    quote = await resolve_doc(db.freight_quotations, shipment["accepted_quotation_id"], "Quotation", business_key="quotation_id")
+    hours = float(quote.get("estimated_transit_hours", 0))
+    async def _transaction(session):
         updated = await transition_shipment(
             db, str(shipment["_id"]), ShipmentStatus.DISPATCHED.value,
             actor_id=current_user["sub"], actor_role=current_user["role"],
             session=session,
-            extra_updates={"actual_dispatch_time": now},
+            extra_updates={"actual_dispatch_time": now, "expected_arrival_time": now + timedelta(hours=hours)},
             event_summary=f"Shipment {shipment.get('shipment_id')} dispatched"
         )
-        
-        # Mark batches as DISPATCHED and transition inventory from reserved to dispatched
-        total_cargo = float(shipment.get("total_cargo_weight_kg", shipment.get("cargo_quantity_kg", 0.0)))
-        batch_ids = shipment.get("batch_ids", [])
-        per_batch_qty = (total_cargo / len(batch_ids)) if batch_ids else total_cargo
+        return updated
+    updated = await run_in_txn(_transaction)
 
-        for b_id in batch_ids:
-            b_query = {"_id": ObjectId(b_id)} if ObjectId.is_valid(b_id) else {"batch_id": b_id}
-            await db.produce_batches.update_one(
-                b_query,
-                {"$set": {"status": "DISPATCHED", "updated_at": now}},
-                session=session
-            )
-            inv = await db.inventory_items.find_one({"batch_id": b_id}, session=session)
-            if inv:
-                res_qty = float(inv.get("reserved_quantity_kg", 0.0))
-                disp_amount = min(per_batch_qty, res_qty)
-                if disp_amount > 0:
-                    try:
-                        await dispatch_stock(
-                            db, str(inv["_id"]), disp_amount,
-                            actor_id=current_user["sub"], actor_role=current_user["role"],
-                            reference_id=str(shipment["_id"]),
-                            from_reserved=True,
-                            session=session
-                        )
-                    except Exception as e:
-                        logger.warning(f"Stock reservation non-critical failure: {type(e)} {e}")
-    
-    return to_response(ShipmentResponse, updated)
+    return to_response(ShipmentResponse, _shipment_response(updated))
 
 
 @router.post("/{shipment_id}/start-transit", response_model=ShipmentResponse)
@@ -463,18 +368,20 @@ async def start_transit(
 ):
     if current_user["role"] not in [UserRole.DRIVER, UserRole.TRANSPORTER, UserRole.ADMIN]:
         raise ForbiddenError("Only driver, transporter, or admin can start transit")
-    
+
     shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
     await assert_can_view_shipment(db, current_user, shipment)
-    
-    async with uow() as session:
+
+    async def _transaction(session):
         updated = await transition_shipment(
             db, str(shipment["_id"]), ShipmentStatus.IN_TRANSIT.value,
             actor_id=current_user["sub"], actor_role=current_user["role"],
             session=session,
             event_summary=f"Shipment {shipment.get('shipment_id')} started transit"
         )
-    return to_response(ShipmentResponse, updated)
+        return updated
+    updated = await run_in_txn(_transaction)
+    return to_response(ShipmentResponse, _shipment_response(updated))
 
 
 @router.post("/{shipment_id}/arrive", response_model=ShipmentResponse)
@@ -485,18 +392,21 @@ async def arrive_at_destination(
 ):
     if current_user["role"] not in [UserRole.DRIVER, UserRole.TRANSPORTER, UserRole.ADMIN]:
         raise ForbiddenError("Only driver, transporter, or admin can report arrival at destination")
-    
+
     shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
     await assert_can_view_shipment(db, current_user, shipment)
-    
-    async with uow() as session:
+
+    async def _transaction(session):
         updated = await transition_shipment(
             db, str(shipment["_id"]), ShipmentStatus.ARRIVED_AT_DESTINATION.value,
             actor_id=current_user["sub"], actor_role=current_user["role"],
             session=session,
+            extra_updates={"actual_arrival_time": datetime.now(timezone.utc)},
             event_summary=f"Shipment {shipment.get('shipment_id')} arrived at destination"
         )
-    return to_response(ShipmentResponse, updated)
+        return updated
+    updated = await run_in_txn(_transaction)
+    return to_response(ShipmentResponse, _shipment_response(updated))
 
 
 @router.post("/{shipment_id}/out-for-delivery", response_model=ShipmentResponse)
@@ -507,18 +417,20 @@ async def set_out_for_delivery(
 ):
     if current_user["role"] not in [UserRole.DRIVER, UserRole.TRANSPORTER, UserRole.ADMIN]:
         raise ForbiddenError("Only driver, transporter, or admin can set shipment out for delivery")
-    
+
     shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
     await assert_can_view_shipment(db, current_user, shipment)
-    
-    async with uow() as session:
+
+    async def _transaction(session):
         updated = await transition_shipment(
             db, str(shipment["_id"]), ShipmentStatus.OUT_FOR_DELIVERY.value,
             actor_id=current_user["sub"], actor_role=current_user["role"],
             session=session,
             event_summary=f"Shipment {shipment.get('shipment_id')} is out for delivery"
         )
-    return to_response(ShipmentResponse, updated)
+        return updated
+    updated = await run_in_txn(_transaction)
+    return to_response(ShipmentResponse, _shipment_response(updated))
 
 
 @router.post("/{shipment_id}/cancel", response_model=ShipmentResponse)
@@ -530,70 +442,19 @@ async def cancel_shipment_endpoint(
 ):
     if current_user["role"] not in [UserRole.TRANSPORTER, UserRole.ADMIN]:
         raise ForbiddenError("Only transporter or admin can cancel shipment")
-    
+
     shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
     await assert_can_view_shipment(db, current_user, shipment)
-    
-    async with uow() as session:
+
+    async def _transaction(session):
         updated = await cancel_shipment(
             db, shipment,
             actor_id=current_user["sub"], actor_role=current_user["role"],
             reason=cancel_data.reason, session=session
         )
-    return to_response(ShipmentResponse, updated)
-
-
-@router.post("/{shipment_id}/report-exception", response_model=ShipmentResponse)
-async def report_exception(
-    shipment_id: str,
-    exception_data: ShipmentExceptionReport,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    if current_user["role"] not in [UserRole.DRIVER, UserRole.TRANSPORTER, UserRole.ADMIN]:
-        raise ForbiddenError("Only driver, transporter, or admin can report exceptions")
-    
-    shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
-    await assert_can_view_shipment(db, current_user, shipment)
-    
-    ex_val = exception_data.exception_type.value if hasattr(exception_data.exception_type, "value") else str(exception_data.exception_type)
-    current_flags = shipment.get("exception_flags", [])
-    if ex_val not in current_flags:
-        current_flags.append(ex_val)
-    
-    now = datetime.now(timezone.utc)
-    async with uow() as session:
-        await db.shipments.update_one(
-            {"_id": shipment["_id"]},
-            {"$set": {"exception_flags": current_flags, "updated_at": now}},
-            session=session
-        )
-        
-        event_doc = {
-            "event_id": f"EV-{uuid.uuid4().hex[:10].upper()}",
-            "shipment_id": str(shipment["_id"]),
-            "event_type": ex_val,
-            "description": exception_data.description,
-            "severity": exception_data.severity,
-            "reported_by": current_user["sub"],
-            "created_at": now,
-        }
-        await db.shipment_events.insert_one(to_mongo(event_doc), session=session)
-        
-        await append_ledger_block(
-            db,
-            event_type=LedgerEventType.SHIPMENT_UPDATED if hasattr(LedgerEventType, "SHIPMENT_UPDATED") else "SHIPMENT_UPDATED",
-            entity_type="SHIPMENT",
-            entity_id=str(shipment["_id"]),
-            actor_id=current_user["sub"],
-            actor_role=current_user["role"],
-            event_summary=f"Exception {ex_val} reported for shipment {shipment.get('shipment_id')}",
-            payload={"exception_type": ex_val, "severity": exception_data.severity},
-            session=session
-        )
-    
-    updated = await db.shipments.find_one({"_id": shipment["_id"]})
-    return to_response(ShipmentResponse, updated)
+        return updated
+    updated = await run_in_txn(_transaction)
+    return to_response(ShipmentResponse, _shipment_response(updated))
 
 
 @router.get("/{shipment_id}/timeline")
@@ -604,34 +465,22 @@ async def get_shipment_timeline(
 ):
     shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
     await assert_can_view_shipment(db, current_user, shipment)
-    
+
     canonical_id = str(shipment["_id"])
-    checkpoints = await db.route_checkpoints.find({"shipment_id": canonical_id}).sort("sequence", 1).to_list(100)
-    events = await db.shipment_events.find({"shipment_id": canonical_id}).sort("created_at", 1).to_list(100)
-    
+    checkpoints = await db.route_checkpoints.find({"shipment_id": canonical_id}).sort("recorded_at", 1).to_list(100)
+    events = await db.ledger_blocks.find({"entity_type": "SHIPMENT", "entity_id": canonical_id}).sort("timestamp", 1).to_list(100)
+
     return {
         "shipment_id": shipment.get("shipment_id"),
         "current_status": shipment.get("status"),
-        "exception_flags": shipment.get("exception_flags", []),
+        "status_history": shipment.get("status_history", []),
         "checkpoints": [{
             "checkpoint_id": c.get("checkpoint_id"),
             "name": c.get("name"),
             "city": c.get("city"),
-            "state": c.get("state"),
-            "sequence": c.get("sequence"),
-            "planned_arrival": c.get("planned_arrival"),
-            "planned_departure": c.get("planned_departure"),
-            "actual_arrival": c.get("actual_arrival"),
-            "actual_departure": c.get("actual_departure"),
-            "status": c.get("status"),
-            "notes": c.get("notes"),
+            "recorded_at": c.get("recorded_at"),
+            "recorded_by": c.get("recorded_by"),
         } for c in checkpoints],
-        "events": [{
-            "event_id": e.get("event_id"),
-            "event_type": e.get("event_type"),
-            "description": e.get("description"),
-            "severity": e.get("severity"),
-            "reported_by": e.get("reported_by"),
-            "created_at": e.get("created_at"),
-        } for e in events],
+        "events": [{"event_type": e.get("event_type"), "event_summary": e.get("event_summary"),
+                    "timestamp": e.get("timestamp")} for e in events],
     }

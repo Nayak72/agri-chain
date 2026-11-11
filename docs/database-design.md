@@ -1,93 +1,19 @@
-# AgriChain Database Design
+# Database design
 
-## Collections
+MongoDB collections are separated by domain and linked with string forms of document IDs. Unique indexes enforce business IDs; the application also uses conditional writes inside replica-set transactions.
 
-### Identity & Master Data
-- **users** - User accounts with roles (ADMIN, FARMER, WAREHOUSE_MANAGER, TRANSPORTER, DRIVER, BUYER)
-- **farms** - Farmer-owned farm profiles
-- **produce_catalogue** - 21 produce types (vegetables + fruits)
-- **handling_profiles** - Temperature/humidity ranges per produce
-- **transporters** - Transportation company profiles
-- **drivers** - Driver records with license info
-- **vehicles** - Vehicle records with capacity and refrigeration
-- **warehouses** - Warehouse facilities with capacity
+| Collection | Key fields and invariant |
+| --- | --- |
+| `users` | Email, bcrypt password hash, role, approval and active flags. No refresh-token collection. |
+| `produce_batches` | Farmer, farm, produce type, initial quantity, shelf-life end, status. No duplicated stock balance. |
+| `warehouse_receipts` | One receipt per batch; `received_weight_kg = accepted_weight_kg + damaged_weight_kg + rejected_weight_kg` within 0.01 kg. |
+| `inventory_items` | One item for the receipt with `accepted_kg` and `available_kg`; `0 ≤ available_kg ≤ accepted_kg`. |
+| `purchase_orders` | Buyer, seller, batch, requested and accepted quantity, status. Accepted, fulfilled and failed orders consume accepted stock. |
+| `freight_bookings`, `freight_quotations` | Booking from one accepted order and its accepted quotation. |
+| `shipments`, `shipment_items` | One shipment per confirmed booking; reduced status and append-only `status_history`; vehicle and driver assignment. |
+| `route_checkpoints` | Append-only driver records with name, city, recorded time, and actor. |
+| `sensor_readings`, `sensor_alerts` | On-demand simulated readings and active/resolved alerts. A partial unique index permits one active alert of each type per shipment. |
+| `delivery_reports` | One buyer decision per shipment with delivered, damaged, missing, and report hash in the ledger event. |
+| `ledger_blocks`, `ledger_heads` | Ordered hash-chained event log and head pointer, updated in the business transaction. |
 
-### Supply Chain Data
-- **produce_batches** - Harvest batches with unique IDs
-- **purchase_orders** - Commercial purchase orders
-- **warehouse_receipts** - Goods receiving records
-- **quality_inspections** - Quality inspection results
-- **inventory_items** - Warehouse stock items
-- **inventory_movements** - Stock movement history
-
-### Freight Data
-- **freight_bookings** - Transportation requests
-- **freight_quotations** - Transporter quotes
-- **shipments** - Physical cargo movements
-- **shipment_items** - Batch items in shipments
-- **route_checkpoints** - Manual checkpoints
-- **shipment_events** - Exception events
-- **freight_charges** - Cost breakdowns
-
-### Monitoring & Delivery
-- **simulated_sensor_sessions** - Simulation sessions
-- **simulated_sensor_readings** - Sensor readings (SIMULATED)
-- **sensor_alerts** - Threshold violation alerts
-- **delivery_reports** - Delivery confirmations
-- **damage_claims** - Damage claims
-- **uploaded_documents** - File metadata
-
-### Ledger & Supporting
-- **ledger_blocks** - Hash-chained audit blocks
-- **ledger_heads** - Chain head tracking
-- **notifications** - User notifications
-- **system_settings** - Configuration
-
-## Key Indexes
-
-| Collection | Index Fields | Type |
-|------------|-------------|------|
-| users | email | unique |
-| produce_batches | batch_id | unique |
-| produce_batches | farmer_id | regular |
-| inventory_items | (warehouse_id, batch_id) | unique |
-| purchase_orders | order_id | unique |
-| freight_bookings | booking_id | unique |
-| shipments | shipment_id | unique |
-| vehicles | registration_number | unique |
-| drivers | license_number | unique |
-| ledger_blocks | (chain_id, index) | unique |
-| ledger_blocks | block_id | unique |
-| sensor_readings | (shipment_id, timestamp) | compound |
-| sensor_alerts | (shipment_id, status) | compound |
-
-## Relationships
-
-```
-users 1:N farms (farmer_id)
-users 1:N produce_batches (farmer_id)
-farms 1:N produce_batches (farm_id)
-produce_batches 1:N warehouse_receipts (batch_id)
-warehouses 1:N warehouse_receipts (warehouse_id)
-warehouse_receipts 1:N quality_inspections (receipt_id)
-produce_batches 1:N inventory_items (batch_id)
-warehouses 1:N inventory_items (warehouse_id)
-users 1:N purchase_orders (buyer_id, seller_id)
-purchase_orders 1:N purchase_orders (batch_id)
-purchase_orders 1:N freight_bookings (purchase_order_id)
-freight_bookings 1:N freight_quotations (booking_id)
-freight_bookings 1:N shipments (booking_id)
-transporters 1:N vehicles (transporter_id)
-transporters 1:N drivers (transporter_id)
-shipments 1:N route_checkpoints (shipment_id)
-shipments 1:N shipment_items (shipment_id)
-shipments 1:N simulated_sensor_readings (shipment_id)
-shipments 1:N sensor_alerts (shipment_id)
-shipments 1:N delivery_reports (shipment_id)
-```
-
-## Monetary Representation
-
-All monetary values stored as integer paise (1 INR = 100 paise) to avoid floating-point errors.
-
-Example: ₹600.50 stored as 60050 paise.
+`backend/scripts/reconcile.py` recomputes accepted minus consuming order quantities, checks each active shipment's vehicle and driver assignment, and verifies the ledger chain. It exits with status 1 for violations.

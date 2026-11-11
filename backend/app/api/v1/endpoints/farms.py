@@ -15,31 +15,21 @@ router = APIRouter()
 
 
 class FarmCreate(BaseModel):
-    name: str = Field(..., min_length=2, max_length=100)
-    address: str = Field(..., min_length=5, max_length=200)
-    city: str = Field(..., min_length=2, max_length=100)
-    state: str = Field(..., min_length=2, max_length=100)
-    pincode: str = Field(..., pattern=r"^\d{6}$")
-    latitude: Optional[float] = Field(None, ge=-90.0, le=90.0)
-    longitude: Optional[float] = Field(None, ge=-180.0, le=180.0)
-    area_hectares: Optional[float] = Field(None, gt=0, le=100000.0)
-    certifications: List[str] = Field(default_factory=list)
-    description: Optional[str] = Field(None, max_length=1000)
+    name: str = Field(...)
+    city: str = Field(...)
+    state: str = Field(...)
+    pincode: str = Field(...)
+    description: Optional[str] = Field(None)
     farmer_id: Optional[str] = None
     model_config = ConfigDict(extra="forbid")
 
 
 class FarmUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=2, max_length=100)
-    address: Optional[str] = Field(None, min_length=5, max_length=200)
-    city: Optional[str] = Field(None, min_length=2, max_length=100)
-    state: Optional[str] = Field(None, min_length=2, max_length=100)
-    pincode: Optional[str] = Field(None, pattern=r"^\d{6}$")
-    latitude: Optional[float] = Field(None, ge=-90.0, le=90.0)
-    longitude: Optional[float] = Field(None, ge=-180.0, le=180.0)
-    area_hectares: Optional[float] = Field(None, gt=0, le=100000.0)
-    certifications: Optional[List[str]] = None
-    description: Optional[str] = Field(None, max_length=1000)
+    name: Optional[str] = Field(None)
+    city: Optional[str] = Field(None)
+    state: Optional[str] = Field(None)
+    pincode: Optional[str] = Field(None)
+    description: Optional[str] = Field(None)
     is_active: Optional[bool] = None
     model_config = ConfigDict(extra="forbid")
 
@@ -48,14 +38,9 @@ class FarmResponse(BaseModel):
     id: str
     farmer_id: str
     name: str
-    address: str
     city: str
     state: str
     pincode: str
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    area_hectares: Optional[float] = None
-    certifications: List[str] = Field(default_factory=list)
     description: Optional[str] = None
     is_active: bool = True
     created_at: Optional[datetime] = None
@@ -95,7 +80,6 @@ async def create_farm(
         "farmer_id": farmer_id,
         **dump,
         "name": farm_data.name.strip(),
-        "address": farm_data.address.strip(),
         "city": farm_data.city.strip(),
         "state": farm_data.state.strip(),
         "is_active": True,
@@ -112,7 +96,7 @@ async def create_farm(
 @router.get("", response_model=List[FarmResponse])
 async def list_farms(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1),
     is_active: Optional[bool] = None,
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)

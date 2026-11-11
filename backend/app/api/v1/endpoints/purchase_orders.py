@@ -9,10 +9,10 @@ from bson import ObjectId
 
 from app.db.mongodb import get_database
 from app.core.permissions import get_current_user
-from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError
+from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError, ConflictError
 from app.core.constants import PurchaseOrderStatus, ProduceType, UserRole, LedgerEventType
 from app.services.ledger_service import append_ledger_block
-from app.db.unit_of_work import uow
+from app.db.unit_of_work import run_in_txn
 from app.utils.serialization import to_response
 from app.utils.mongo import to_mongo, resolve_doc
 from app.core.access import get_warehouses_for_user
@@ -24,22 +24,11 @@ router = APIRouter()
 class PurchaseOrderCreate(BaseModel):
     seller_id: Optional[str] = None
     produce_type: ProduceType
-    batch_id: Optional[str] = None
-    requested_quantity_kg: float = Field(..., gt=0, le=1000000.0, allow_inf_nan=False)
-    unit_price_paise: int = Field(..., gt=0, le=100000000)
+    batch_id: str
+    requested_quantity_kg: float = Field(..., gt=0, allow_inf_nan=False)
+    unit_price_paise: int = Field(..., gt=0)
     preferred_delivery_date: date
-    pickup_address: str = Field(..., min_length=1, max_length=500)
-    delivery_address: str = Field(..., min_length=1, max_length=500)
-    handling_requirements: Optional[str] = Field(None, max_length=1000)
     buyer_id: Optional[str] = None
-    model_config = ConfigDict(extra="forbid")
-
-
-class PurchaseOrderUpdate(BaseModel):
-    status: Optional[PurchaseOrderStatus] = None
-    delivery_address: Optional[str] = Field(None, min_length=1, max_length=500)
-    pickup_address: Optional[str] = Field(None, min_length=1, max_length=500)
-    handling_requirements: Optional[str] = Field(None, max_length=1000)
     model_config = ConfigDict(extra="forbid")
 
 
@@ -49,14 +38,11 @@ class PurchaseOrderResponse(BaseModel):
     buyer_id: str
     seller_id: str
     produce_type: ProduceType
-    batch_id: Optional[str] = None
+    batch_id: str
     requested_quantity_kg: float
     unit_price_paise: int
     total_amount_paise: int
     preferred_delivery_date: date
-    pickup_address: str
-    delivery_address: str
-    handling_requirements: Optional[str] = None
     status: PurchaseOrderStatus
     accepted_quantity_kg: float = 0.0
     fulfilled_quantity_kg: float = 0.0
@@ -120,15 +106,12 @@ async def create_purchase_order(
         "buyer_id": buyer_id,
         "seller_id": seller_id,
         "produce_type": order_data.produce_type.value if hasattr(order_data.produce_type, "value") else str(order_data.produce_type),
-        "batch_id": str(batch["_id"]) if batch else None,
+        "batch_id": str(batch["_id"]),
         "requested_quantity_kg": round(float(qty_dec), 3),
         "unit_price_paise": order_data.unit_price_paise,
         "total_amount_paise": total_amount_paise,
         "preferred_delivery_date": order_data.preferred_delivery_date,
-        "pickup_address": order_data.pickup_address.strip(),
-        "delivery_address": order_data.delivery_address.strip(),
-        "handling_requirements": order_data.handling_requirements,
-        "status": PurchaseOrderStatus.DRAFT.value,
+        "status": PurchaseOrderStatus.PLACED.value,
         "accepted_quantity_kg": 0.0,
         "fulfilled_quantity_kg": 0.0,
         "created_by": current_user["sub"],
@@ -136,60 +119,28 @@ async def create_purchase_order(
         "updated_at": now,
     }
     
-    result = await db.purchase_orders.insert_one(to_mongo(order_doc))
-    order_doc["_id"] = result.inserted_id
-    
-    await append_ledger_block(
-        db,
-        event_type=LedgerEventType.PURCHASE_ORDER_CREATED,
-        entity_type="PURCHASE_ORDER",
-        entity_id=str(result.inserted_id),
-        actor_id=current_user["sub"],
-        actor_role=current_user["role"],
-        event_summary=f"Purchase order {order_id} created",
-        payload={
-            "order_id": order_id,
-            "produce_type": order_doc["produce_type"],
-            "requested_quantity_kg": order_doc["requested_quantity_kg"],
-            "total_amount_paise": total_amount_paise,
-            "seller_id": seller_id,
-        }
-    )
+    async def _transaction(session):
+        result = await db.purchase_orders.insert_one(to_mongo(order_doc), session=session)
+        order_doc["_id"] = result.inserted_id
+        await append_ledger_block(
+            db, event_type=LedgerEventType.PURCHASE_ORDER_CREATED,
+            entity_type="PURCHASE_ORDER", entity_id=str(result.inserted_id),
+            actor_id=current_user["sub"], actor_role=current_user["role"],
+            event_summary=f"Purchase order {order_id} created",
+            payload={"order_id": order_id, "produce_type": order_doc["produce_type"],
+                     "requested_quantity_kg": order_doc["requested_quantity_kg"],
+                     "total_amount_paise": total_amount_paise, "seller_id": seller_id},
+            session=session,
+        )
+    await run_in_txn(_transaction)
     
     return to_response(PurchaseOrderResponse, order_doc)
-
-
-@router.post("/{order_id}/place", response_model=PurchaseOrderResponse)
-async def place_purchase_order(
-    order_id: str,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    order = await resolve_doc(db.purchase_orders, order_id, "Purchase Order", business_key="order_id")
-    
-    if current_user["role"] not in [UserRole.BUYER, UserRole.ADMIN]:
-        raise ForbiddenError("Only buyers or admins can place purchase orders")
-    if current_user["role"] == UserRole.BUYER and order["buyer_id"] != current_user["sub"]:
-        raise ForbiddenError("Not authorized to place this order")
-    
-    if order["status"] != PurchaseOrderStatus.DRAFT.value:
-        raise ValidationError(f"Order cannot be placed from status {order['status']}")
-    
-    now = datetime.now(timezone.utc)
-    await db.purchase_orders.update_one(
-        {"_id": order["_id"]},
-        {"$set": {"status": PurchaseOrderStatus.PLACED.value, "updated_at": now}}
-    )
-    
-    order["status"] = PurchaseOrderStatus.PLACED.value
-    order["updated_at"] = now
-    return to_response(PurchaseOrderResponse, order)
 
 
 @router.get("", response_model=List[PurchaseOrderResponse])
 async def list_purchase_orders(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1),
     status: Optional[PurchaseOrderStatus] = None,
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
@@ -245,7 +196,7 @@ async def accept_purchase_order(
     if current_user["role"] == UserRole.FARMER and order["seller_id"] != current_user["sub"]:
         raise ForbiddenError("Only the seller or admin can accept this order")
     
-    allowed_statuses = [PurchaseOrderStatus.PLACED.value, PurchaseOrderStatus.DRAFT.value, PurchaseOrderStatus.PLACED, PurchaseOrderStatus.DRAFT]
+    allowed_statuses = [PurchaseOrderStatus.PLACED.value]
     if order["status"] not in allowed_statuses:
         raise ValidationError(f"Order cannot be accepted from status {order['status']}")
     
@@ -253,48 +204,25 @@ async def accept_purchase_order(
     qty = order["requested_quantity_kg"]
     now = datetime.now(timezone.utc)
 
-    async with uow() as session:
-        # Atomic stock reservation if linked to batch
-        if batch_id:
-            batch = await resolve_doc(db.produce_batches, batch_id, "Batch", session=session)
-            if batch.get("available_quantity_kg", 0) < qty:
-                raise ValidationError("Insufficient available quantity in batch to reserve")
-            
-            # Atomic conditional update on batch
-            res = await db.produce_batches.update_one(
-                {"_id": batch["_id"], "available_quantity_kg": {"$gte": qty}},
-                {"$inc": {"reserved_quantity_kg": qty, "available_quantity_kg": -qty}, "$set": {"updated_at": now}},
-                session=session
-            )
-            if res.matched_count == 0:
-                raise ValidationError("Batch stock was reserved by a concurrent request")
-            
-            # Update warehouse inventory if exists
-            inv = await db.inventory_items.find_one({"batch_id": str(batch["_id"])}, session=session)
-            if inv:
-                avail_inv = float(inv.get("available_quantity_kg", inv.get("quantity_kg", 0.0)))
-                res_amt = min(qty, avail_inv)
-                if res_amt > 0:
-                    try:
-                        await reserve_stock(
-                            db, str(inv["_id"]), res_amt,
-                            actor_id=current_user["sub"], actor_role=current_user["role"],
-                            reference_id=str(order["_id"]),
-                            session=session
-                        )
-                    except Exception:
-                        pass
-
-        await db.purchase_orders.update_one(
-            {"_id": order["_id"]},
-            {"$set": {
-                "status": PurchaseOrderStatus.ACCEPTED.value,
-                "accepted_quantity_kg": qty,
-                "updated_at": now
-            }},
-            session=session
+    async def accept_transaction(session):
+        claim = await db.purchase_orders.update_one(
+            {"_id": order["_id"], "status": {"$in": [PurchaseOrderStatus.PLACED.value]}},
+            {"$set": {"status": PurchaseOrderStatus.ACCEPTED.value, "accepted_quantity_kg": qty, "updated_at": now}},
+            session=session,
         )
-        
+        if claim.matched_count == 0:
+            raise ConflictError("Order was already processed")
+        batch = await resolve_doc(db.produce_batches, batch_id, "Batch", session=session)
+        if batch.get("status") != "AT_WAREHOUSE":
+            raise ValidationError("Batch has no accepted warehouse receipt")
+        inv = await db.inventory_items.find_one({"batch_id": batch_id}, sort=[("estimated_shelf_life_end", 1)], session=session)
+        if not inv:
+            raise ValidationError("Batch has no accepted warehouse stock")
+        await reserve_stock(db, str(inv["_id"]), qty, session)
+        await db.purchase_orders.update_one(
+            {"_id": order["_id"]}, {"$set": {"inventory_id": str(inv["_id"])}}, session=session,
+        )
+
         await append_ledger_block(
             db,
             event_type=LedgerEventType.PURCHASE_ORDER_ACCEPTED,
@@ -306,6 +234,7 @@ async def accept_purchase_order(
             payload={"order_id": order["order_id"], "accepted_quantity_kg": qty},
             session=session
         )
+    await run_in_txn(accept_transaction)
     
     updated = await db.purchase_orders.find_one({"_id": order["_id"]})
     return to_response(PurchaseOrderResponse, updated)
@@ -324,40 +253,17 @@ async def reject_purchase_order(
         raise ForbiddenError("Only the seller or admin can reject this order")
     if current_user["role"] == UserRole.FARMER and order["seller_id"] != current_user["sub"]:
         raise ForbiddenError("Only the seller or admin can reject this order")
+    if order["status"] not in (PurchaseOrderStatus.PLACED.value):
+        raise ValidationError(f"Order cannot be rejected from status {order['status']}")
     
     now = datetime.now(timezone.utc)
-    qty = order["requested_quantity_kg"]
-    batch_id = order.get("batch_id")
-
-    async with uow() as session:
-        # If previously accepted, release reservation
-        if order["status"] == PurchaseOrderStatus.ACCEPTED.value and batch_id:
-            await db.produce_batches.update_one(
-                {"_id": ObjectId(batch_id) if ObjectId.is_valid(batch_id) else batch_id, "reserved_quantity_kg": {"$gte": qty}},
-                {"$inc": {"reserved_quantity_kg": -qty, "available_quantity_kg": qty}, "$set": {"updated_at": now}},
-                session=session
-            )
-            inv = await db.inventory_items.find_one({"batch_id": batch_id}, session=session)
-            if inv:
-                res_in_inv = float(inv.get("reserved_quantity_kg", 0.0))
-                rel_amt = min(qty, res_in_inv)
-                if rel_amt > 0:
-                    try:
-                        await release_stock(
-                            db, str(inv["_id"]), rel_amt,
-                            actor_id=current_user["sub"], actor_role=current_user["role"],
-                            reference_id=str(order["_id"]),
-                            session=session
-                        )
-                    except Exception:
-                        pass
-
-        await db.purchase_orders.update_one(
-            {"_id": order["_id"]},
-            {"$set": {"status": PurchaseOrderStatus.REJECTED.value, "updated_at": now}},
-            session=session
+    async def _transaction(session):
+        claim = await db.purchase_orders.update_one(
+            {"_id": order["_id"], "status": order["status"]},
+            {"$set": {"status": PurchaseOrderStatus.REJECTED.value, "updated_at": now}}, session=session,
         )
-        
+        if claim.matched_count == 0:
+            raise ConflictError("Order was already processed")
         await append_ledger_block(
             db,
             event_type=LedgerEventType.PURCHASE_ORDER_REJECTED,
@@ -369,6 +275,7 @@ async def reject_purchase_order(
             payload={"order_id": order["order_id"]},
             session=session
         )
+    await run_in_txn(_transaction)
     
     updated = await db.purchase_orders.find_one({"_id": order["_id"]})
     return to_response(PurchaseOrderResponse, updated)
@@ -388,42 +295,31 @@ async def cancel_purchase_order(
     if current_user["role"] == UserRole.BUYER and order["buyer_id"] != current_user["sub"]:
         raise ForbiddenError("Only the buyer or admin can cancel this order")
     
-    if order["status"] in [PurchaseOrderStatus.FULFILLED.value, PurchaseOrderStatus.CANCELLED.value, PurchaseOrderStatus.REJECTED.value]:
+    if order["status"] not in [PurchaseOrderStatus.PLACED.value, PurchaseOrderStatus.ACCEPTED.value]:
         raise ValidationError(f"Order cannot be cancelled from status {order['status']}")
     
     now = datetime.now(timezone.utc)
     qty = order["requested_quantity_kg"]
     batch_id = order.get("batch_id")
 
-    async with uow() as session:
-        # If order was accepted, release reservation
-        if order["status"] == PurchaseOrderStatus.ACCEPTED.value and batch_id:
-            await db.produce_batches.update_one(
-                {"_id": ObjectId(batch_id) if ObjectId.is_valid(batch_id) else batch_id, "reserved_quantity_kg": {"$gte": qty}},
-                {"$inc": {"reserved_quantity_kg": -qty, "available_quantity_kg": qty}, "$set": {"updated_at": now}},
-                session=session
-            )
-            inv = await db.inventory_items.find_one({"batch_id": batch_id}, session=session)
-            if inv:
-                res_in_inv = float(inv.get("reserved_quantity_kg", 0.0))
-                rel_amt = min(qty, res_in_inv)
-                if rel_amt > 0:
-                    try:
-                        await release_stock(
-                            db, str(inv["_id"]), rel_amt,
-                            actor_id=current_user["sub"], actor_role=current_user["role"],
-                            reference_id=str(order["_id"]),
-                            session=session
-                        )
-                    except Exception:
-                        pass
-
-        await db.purchase_orders.update_one(
-            {"_id": order["_id"]},
-            {"$set": {"status": PurchaseOrderStatus.CANCELLED.value, "updated_at": now}},
-            session=session
+    async def _transaction(session):
+        shipment = await db.shipments.find_one(
+            {"purchase_order_id": str(order["_id"]), "status": {"$ne": "CANCELLED"}}, session=session,
         )
-        
+        if shipment:
+            raise ConflictError("Cancel the shipment before cancelling this order")
+        claim = await db.purchase_orders.update_one(
+            {"_id": order["_id"], "status": order["status"]},
+            {"$set": {"status": PurchaseOrderStatus.CANCELLED.value, "updated_at": now}}, session=session,
+        )
+        if claim.matched_count == 0:
+            raise ConflictError("Order was already processed")
+        if order["status"] == PurchaseOrderStatus.ACCEPTED.value:
+            inventory_id = order.get("inventory_id")
+            if not inventory_id:
+                raise ConflictError("Accepted order has no inventory allocation")
+            await release_stock(db, inventory_id, qty, session)
+
         await append_ledger_block(
             db,
             event_type=LedgerEventType.PURCHASE_ORDER_REJECTED,
@@ -435,6 +331,7 @@ async def cancel_purchase_order(
             payload={"order_id": order["order_id"], "reason": "Buyer cancellation"},
             session=session
         )
+    await run_in_txn(_transaction)
     
     updated = await db.purchase_orders.find_one({"_id": order["_id"]})
     return to_response(PurchaseOrderResponse, updated)

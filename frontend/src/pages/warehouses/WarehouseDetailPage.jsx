@@ -95,7 +95,7 @@ export default function WarehouseDetailPage() {
               </div>
               <div className="flex items-center gap-1.5 text-[#526357]">
                 <MapPin className="w-3.5 h-3.5 text-[#7A887E]" />
-                <span className="font-sans">{warehouse.address}, {warehouse.city}, {warehouse.state}</span>
+                <span className="font-sans">{warehouse.city}, {warehouse.state}</span>
               </div>
             </div>
           </CardContent>

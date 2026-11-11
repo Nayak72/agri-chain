@@ -27,7 +27,7 @@ async def connect_to_mongo() -> bool:
     global _client, _database, _supports_transactions
     sanitized_uri = get_sanitized_uri(settings.mongodb_uri)
     logger.info(f"Connecting to MongoDB at {sanitized_uri}")
-    _client = AsyncIOMotorClient(settings.mongodb_uri, tz_aware=True)
+    _client = AsyncIOMotorClient(settings.mongodb_uri, tz_aware=True, w="majority", readConcernLevel="majority")
     _database = _client[settings.database_name]
     
     try:

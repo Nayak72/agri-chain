@@ -13,38 +13,24 @@ from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError, 
 from app.core.constants import DriverStatus, UserRole
 from app.utils.serialization import to_response
 from app.utils.mongo import to_mongo, resolve_doc
-from app.schemas.validators import normalize_identifier, normalize_email
-from app.services.outbox import schedule_outbox_event, OutboxEventType
 
 router = APIRouter()
 
 
 class DriverCreate(BaseModel):
     transporter_id: Optional[str] = None
-    name: str = Field(..., min_length=2, max_length=100)
-    phone: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")
-    email: Optional[str] = Field(None, pattern=r"^[^@]+@[^@]+\.[^@]+$")
-    license_number: str = Field(..., min_length=5, max_length=30)
-    license_expiry: date
-    address: str = Field(..., min_length=5, max_length=200)
-    city: str = Field(..., min_length=2, max_length=100)
-    state: str = Field(..., min_length=2, max_length=100)
-    pincode: str = Field(..., pattern=r"^\d{6}$")
-    experience_years: int = Field(0, ge=0, le=60)
+    name: str = Field(...)
+    phone: str = Field(...)
+    city: str = Field(...)
+    state: str = Field(...)
     model_config = ConfigDict(extra="forbid")
 
 
 class DriverUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=2, max_length=100)
-    phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")
-    email: Optional[str] = Field(None, pattern=r"^[^@]+@[^@]+\.[^@]+$")
-    license_number: Optional[str] = Field(None, min_length=5, max_length=30)
-    license_expiry: Optional[date] = None
-    address: Optional[str] = Field(None, min_length=5, max_length=200)
-    city: Optional[str] = Field(None, min_length=2, max_length=100)
-    state: Optional[str] = Field(None, min_length=2, max_length=100)
-    pincode: Optional[str] = Field(None, pattern=r"^\d{6}$")
-    experience_years: Optional[int] = Field(None, ge=0, le=60)
+    name: Optional[str] = Field(None)
+    phone: Optional[str] = Field(None)
+    city: Optional[str] = Field(None)
+    state: Optional[str] = Field(None)
     model_config = ConfigDict(extra="forbid")
 
 
@@ -60,14 +46,8 @@ class DriverResponse(BaseModel):
     user_id: Optional[str] = None
     name: str
     phone: str
-    email: Optional[str] = None
-    license_number: str
-    license_expiry: date
-    address: str
     city: str
     state: str
-    pincode: str
-    experience_years: int
     status: DriverStatus
     current_assignment: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -104,23 +84,6 @@ async def create_driver(
     if current_user["role"] == UserRole.TRANSPORTER and transporter.get("user_id") != current_user["sub"]:
         raise ForbiddenError("Not authorized to add drivers for this transporter")
     
-    clean_license = normalize_identifier(driver_data.license_number)
-    existing = await db.drivers.find_one({"license_number": clean_license})
-    if existing:
-        raise ConflictError(f"Driver with license {clean_license} already exists")
-    
-    clean_email = normalize_email(driver_data.email)
-    
-    # Auto-link if a DRIVER user with matching email already exists
-    linked_user_id = None
-    if clean_email:
-        user_account = await db.users.find_one({"email": clean_email, "role": UserRole.DRIVER})
-        if user_account:
-            # Check if this user is already linked to another driver
-            already_linked = await db.drivers.find_one({"user_id": str(user_account["_id"])})
-            if not already_linked:
-                linked_user_id = str(user_account["_id"])
-    
     driver_id = generate_driver_id()
     while await db.drivers.find_one({"driver_id": driver_id}):
         driver_id = generate_driver_id()
@@ -129,10 +92,8 @@ async def create_driver(
     driver_doc = {
         "driver_id": driver_id,
         "transporter_id": trans_id,
-        "user_id": linked_user_id,
+        "user_id": None,
         **driver_data.model_dump(),
-        "license_number": clean_license,
-        "email": clean_email,
         "status": DriverStatus.AVAILABLE.value,
         "current_assignment": None,
         "created_at": now,
@@ -148,7 +109,7 @@ async def create_driver(
 @router.get("", response_model=List[DriverResponse])
 async def list_drivers(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1),
     transporter_id: Optional[str] = None,
     status: Optional[DriverStatus] = None,
     current_user: dict = Depends(get_current_user),
@@ -215,11 +176,6 @@ async def update_driver(
     if not update_data:
         raise ValidationError("No valid fields to update")
     
-    if "license_number" in update_data:
-        update_data["license_number"] = normalize_identifier(update_data["license_number"])
-    if "email" in update_data:
-        update_data["email"] = normalize_email(update_data["email"])
-    
     update_data["updated_at"] = datetime.now(timezone.utc)
     
     await db.drivers.update_one(
@@ -249,6 +205,9 @@ async def link_driver_user(
         if not transporter or driver["transporter_id"] != str(transporter["_id"]):
             raise ForbiddenError("Not authorized to manage this driver")
     
+    if driver.get("user_id") and driver["user_id"] != body.user_id:
+        raise ConflictError("Driver profile is already linked to another user")
+
     if not ObjectId.is_valid(body.user_id):
         raise ValidationError("Invalid user ID")
     
@@ -256,7 +215,7 @@ async def link_driver_user(
     if not target_user:
         raise NotFoundError("User", body.user_id)
     
-    if target_user.get("role") != UserRole.DRIVER:
+    if target_user.get("role") != UserRole.DRIVER or not target_user.get("is_approved", False) or not target_user.get("is_active", False):
         raise ValidationError("The target user account must possess the DRIVER role")
     
     # Ensure this user is not already linked to another driver
@@ -272,62 +231,3 @@ async def link_driver_user(
     
     updated = await db.drivers.find_one({"_id": driver["_id"]})
     return to_response(DriverResponse, updated)
-
-
-@router.post("/{driver_id}/invite")
-async def invite_driver(
-    driver_id: str,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    """Generate a secure, single-use activation invitation token for the driver."""
-    if current_user["role"] not in [UserRole.TRANSPORTER, UserRole.ADMIN]:
-        raise ForbiddenError("Only transporters or admins can invite drivers")
-
-    driver = await resolve_doc(db.drivers, driver_id, "Driver", business_key="driver_id")
-    if not driver.get("email"):
-        raise ValidationError("Driver record must have a valid email address to issue an invitation")
-    
-    # Check if driver is already linked to an active user
-    if driver.get("user_id"):
-        raise ConflictError("Driver is already linked to an active user account")
-    
-    # Generate 32-byte cryptographic token
-    raw_token = secrets.token_hex(32)
-    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=48)
-    
-    # Invalidate existing pending invitations for this driver
-    await db.driver_invitations.update_many(
-        {"driver_id": str(driver["_id"]), "status": "PENDING"},
-        {"$set": {"status": "REVOKED", "updated_at": datetime.now(timezone.utc)}}
-    )
-    
-    invitation_doc = {
-        "driver_id": str(driver["_id"]),
-        "email": driver["email"],
-        "token_hash": token_hash,
-        "status": "PENDING",
-        "expires_at": expires_at,
-        "created_by": current_user["sub"],
-        "created_at": datetime.now(timezone.utc),
-    }
-    result = await db.driver_invitations.insert_one(invitation_doc)
-    invitation_doc["_id"] = result.inserted_id
-
-    await schedule_outbox_event(
-        db, OutboxEventType.SEND_DRIVER_INVITATION,
-        {
-            "invitation_id": str(result.inserted_id),
-            "driver_id": str(driver["_id"]),
-            "email": driver["email"],
-            "token": raw_token
-        }
-    )
-    
-    # In actual production, this raw_token is delivered via email.
-    return {
-        "message": f"Invitation issued for {driver['email']}",
-        "expires_at": expires_at.isoformat(),
-        "invitation_token": raw_token
-    }

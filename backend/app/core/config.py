@@ -10,13 +10,11 @@ class Settings(BaseSettings):
     
     mongodb_uri: str = "mongodb://localhost:27017/agri_chain?replicaSet=rs0"
     database_name: str = "agri_chain"
+    allow_standalone_dev: bool = False
     
     jwt_secret_key: str = "dev-secret-change-in-production"
     jwt_algorithm: str = "HS256"
-    jwt_access_token_expire_minutes: int = 30
-    jwt_refresh_token_expire_days: int = 7
-    refresh_cookie_name: str = "refresh_token"
-    cookie_secure: bool = False
+    jwt_access_token_expire_minutes: int = 480
     
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000", "http://localhost:5173"]
     
@@ -36,9 +34,6 @@ class Settings(BaseSettings):
     
     upload_directory: str = "uploads"
     max_file_size: int = 10 * 1024 * 1024  # 10MB
-    
-    simulator_enabled: bool = True
-    simulator_default_interval_seconds: int = 30
     
     ledger_chain_id: str = "AGRCHAIN-GLOBAL-001"
     ledger_genesis_hash: str = "0" * 64

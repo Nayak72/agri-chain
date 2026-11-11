@@ -32,7 +32,6 @@ async function sha256(message) {
 
 export default function LedgerPage() {
   const [blocks, setBlocks] = useState([])
-  const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [verifying, setVerifying] = useState(false)
   const [verifyResult, setVerifyResult] = useState(null)
@@ -53,12 +52,8 @@ export default function LedgerPage() {
     setLoading(true)
     setError(null)
     try {
-      const [blocksRes, statsRes] = await Promise.all([
-        ledgerApi.blocks({ page_size: 50 }),
-        ledgerApi.statistics().catch(() => ({ data: null })),
-      ])
+      const blocksRes = await ledgerApi.blocks({ page_size: 50 })
       setBlocks(blocksRes.data || [])
-      setStats(statsRes.data || null)
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to load ledger records')
     } finally {
@@ -141,7 +136,7 @@ export default function LedgerPage() {
           { label: 'Audit Ledger' }
         ]}
         title="Cryptographic Audit Ledger Explorer"
-        description="Immutable supply-chain event journal with cryptographic forward-linkage and verifiable provenance."
+        description="Simulated hash-chained audit journal with verifiable event history."
         badge={
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
@@ -205,7 +200,7 @@ export default function LedgerPage() {
         )
       })()}
 
-      {/* Statistics Cards */}
+      {/* Ledger summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
           <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
@@ -213,10 +208,10 @@ export default function LedgerPage() {
             <Layers className="h-4 w-4 text-[#244634]" />
           </div>
           <div className="text-2xl font-bold font-mono text-stone-900">
-            {stats?.total_blocks ?? blocks.length}
+            {blocks.length > 0 ? blocks[0].index : 0}
           </div>
           <div className="text-xs text-stone-500 mt-1 font-mono">
-            Height Index #{stats?.last_index ?? (blocks.length > 0 ? blocks[blocks.length - 1].index : 0)}
+            Height Index #{blocks.length > 0 ? blocks[0].index : 0}
           </div>
         </div>
 
@@ -237,16 +232,16 @@ export default function LedgerPage() {
             <Hash className="h-4 w-4 text-purple-700" />
           </div>
           <div className="text-xs font-mono text-stone-700 truncate bg-stone-50 px-2.5 py-1.5 rounded-lg border border-stone-200 flex items-center justify-between">
-            <span className="truncate">{stats?.last_hash || (blocks.length > 0 ? blocks[blocks.length - 1].hash : 'GENESIS')}</span>
+            <span className="truncate">{blocks.length > 0 ? blocks[0].hash : 'GENESIS'}</span>
             <button
-              onClick={() => copyToClipboard(stats?.last_hash || (blocks.length > 0 ? blocks[blocks.length - 1].hash : ''), 'head')}
+              onClick={() => copyToClipboard(blocks.length > 0 ? blocks[0].hash : '', 'head')}
               className="text-[#244634] hover:text-emerald-700 ml-2 shrink-0"
               title="Copy hash"
             >
               {copiedHash === 'head' ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
             </button>
           </div>
-          <div className="text-xs text-stone-500 mt-1 font-mono">Chain ID: {stats?.chain_id || 'agrichain-ledger-v1'}</div>
+          <div className="text-xs text-stone-500 mt-1 font-mono">Latest listed block</div>
         </div>
       </div>
 
@@ -298,7 +293,7 @@ export default function LedgerPage() {
           </span>
         </div>
         <p className="text-xs text-stone-600 mb-4 font-sans leading-relaxed">
-          Experience mathematical immutability: alter any block payload in this sandbox to witness how the SHA-256 avalanche effect instantly breaks cryptographic pointer continuity across all subsequent blocks down the chain.
+          Change a block payload in this local demonstration to see its SHA-256 hash change and break the next stored hash link.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
@@ -373,7 +368,7 @@ export default function LedgerPage() {
               </div>
             </div>
             <p className="text-stone-600 text-[11px] pt-1 font-sans">
-              Result: The payload modification alters the SHA-256 digest completely. Block #{tamperSimResult.blockIndex + 1}&apos;s stored `previous_hash` no longer matches, invalidating the next {tamperSimResult.subsequentBlocksCount} block(s) downstream. Any tamper attempt is immediately rejected by the network.
+              Result: The payload modification alters the SHA-256 digest completely. Block #{tamperSimResult.blockIndex + 1}&apos;s stored `previous_hash` no longer matches, invalidating the next {tamperSimResult.subsequentBlocksCount} block(s) downstream. The server verifier detects changes to persisted blocks.
             </p>
           </div>
         )}

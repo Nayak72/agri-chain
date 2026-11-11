@@ -4,20 +4,13 @@ import {
   Thermometer,
   Droplets,
   Activity,
-  Play,
-  Pause,
-  RotateCcw,
-  Square,
   FastForward,
   AlertTriangle,
   CheckCircle2,
   ShieldAlert,
   Radio,
   Clock,
-  Battery,
   MapPin,
-  RefreshCw,
-  Info
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -35,17 +28,15 @@ import { shipmentsApi } from '../../api/commerce.api'
 import { formatDate } from '../../utils'
 import PageHeader from '../../components/common/PageHeader'
 import StatusBadge from '../../components/common/StatusBadge'
+import { useAuth } from '../../context/AuthContext'
 
 const SCENARIOS = [
-  { value: 'NORMAL', label: 'Normal (Optimal 4°C - 8°C)' },
-  { value: 'TEMP_EXCURSION', label: 'Temp Spike (Cooling Failure)' },
-  { value: 'HUMIDITY_EXCURSION', label: 'Humidity Breach (>90%)' },
-  { value: 'BOTH_EXCURSION', label: 'Compound Excursion (Temp + Humidity)' },
-  { value: 'FLUCTUATION', label: 'Sensor Fluctuation (Volatile)' },
-  { value: 'RECOVERY', label: 'Recovery (Cooling Restored)' },
+  { value: 'NORMAL', label: 'Normal' },
+  { value: 'TEMP_EXCURSION', label: 'Temperature excursion' },
 ]
 
 export default function ColdChainPage() {
+  const { hasRole } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const initialShipmentId = searchParams.get('shipmentId') || ''
 
@@ -60,12 +51,9 @@ export default function ColdChainPage() {
 
   // Simulation controls state
   const [scenario, setScenario] = useState('NORMAL')
-  const [intervalSec, setIntervalSec] = useState(10)
-  const [simStatus, setSimStatus] = useState('IDLE') // IDLE, RUNNING, PAUSED, STOPPED
-  const [autoPoll, setAutoPoll] = useState(true)
 
-  // Acknowledge / Resolve Modal
-  const [activeAlertModal, setActiveAlertModal] = useState(null) // { alert, mode: 'ack' | 'resolve' }
+  // Resolve alert modal
+  const [activeAlertModal, setActiveAlertModal] = useState(null)
   const [correctiveAction, setCorrectiveAction] = useState('')
 
   // 1. Fetch available shipments on mount
@@ -115,103 +103,11 @@ export default function ColdChainPage() {
     }
   }, [selectedShipmentId])
 
-  // 3. Auto-polling interval
-  useEffect(() => {
-    if (!autoPoll || !selectedShipmentId) return
-    const timer = setInterval(() => {
-      fetchTelemetry(true)
-    }, 4000)
-    return () => clearInterval(timer)
-  }, [autoPoll, selectedShipmentId])
-
-  // Simulation actions
-  const handleStart = async () => {
-    if (!selectedShipmentId) return
-    setActionLoading(true)
-    setError(null)
-    try {
-      await sensorsApi.startSimulation(selectedShipmentId, {
-        scenario,
-        interval_seconds: Number(intervalSec),
-      })
-      setSimStatus('RUNNING')
-      setSuccessMsg(`Simulation started with scenario: ${scenario}`)
-      setTimeout(() => setSuccessMsg(null), 3000)
-      fetchTelemetry(true)
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to start simulation')
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const handlePause = async () => {
-    if (!selectedShipmentId) return
-    setActionLoading(true)
-    try {
-      await sensorsApi.pauseSimulation(selectedShipmentId)
-      setSimStatus('PAUSED')
-      setSuccessMsg('Simulation paused')
-      setTimeout(() => setSuccessMsg(null), 3000)
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to pause simulation')
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const handleResume = async () => {
-    if (!selectedShipmentId) return
-    setActionLoading(true)
-    try {
-      await sensorsApi.resumeSimulation(selectedShipmentId)
-      setSimStatus('RUNNING')
-      setSuccessMsg('Simulation resumed')
-      setTimeout(() => setSuccessMsg(null), 3000)
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to resume simulation')
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const handleStop = async () => {
-    if (!selectedShipmentId) return
-    setActionLoading(true)
-    try {
-      await sensorsApi.stopSimulation(selectedShipmentId)
-      setSimStatus('STOPPED')
-      setSuccessMsg('Simulation stopped')
-      setTimeout(() => setSuccessMsg(null), 3000)
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to stop simulation')
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const handleReset = async () => {
-    if (!selectedShipmentId) return
-    if (!window.confirm('Reset all simulated sensor readings and alerts for this shipment?')) return
-    setActionLoading(true)
-    try {
-      await sensorsApi.resetSimulation(selectedShipmentId)
-      setSimStatus('IDLE')
-      setSuccessMsg('Simulation reset. History cleared.')
-      setTimeout(() => setSuccessMsg(null), 3000)
-      fetchTelemetry()
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to reset simulation')
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
   const handleNextReading = async () => {
     if (!selectedShipmentId) return
     setActionLoading(true)
     try {
-      await sensorsApi.nextReading(selectedShipmentId)
+      await sensorsApi.nextReading(selectedShipmentId, scenario)
       setSuccessMsg('Manual reading generated')
       setTimeout(() => setSuccessMsg(null), 2000)
       fetchTelemetry(true)
@@ -226,17 +122,12 @@ export default function ColdChainPage() {
   const handleAlertActionSubmit = async (e) => {
     e.preventDefault()
     if (!activeAlertModal) return
-    const { alert, mode } = activeAlertModal
+    const { alert } = activeAlertModal
     const alertId = alert.id || alert._id
     setActionLoading(true)
     try {
-      if (mode === 'ack') {
-        await sensorsApi.acknowledgeAlert(alertId, { corrective_action: correctiveAction })
-        setSuccessMsg('Alert acknowledged')
-      } else {
-        await sensorsApi.resolveAlert(alertId, { corrective_action: correctiveAction })
-        setSuccessMsg('Alert resolved and ledger entry logged')
-      }
+      await sensorsApi.resolveAlert(alertId, { corrective_action: correctiveAction })
+      setSuccessMsg('Alert resolved and ledger entry logged')
       setActiveAlertModal(null)
       setCorrectiveAction('')
       setTimeout(() => setSuccessMsg(null), 3000)
@@ -249,13 +140,14 @@ export default function ColdChainPage() {
   }
 
   const selectedShipment = shipments.find(s => (s.id || s._id) === selectedShipmentId)
+  const canManageReadings = hasRole('ADMIN', 'DRIVER', 'TRANSPORTER')
   const latestReading = readings.length > 0 ? readings[readings.length - 1] : null
 
   // Format data for chart
   const chartData = readings.map((r, idx) => ({
     time: r.timestamp ? new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : `#${idx + 1}`,
-    temperature: typeof r.temperature === 'number' ? Number(r.temperature.toFixed(1)) : (r.temperature_celsius ? Number(r.temperature_celsius.toFixed(1)) : 0),
-    humidity: typeof r.humidity === 'number' ? Number(r.humidity.toFixed(1)) : (r.humidity_percentage ? Number(r.humidity_percentage.toFixed(1)) : 0),
+    temperature: Number(r.temperature.toFixed(1)),
+    humidity: Number(r.humidity.toFixed(1)),
     status: r.status,
   }))
 
@@ -268,7 +160,7 @@ export default function ColdChainPage() {
           { label: 'Cold-Chain Telemetry' }
         ]}
         title="Cold-Chain Monitoring & Telemetry"
-        description="Real-time cold-chain condition telemetry, automated SLA excursion detection, and simulated IoT sensor controls."
+        description="On-demand simulated temperature and humidity readings with excursion alerts."
         badge={
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-amber-50 text-amber-800 border border-amber-200">
             <Radio className="h-3 w-3 animate-pulse text-amber-600" />
@@ -278,22 +170,11 @@ export default function ColdChainPage() {
         actions={
           <div className="flex items-center gap-2.5">
             <button
-              onClick={() => setAutoPoll(!autoPoll)}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono rounded-lg border shadow-xs transition-colors ${
-                autoPoll
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : 'bg-stone-50 text-stone-600 border-stone-200'
-              }`}
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${autoPoll ? 'animate-spin text-emerald-600' : 'text-stone-400'}`} />
-              <span>{autoPoll ? 'Live Polling (4s)' : 'Polling Paused'}</span>
-            </button>
-            <button
               onClick={() => fetchTelemetry()}
               disabled={loading}
               className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 shadow-xs transition-colors"
             >
-              Manual Sync
+              Refresh readings
             </button>
           </div>
         }
@@ -358,7 +239,7 @@ export default function ColdChainPage() {
       </div>
 
       {/* Simulation Control Deck */}
-      <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+      {canManageReadings && <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-stone-100">
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-[#244634]" />
@@ -366,20 +247,6 @@ export default function ColdChainPage() {
               Simulated Telemetry Generator Controls
             </h2>
           </div>
-          <span className="text-xs font-mono text-stone-500">
-            Engine State:{' '}
-            <span
-              className={`font-semibold ${
-                simStatus === 'RUNNING'
-                  ? 'text-emerald-700'
-                  : simStatus === 'PAUSED'
-                  ? 'text-amber-700'
-                  : 'text-stone-500'
-              }`}
-            >
-              {simStatus}
-            </span>
-          </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
@@ -401,78 +268,21 @@ export default function ColdChainPage() {
             </select>
           </div>
 
-          {/* Interval Selector */}
-          <div className="md:col-span-2">
-            <label className="block text-xs font-mono uppercase text-stone-600 font-semibold mb-1.5">
-              Interval (Sec)
-            </label>
-            <select
-              value={intervalSec}
-              onChange={(e) => setIntervalSec(e.target.value)}
-              className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono"
-            >
-              <option value={5}>5 seconds</option>
-              <option value={10}>10 seconds</option>
-              <option value={30}>30 seconds</option>
-              <option value={60}>60 seconds</option>
-            </select>
-          </div>
 
           {/* Action Buttons */}
           <div className="md:col-span-6 flex flex-wrap items-center gap-2">
             <button
-              onClick={handleStart}
-              disabled={actionLoading || !selectedShipmentId}
-              className="flex-1 min-w-[110px] px-3.5 py-2 rounded-lg bg-[#244634] hover:bg-[#1b3527] disabled:opacity-50 text-white text-xs font-mono font-semibold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-xs transition-all"
-            >
-              <Play className="h-3.5 w-3.5 fill-current" />
-              <span>Start</span>
-            </button>
-            <button
-              onClick={handlePause}
-              disabled={actionLoading || !selectedShipmentId}
-              className="px-3 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-800 border border-amber-200 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
-            >
-              <Pause className="h-3.5 w-3.5" />
-              <span>Pause</span>
-            </button>
-            <button
-              onClick={handleResume}
-              disabled={actionLoading || !selectedShipmentId}
-              className="px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-800 border border-emerald-200 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
-            >
-              <Play className="h-3.5 w-3.5" />
-              <span>Resume</span>
-            </button>
-            <button
-              onClick={handleStop}
-              disabled={actionLoading || !selectedShipmentId}
-              className="px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 disabled:opacity-50 text-rose-800 border border-rose-200 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
-            >
-              <Square className="h-3.5 w-3.5 fill-current" />
-              <span>Stop</span>
-            </button>
-            <button
               onClick={handleNextReading}
-              disabled={actionLoading || !selectedShipmentId}
+              disabled={actionLoading || !selectedShipmentId || selectedShipment?.status !== 'IN_TRANSIT'}
               title="Generate single reading"
               className="px-3 py-2 rounded-lg bg-stone-100 hover:bg-stone-200 disabled:opacity-50 text-stone-700 border border-stone-200 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
             >
               <FastForward className="h-3.5 w-3.5" />
-              <span>Tick</span>
-            </button>
-            <button
-              onClick={handleReset}
-              disabled={actionLoading || !selectedShipmentId}
-              title="Reset simulation readings"
-              className="px-3 py-2 rounded-lg bg-stone-100 hover:bg-stone-200 disabled:opacity-50 text-stone-600 border border-stone-200 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>Reset</span>
+              <span>Simulate reading</span>
             </button>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Telemetry Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -488,8 +298,6 @@ export default function ColdChainPage() {
                 className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                   latestReading.status === 'NORMAL'
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                    : latestReading.status === 'WARNING'
-                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
                     : 'bg-rose-50 text-rose-800 border border-rose-200 animate-pulse'
                 }`}
               >
@@ -500,12 +308,10 @@ export default function ColdChainPage() {
           <div className="text-2xl font-bold font-mono text-stone-900">
             {latestReading?.temperature != null
               ? `${Number(latestReading.temperature).toFixed(1)}°C`
-              : latestReading?.temperature_celsius != null
-              ? `${Number(latestReading.temperature_celsius).toFixed(1)}°C`
               : '—'}
           </div>
           <div className="text-xs text-stone-500 mt-1 font-sans">
-            Target SLA: 4.0°C – 8.0°C
+            Target range: {latestReading?.configured_temp_min ?? "—"}°C – {latestReading?.configured_temp_max ?? "—"}°C
           </div>
         </div>
 
@@ -521,12 +327,10 @@ export default function ColdChainPage() {
           <div className="text-2xl font-bold font-mono text-stone-900">
             {latestReading?.humidity != null
               ? `${Number(latestReading.humidity).toFixed(1)}%`
-              : latestReading?.humidity_percentage != null
-              ? `${Number(latestReading.humidity_percentage).toFixed(1)}%`
               : '—'}
           </div>
           <div className="text-xs text-stone-500 mt-1 font-sans">
-            Target Envelope: 85% – 95%
+            Target range: {latestReading?.configured_humidity_min ?? '—'}% – {latestReading?.configured_humidity_max ?? '—'}%
           </div>
         </div>
 
@@ -537,7 +341,7 @@ export default function ColdChainPage() {
               <Activity className="h-4 w-4 text-purple-700" />
               Readings Logged
             </span>
-            <span className="text-[10px] text-stone-400">Total</span>
+            <span className="text-[10px] text-stone-400">Recent</span>
           </div>
           <div className="text-2xl font-bold font-mono text-stone-900">
             {readings.length}
@@ -571,10 +375,10 @@ export default function ColdChainPage() {
           <div>
             <h2 className="text-base font-semibold text-stone-900 flex items-center gap-2">
               <Activity className="h-4 w-4 text-[#244634]" />
-              Live Sensor Telemetry Stream (Temperature & Humidity)
+              Simulated Sensor Readings (Temperature & Humidity)
             </h2>
             <p className="text-xs text-stone-500 mt-0.5">
-              Continuous time-series tracking against cold-chain boundary thresholds
+              On-demand readings against produce handling ranges
             </p>
           </div>
           <div className="flex items-center gap-4 text-xs font-mono">
@@ -592,7 +396,7 @@ export default function ColdChainPage() {
             <Radio className="h-8 w-8 text-stone-300 mb-2" />
             <p className="text-sm font-mono text-stone-600">No telemetry readings recorded for this shipment</p>
             <p className="text-xs text-stone-400 mt-1 font-sans">
-              Select a scenario above and click &quot;Start&quot; or &quot;Tick&quot; to begin generating simulated sensor data
+              Select a scenario and simulate a reading to begin generating sensor data.
             </p>
           </div>
         ) : (
@@ -742,8 +546,6 @@ export default function ColdChainPage() {
                           className={`px-2 py-0.5 rounded text-[10px] font-medium ${
                             alert.status === 'ACTIVE'
                               ? 'bg-rose-50 text-rose-800 border border-rose-200'
-                              : alert.status === 'ACKNOWLEDGED'
-                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
                               : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                           }`}
                         >
@@ -751,18 +553,8 @@ export default function ColdChainPage() {
                         </span>
                       </td>
                       <td className="py-3 px-3 text-right space-x-2">
-                        {alert.status === 'ACTIVE' && (
-                          <button
-                            onClick={() => {
-                              setActiveAlertModal({ alert, mode: 'ack' })
-                              setCorrectiveAction('')
-                            }}
-                            className="px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors"
-                          >
-                            Acknowledge
-                          </button>
-                        )}
-                        {alert.status !== 'RESOLVED' && (
+
+                        {canManageReadings && alert.status !== 'RESOLVED' && (
                           <button
                             onClick={() => {
                               setActiveAlertModal({ alert, mode: 'resolve' })
@@ -791,7 +583,7 @@ export default function ColdChainPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl animate-fade-in-up">
             <h3 className="text-lg font-bold text-stone-900 mb-1">
-              {activeAlertModal.mode === 'ack' ? 'Acknowledge Sensor Alert' : 'Resolve Sensor Excursion'}
+              Resolve Sensor Excursion
             </h3>
             <p className="text-xs text-stone-500 mb-4 font-sans">
               {activeAlertModal.alert.message || 'SLA threshold breach detected.'}
@@ -806,7 +598,7 @@ export default function ColdChainPage() {
                   rows={3}
                   value={correctiveAction}
                   onChange={(e) => setCorrectiveAction(e.target.value)}
-                  placeholder="e.g. Reefer temperature setpoint adjusted to 4°C, compressor reset verified."
+                  placeholder="e.g. Reefer setpoint adjusted to 10°C and verified."
                   className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-sans"
                   required
                 />

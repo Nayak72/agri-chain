@@ -5,7 +5,7 @@ from typing import TypedDict
 
 class AllocatableBatch(TypedDict, total=False):
     id: str
-    available_quantity_kg: float
+    available_kg: float
     shelf_life_end: datetime
 
 
@@ -16,7 +16,7 @@ def fefo_allocate(batches: Iterable[AllocatableBatch], requested_quantity_kg: fl
     remaining = requested_quantity_kg
     allocation: list[dict[str, float | str]] = []
     for batch in sorted(batches, key=lambda item: item["shelf_life_end"]):
-        available = max(0.0, float(batch.get("available_quantity_kg", 0)))
+        available = max(0.0, float(batch.get("available_kg", 0)))
         quantity = min(available, remaining)
         if quantity:
             allocation.append({"batch_id": batch["id"], "quantity_kg": quantity})

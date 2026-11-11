@@ -34,11 +34,3 @@ class LedgerVerifyResponse(BaseModel):
     invalid_blocks: int
     first_invalid_block: Optional[dict] = None
     message: str
-
-
-class LedgerStatisticsResponse(BaseModel):
-    chain_id: str
-    total_blocks: int
-    last_index: int
-    last_hash: str
-    event_type_distribution: List[dict]

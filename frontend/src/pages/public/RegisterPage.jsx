@@ -38,7 +38,7 @@ const ROLE_OPTIONS = [
     role: ROLES.WAREHOUSE_MANAGER,
     label: 'Warehouse Manager',
     icon: Warehouse,
-    desc: 'Receive harvests, reconcile cargo weights, and log inspections (Admin approval)',
+    desc: 'Receive harvests and reconcile cargo weights (Admin approval)',
     autoApprove: false,
   },
   {
@@ -52,7 +52,7 @@ const ROLE_OPTIONS = [
     role: ROLES.DRIVER,
     label: 'Driver',
     icon: MapPin,
-    desc: 'Transit checkpoints, update cargo telemetry, and file delivery reports (Admin approval)',
+    desc: 'Transit checkpoints, update cargo telemetry, and record checkpoints (Admin approval)',
     autoApprove: false,
   },
 ]

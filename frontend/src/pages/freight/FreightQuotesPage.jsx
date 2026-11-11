@@ -25,17 +25,11 @@ export default function FreightQuotesPage() {
   // Form state
   const [form, setForm] = useState({
     booking_id: prefillBookingId,
-    proposed_vehicle_category: 'REEFER_14FT',
+    proposed_vehicle_category: 'REFRIGERATED_TRUCK',
     freight_base_charge_inr: '12000',
-    handling_charge_inr: '1500',
     fuel_surcharge_inr: '2500',
-    other_charges_inr: '500',
     planned_distance_km: '280',
     estimated_transit_hours: '6.5',
-    expected_pickup_date: new Date().toISOString().split('T')[0],
-    expected_delivery_date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-    validity_days: '7',
-    additional_terms: 'Reefer temperature maintained at +4°C continuous datalogging.',
   })
 
   const [formError, setFormError] = useState('')
@@ -85,10 +79,8 @@ export default function FreightQuotesPage() {
       return
     }
 
-    const handlingInr = form.handling_charge_inr ? Number(form.handling_charge_inr) : 0
     const fuelInr = form.fuel_surcharge_inr ? Number(form.fuel_surcharge_inr) : 0
-    const otherInr = form.other_charges_inr ? Number(form.other_charges_inr) : 0
-    if (isNaN(handlingInr) || isNaN(fuelInr) || isNaN(otherInr)) {
+    if (isNaN(fuelInr)) {
       setFormError('Additional charges must be valid numeric amounts.')
       return
     }
@@ -109,15 +101,9 @@ export default function FreightQuotesPage() {
       booking_id: form.booking_id.trim(),
       proposed_vehicle_category: form.proposed_vehicle_category,
       freight_base_charge_paise: Math.round(baseInr * 100),
-      handling_charge_paise: Math.round(handlingInr * 100),
       fuel_surcharge_paise: Math.round(fuelInr * 100),
-      other_charges_paise: Math.round(otherInr * 100),
       planned_distance_km: distanceKm,
       estimated_transit_hours: transitHours,
-      expected_pickup_date: form.expected_pickup_date,
-      expected_delivery_date: form.expected_delivery_date,
-      validity_days: parseInt(form.validity_days, 10),
-      additional_terms: form.additional_terms ? form.additional_terms.trim() : null,
     }
 
     submitQuoteMutation.mutate(payload)
@@ -204,7 +190,7 @@ export default function FreightQuotesPage() {
                   onChange={handleChange}
                   className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                 >
-                  <option value="REEFER_14FT">Refrigerated Truck (14ft)</option>
+                  <option value="REFRIGERATED_TRUCK">Refrigerated Truck (14ft)</option>
                   <option value="REEFER_20FT">Refrigerated Truck (20ft)</option>
                   <option value="REEFER_32FT">Refrigerated Trailer (32ft)</option>
                   <option value="OPEN_TRUCK">Open Tarpaulin Truck</option>
@@ -224,16 +210,7 @@ export default function FreightQuotesPage() {
                     className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Handling (₹)</label>
-                  <Input
-                    type="number"
-                    name="handling_charge_inr"
-                    value={form.handling_charge_inr}
-                    onChange={handleChange}
-                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
-                  />
-                </div>
+
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -247,16 +224,7 @@ export default function FreightQuotesPage() {
                     className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Other Charges (₹)</label>
-                  <Input
-                    type="number"
-                    name="other_charges_inr"
-                    value={form.other_charges_inr}
-                    onChange={handleChange}
-                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
-                  />
-                </div>
+
               </div>
 
               <div className="grid grid-cols-2 gap-2">

@@ -10,6 +10,7 @@ from app.core.permissions import get_current_user, get_current_admin_user
 from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError, ConflictError
 from app.core.constants import UserRole, LedgerEventType
 from app.services.ledger_service import append_ledger_block
+from app.db.unit_of_work import run_in_txn
 from app.utils.serialization import to_response
 from app.utils.mongo import to_mongo, resolve_doc
 from app.schemas.validators import normalize_email, normalize_identifier
@@ -18,34 +19,34 @@ router = APIRouter()
 
 
 class TransporterCreate(BaseModel):
-    company_name: str = Field(..., min_length=2, max_length=100)
-    contact_person: str = Field(..., min_length=2, max_length=100)
-    email: str = Field(..., pattern=r"^[^@]+@[^@]+\.[^@]+$")
-    phone: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")
-    address: str = Field(..., min_length=5, max_length=200)
-    city: str = Field(..., min_length=2, max_length=100)
-    state: str = Field(..., min_length=2, max_length=100)
-    pincode: str = Field(..., pattern=r"^\d{6}$")
-    gst_number: Optional[str] = Field(None, max_length=20)
-    license_number: Optional[str] = Field(None, max_length=50)
-    bank_account: Optional[str] = Field(None, max_length=50)
-    ifsc_code: Optional[str] = Field(None, max_length=20)
+    company_name: str = Field(...)
+    contact_person: str = Field(...)
+    email: str = Field(...)
+    phone: str = Field(...)
+    address: str = Field(...)
+    city: str = Field(...)
+    state: str = Field(...)
+    pincode: str = Field(...)
+    gst_number: Optional[str] = Field(None)
+    license_number: Optional[str] = Field(None)
+    bank_account: Optional[str] = Field(None)
+    ifsc_code: Optional[str] = Field(None)
     model_config = ConfigDict(extra="forbid")
 
 
 class TransporterUpdate(BaseModel):
-    company_name: Optional[str] = Field(None, min_length=2, max_length=100)
-    contact_person: Optional[str] = Field(None, min_length=2, max_length=100)
-    email: Optional[str] = Field(None, pattern=r"^[^@]+@[^@]+\.[^@]+$")
-    phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")
-    address: Optional[str] = Field(None, min_length=5, max_length=200)
-    city: Optional[str] = Field(None, min_length=2, max_length=100)
-    state: Optional[str] = Field(None, min_length=2, max_length=100)
-    pincode: Optional[str] = Field(None, pattern=r"^\d{6}$")
-    gst_number: Optional[str] = Field(None, max_length=20)
-    license_number: Optional[str] = Field(None, max_length=50)
-    bank_account: Optional[str] = Field(None, max_length=50)
-    ifsc_code: Optional[str] = Field(None, max_length=20)
+    company_name: Optional[str] = Field(None)
+    contact_person: Optional[str] = Field(None)
+    email: Optional[str] = Field(None)
+    phone: Optional[str] = Field(None)
+    address: Optional[str] = Field(None)
+    city: Optional[str] = Field(None)
+    state: Optional[str] = Field(None)
+    pincode: Optional[str] = Field(None)
+    gst_number: Optional[str] = Field(None)
+    license_number: Optional[str] = Field(None)
+    bank_account: Optional[str] = Field(None)
+    ifsc_code: Optional[str] = Field(None)
     # approval_status and is_active removed - system/admin managed only
     model_config = ConfigDict(extra="forbid")
 
@@ -131,7 +132,7 @@ async def create_transporter(
 @router.get("", response_model=List[TransporterResponse])
 async def list_transporters(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1),
     approval_status: Optional[str] = None,
     is_active: Optional[bool] = None,
     current_user: dict = Depends(get_current_user),
@@ -216,17 +217,30 @@ async def approve_transporter(
     transporter = await resolve_doc(db.transporters, transporter_id, "Transporter", business_key="transporter_id")
     now = datetime.now(timezone.utc)
     
-    await db.transporters.update_one(
-        {"_id": transporter["_id"]},
-        {"$set": {"approval_status": "APPROVED", "is_active": True, "updated_at": now}}
-    )
-    
-    # Also activate the user account if linked
-    if transporter.get("user_id"):
-        await db.users.update_one(
-            {"_id": ObjectId(transporter["user_id"])},
-            {"$set": {"is_approved": True, "updated_at": now}}
+    async def approve_transaction(session):
+        result = await db.transporters.update_one(
+            {"_id": transporter["_id"], "approval_status": {"$ne": "APPROVED"}},
+            {"$set": {"approval_status": "APPROVED", "is_active": True, "updated_at": now}},
+            session=session,
         )
+        if result.matched_count == 0:
+            raise ConflictError("Transporter is already approved")
+        if transporter.get("user_id"):
+            user_id = transporter["user_id"]
+            await db.users.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$set": {"is_approved": True, "updated_at": now}}, session=session,
+            )
+            await append_ledger_block(
+                db, event_type=LedgerEventType.USER_APPROVED,
+                entity_type="USER", entity_id=user_id,
+                actor_id=current_user["sub"], actor_role=current_user["role"],
+                event_summary="Transporter user approved",
+                payload={"user_id": user_id, "transporter_id": str(transporter["_id"])},
+                session=session,
+            )
+
+    await run_in_txn(approve_transaction)
     
     return {"message": "Transporter approved successfully"}
 

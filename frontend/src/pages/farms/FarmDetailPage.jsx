@@ -74,7 +74,7 @@ export default function FarmDetailPage() {
               <h1 className="text-3xl font-serif font-bold text-[#1B2A20] tracking-tight">{farm.name}</h1>
               <p className="text-[#526357] text-sm mt-1.5 flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-[#7A887E] shrink-0" />
-                <span>{farm.address}, {farm.city}, {farm.state} — {farm.pincode}</span>
+                <span>{farm.city}, {farm.state}</span>
               </p>
             </div>
 
@@ -109,16 +109,6 @@ export default function FarmDetailPage() {
                 <dt className="text-[#7A887E]">Farmer Owner ID</dt>
                 <dd className="text-[#26312A]">{farm.farmer_id}</dd>
               </div>
-              <div className="flex justify-between py-2 border-b border-[#ECE7DA]">
-                <dt className="text-[#7A887E]">Total Cultivation Area</dt>
-                <dd className="text-[#244634] font-bold">{farm.area_hectares ? `${farm.area_hectares} Hectares` : 'Not specified'}</dd>
-              </div>
-              <div className="flex justify-between py-2 border-b border-[#ECE7DA]">
-                <dt className="text-[#7A887E]">GPS Coordinates</dt>
-                <dd className="text-[#26312A]">
-                  {farm.latitude && farm.longitude ? `${farm.latitude}, ${farm.longitude}` : 'Not mapped'}
-                </dd>
-              </div>
               <div className="flex justify-between py-2">
                 <dt className="text-[#7A887E]">Registered At</dt>
                 <dd className="text-[#26312A]">{formatDateTime(farm.created_at)}</dd>
@@ -127,28 +117,13 @@ export default function FarmDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Certifications & Notes */}
+        {/* Farm details */}
         <Card className="bg-white/90 border-[#E1DDD0] flex flex-col justify-between">
           <CardContent className="p-6 flex flex-col justify-between h-full">
             <div>
               <h3 className="text-xs font-mono text-[#526357] uppercase tracking-widest font-semibold mb-4">
-                Certifications & Standards
+                Farm details
               </h3>
-              {farm.certifications && farm.certifications.length > 0 ? (
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {farm.certifications.map((c, i) => (
-                    <span
-                      key={i}
-                      className="px-2.5 py-1 rounded-md bg-[#E8EFE9] border border-[#C3D4C7] text-[#244634] text-xs font-mono flex items-center gap-1.5"
-                    >
-                      <CheckCircle className="w-3 h-3 text-[#3F7C56]" />
-                      {c}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-[#7A887E] text-xs font-mono mb-6">No compliance certificates attached.</p>
-              )}
 
               <h3 className="text-xs font-mono text-[#526357] uppercase tracking-widest font-semibold mb-2">
                 Node Description

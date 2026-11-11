@@ -7,21 +7,14 @@ from app.schemas.common import BaseSchema
 class PurchaseOrderBase(BaseModel):
     seller_id: str
     produce_type: str
-    batch_id: Optional[str] = None
+    batch_id: str
     requested_quantity_kg: float = Field(..., gt=0)
     unit_price_paise: int = Field(..., gt=0)
     preferred_delivery_date: date
-    pickup_address: str
-    delivery_address: str
-    handling_requirements: Optional[str] = None
 
 
 class PurchaseOrderCreate(PurchaseOrderBase):
     pass
-
-
-class PurchaseOrderUpdate(BaseModel):
-    status: Optional[str] = None
 
 
 class PurchaseOrderResponse(BaseSchema, PurchaseOrderBase):

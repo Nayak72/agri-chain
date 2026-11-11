@@ -9,7 +9,7 @@ from app.core.permissions import get_current_user, Role
 from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError
 from app.core.constants import (
     UserRole, ShipmentStatus, DeliveryStatus, VehicleStatus,
-    DriverStatus, AlertStatus, SensorStatus, DamageClaimStatus
+    DriverStatus, AlertStatus, SensorStatus
 )
 
 router = APIRouter()
@@ -86,9 +86,9 @@ async def get_dashboard_metrics(
         query["batch_ids"] = {"$in": b_ids}
     
     total = await db.shipments.count_documents(query)
-    active = await db.shipments.count_documents({**query, "status": {"$in": [ShipmentStatus.IN_TRANSIT, ShipmentStatus.AT_CHECKPOINT, ShipmentStatus.OUT_FOR_DELIVERY]}})
+    active = await db.shipments.count_documents({**query, "status": {"$in": [ShipmentStatus.IN_TRANSIT, ShipmentStatus.OUT_FOR_DELIVERY]}})
     completed = await db.shipments.count_documents({**query, "status": ShipmentStatus.DELIVERED})
-    delayed = await db.shipments.count_documents({**query, "status": ShipmentStatus.DELAYED})
+    delayed = await db.shipments.count_documents({**query, "$expr": {"$gt": ["$actual_arrival_time", "$expected_arrival_time"]}})
     cancelled = await db.shipments.count_documents({**query, "status": ShipmentStatus.CANCELLED})
     
     pipeline = [
@@ -230,7 +230,7 @@ async def get_freight_analytics(
         {"$group": {
             "_id": {"origin": "$pickup_city", "dest": "$destination_city"},
             "count": {"$sum": 1},
-            "total_weight": {"$sum": "$total_cargo_weight_kg"}
+            "total_weight": {"$sum": "$cargo_quantity_kg"}
         }},
         {"$sort": {"count": -1}},
         {"$limit": 5}
@@ -314,7 +314,7 @@ async def get_quality_analytics(
     # Calculate actual dispatched weight from shipments
     shipment_weight_pipeline = [
         {"$match": {**query, "status": {"$in": [ShipmentStatus.DELIVERED, ShipmentStatus.PARTIALLY_DELIVERED]}}},
-        {"$group": {"_id": None, "total_weight": {"$sum": "$total_cargo_weight_kg"}}}
+        {"$group": {"_id": None, "total_weight": {"$sum": "$cargo_quantity_kg"}}}
     ]
     weight_res = await db.shipments.aggregate(shipment_weight_pipeline).to_list(1)
     total_dispatched_kg = float(weight_res[0]["total_weight"]) if weight_res and weight_res[0].get("total_weight") else 0.0
@@ -370,7 +370,6 @@ async def get_cold_chain_analytics(
 ):
     total_readings = await db.sensor_readings.count_documents({})
     normal_readings = await db.sensor_readings.count_documents({"status": SensorStatus.NORMAL})
-    warning_readings = await db.sensor_readings.count_documents({"status": SensorStatus.WARNING})
     critical_readings = await db.sensor_readings.count_documents({"status": SensorStatus.CRITICAL})
     
     compliance = (normal_readings / total_readings * 100) if total_readings > 0 else None
@@ -378,7 +377,6 @@ async def get_cold_chain_analytics(
     return {
         "total_readings": total_readings,
         "normal_readings": normal_readings,
-        "warning_readings": warning_readings,
         "critical_readings": critical_readings,
         "compliance_percentage": round(compliance, 2) if compliance is not None else None,
         "active_alerts": await db.sensor_alerts.count_documents({"status": AlertStatus.ACTIVE}),

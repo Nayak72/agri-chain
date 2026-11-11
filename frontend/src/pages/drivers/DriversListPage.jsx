@@ -27,7 +27,6 @@ export default function DriversListPage() {
   const filtered = driverList.filter(d =>
     d.name?.toLowerCase().includes(search.toLowerCase()) ||
     d.phone?.toLowerCase().includes(search.toLowerCase()) ||
-    d.license_number?.toLowerCase().includes(search.toLowerCase()) ||
     d.city?.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -39,7 +38,7 @@ export default function DriversListPage() {
       <PageHeader
         eyebrow="Personnel Registry"
         title="Commercial Drivers"
-        description="Certified heavy vehicle operators, active shipment assignments, and commercial license validity."
+        description="Drivers and their active shipment assignments."
         actions={
           <div className="flex items-center gap-2.5">
             <Button
@@ -125,9 +124,7 @@ export default function DriversListPage() {
                   <div>
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <span className="text-[10px] font-mono text-[#7A887E] uppercase tracking-widest block">
-                          LICENSE: {d.license_number}
-                        </span>
+
                         <h3 className="text-base font-serif font-bold text-[#1B2A20] group-hover:text-[#244634] transition-colors truncate max-w-[200px] mt-0.5">
                           {d.name}
                         </h3>
@@ -140,8 +137,6 @@ export default function DriversListPage() {
                     <div className="space-y-1.5 text-xs font-mono text-[#526357] py-2 border-y border-[#ECE7DA] mb-3">
                       <div>Phone: <span className="text-[#26312A] font-medium">{d.phone}</span></div>
                       <div>Location: <span className="text-[#26312A]">{d.city}, {d.state}</span></div>
-                      <div>Experience: <span className="text-[#244634] font-semibold">{d.experience_years} years</span></div>
-                      <div>License Valid: <span className="text-[#B36B21]">{formatDate(d.license_expiry)}</span></div>
                     </div>
                   </div>
 

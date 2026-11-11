@@ -44,14 +44,6 @@ def generate_movement_id() -> str:
     return f"IM-{uuid.uuid4().hex[:8].upper()}"
 
 
-def generate_alert_id(session_id: str, reading_count: int) -> str:
-    return f"ALERT-{session_id}-{reading_count:06d}"
-
-
-def generate_reading_id(session_id: str, reading_count: int) -> str:
-    return f"SR-{session_id}-{reading_count:06d}"
-
-
 def generate_event_id() -> str:
     return f"EV-{uuid.uuid4().hex[:10].upper()}"
 
@@ -62,10 +54,6 @@ def generate_item_id() -> str:
 
 def generate_claim_id() -> str:
     return f"DC-{uuid.uuid4().hex[:8].upper()}"
-
-
-def generate_session_id() -> str:
-    return f"SS-{uuid.uuid4().hex[:8].upper()}"
 
 
 def generate_transporter_id() -> str:

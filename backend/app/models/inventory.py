@@ -39,12 +39,3 @@ class BatchModel:
         await db[BatchModel.collection].update_one(
             {"_id": ObjectId(batch_id)}, {"$set": update_data}
         )
-
-    @staticmethod
-    async def increment_quantity(batch_id: str, field: str, amount: float):
-        from bson import ObjectId
-        db = get_database()
-        await db[BatchModel.collection].update_one(
-            {"_id": ObjectId(batch_id)},
-            {"$inc": {field: amount}, "$set": {"updated_at": datetime.now(timezone.utc)}}
-        )

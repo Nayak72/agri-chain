@@ -38,22 +38,18 @@ export default function FreightBookingCreatePage() {
     purchase_order_id: poState.purchaseOrderId || '',
     batch_ids: poState.batchId ? [poState.batchId] : [],
     cargo_quantity_kg: poState.cargoWeightKg ? String(poState.cargoWeightKg) : '',
-    total_cargo_weight_kg: poState.cargoWeightKg ? String(poState.cargoWeightKg) : '',
     package_count: '100',
-    pickup_address: poState.pickupAddress || '',
     pickup_city: 'Nashik',
     pickup_state: 'Maharashtra',
-    destination_address: poState.deliveryAddress || '',
     destination_city: 'Navi Mumbai',
     destination_state: 'Maharashtra',
     requested_pickup_date: new Date().toISOString().split('T')[0],
     required_delivery_date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-    preferred_vehicle_category: 'REEFER_14FT',
+    preferred_vehicle_category: 'REFRIGERATED_TRUCK',
     refrigeration_required: true,
     temperature_min: '2.0',
     temperature_max: '8.0',
     packaging_details: 'Standard ventilated agricultural crates on plastic pallets',
-    special_handling_instructions: 'Strict cold-chain compliance. No exposure to direct sunlight during loading.',
   })
 
   // Handle PO selection
@@ -71,9 +67,6 @@ export default function FreightBookingCreatePage() {
         purchase_order_id: canonicalPoId,
         batch_ids: linkedBatchIds,
         cargo_quantity_kg: String(selectedPo.requested_quantity_kg || prev.cargo_quantity_kg || 2000),
-        total_cargo_weight_kg: String(selectedPo.requested_quantity_kg || prev.total_cargo_weight_kg || 2000),
-        pickup_address: selectedPo.pickup_address || prev.pickup_address,
-        destination_address: selectedPo.delivery_address || prev.destination_address,
       }))
     }
   }
@@ -107,12 +100,6 @@ export default function FreightBookingCreatePage() {
     const cargoQty = parseFloat(form.cargo_quantity_kg)
     if (isNaN(cargoQty) || cargoQty <= 0) {
       setError('Cargo quantity must be a positive number.')
-      return
-    }
-
-    const totalWeight = parseFloat(form.total_cargo_weight_kg)
-    if (isNaN(totalWeight) || totalWeight <= 0) {
-      setError('Total cargo weight must be a positive number.')
       return
     }
 
@@ -152,12 +139,9 @@ export default function FreightBookingCreatePage() {
         purchase_order_id: form.purchase_order_id.trim(),
         batch_ids: Array.isArray(form.batch_ids) ? form.batch_ids : [form.batch_ids],
         cargo_quantity_kg: cargoQty,
-        total_cargo_weight_kg: totalWeight,
         package_count: pkgCount,
-        pickup_address: form.pickup_address.trim(),
         pickup_city: form.pickup_city.trim(),
         pickup_state: form.pickup_state.trim(),
-        destination_address: form.destination_address.trim(),
         destination_city: form.destination_city.trim(),
         destination_state: form.destination_state.trim(),
         requested_pickup_date: form.requested_pickup_date,
@@ -167,7 +151,6 @@ export default function FreightBookingCreatePage() {
         temperature_min: tempMin,
         temperature_max: tempMax,
         packaging_details: form.packaging_details ? form.packaging_details.trim() : null,
-        special_handling_instructions: form.special_handling_instructions ? form.special_handling_instructions.trim() : null,
       }
 
       const res = await freightBookingsApi.create(payload)
@@ -259,21 +242,6 @@ export default function FreightBookingCreatePage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
-                  Cargo Weight (KG) *
-                </label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  min="0.1"
-                  required
-                  name="total_cargo_weight_kg"
-                  value={form.total_cargo_weight_kg}
-                  onChange={(e) => setForm({ ...form, total_cargo_weight_kg: e.target.value, cargo_quantity_kg: e.target.value })}
-                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
-                />
-              </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
@@ -300,7 +268,7 @@ export default function FreightBookingCreatePage() {
                   onChange={handleChange}
                   className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
-                  <option value="REEFER_14FT">Refrigerated Truck (14ft / 3.5 Ton)</option>
+                  <option value="REFRIGERATED_TRUCK">Refrigerated Truck (14ft / 3.5 Ton)</option>
                   <option value="REEFER_20FT">Refrigerated Truck (20ft / 7 Ton)</option>
                   <option value="REEFER_32FT">Refrigerated Trailer (32ft / 15 Ton)</option>
                   <option value="OPEN_TRUCK">Open Tarpaulin Truck (General Cargo)</option>
@@ -346,15 +314,6 @@ export default function FreightBookingCreatePage() {
                   <span className="w-2 h-2 rounded-full bg-[#244634]"></span>
                   Pickup Node Origin
                 </div>
-                <Input
-                  type="text"
-                  placeholder="Street Address"
-                  name="pickup_address"
-                  required
-                  value={form.pickup_address}
-                  onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] text-xs font-sans focus-visible:ring-[#244634]"
-                />
                 <div className="grid grid-cols-2 gap-2">
                   <Input
                     type="text"
@@ -383,15 +342,6 @@ export default function FreightBookingCreatePage() {
                   <span className="w-2 h-2 rounded-full bg-[#3F7C56]"></span>
                   Destination Delivery Hub
                 </div>
-                <Input
-                  type="text"
-                  placeholder="Street Address"
-                  name="destination_address"
-                  required
-                  value={form.destination_address}
-                  onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] text-xs font-sans focus-visible:ring-[#244634]"
-                />
                 <div className="grid grid-cols-2 gap-2">
                   <Input
                     type="text"
@@ -462,20 +412,6 @@ export default function FreightBookingCreatePage() {
                   </div>
                 </div>
               )}
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
-                Handling & Stacking Instructions
-              </label>
-              <Textarea
-                name="special_handling_instructions"
-                rows={2}
-                value={form.special_handling_instructions}
-                onChange={handleChange}
-                placeholder="e.g. Palletized crates only. Avoid direct midday sun during transshipment."
-                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
-              />
             </div>
 
             <div className="pt-4 flex items-center justify-end gap-3 border-t border-[#ECE7DA]">

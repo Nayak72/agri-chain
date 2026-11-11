@@ -13,11 +13,6 @@ class VehicleBase(BaseModel):
     refrigeration_available: bool = False
     temperature_min: Optional[float] = None
     temperature_max: Optional[float] = None
-    registration_expiry: date
-    insurance_expiry: date
-    fitness_expiry: date
-    last_maintenance_date: Optional[date] = None
-    next_maintenance_date: Optional[date] = None
 
 
 class VehicleCreate(VehicleBase):
@@ -33,11 +28,6 @@ class VehicleUpdate(BaseModel):
     temperature_min: Optional[float] = None
     temperature_max: Optional[float] = None
     status: Optional[str] = None
-    registration_expiry: Optional[date] = None
-    insurance_expiry: Optional[date] = None
-    fitness_expiry: Optional[date] = None
-    last_maintenance_date: Optional[date] = None
-    next_maintenance_date: Optional[date] = None
 
 
 class VehicleResponse(BaseSchema, VehicleBase):

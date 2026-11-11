@@ -9,7 +9,6 @@ import { formatApiErrorMessage } from '../../utils'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Select } from '../../components/ui/select'
-import { Textarea } from '../../components/ui/textarea'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card'
 
 export default function OrderCreatePage() {
@@ -46,12 +45,9 @@ export default function OrderCreatePage() {
     requested_quantity_kg: '',
     unit_price_inr: '', // User enters in INR, converted to paise on submit
     preferred_delivery_date: '',
-    pickup_address: '',
-    delivery_address: '',
-    handling_requirements: '',
   })
 
-  // When a batch is selected, autofill produce_type, pickup address, seller_id, and default quantity
+  // When a batch is selected, autofill produce_type, seller_id, and default quantity
   const handleBatchSelect = (batchId) => {
     if (!batchId) {
       setForm(prev => ({ ...prev, batch_id: '' }))
@@ -63,9 +59,8 @@ export default function OrderCreatePage() {
         ...prev,
         batch_id: selected.id || selected._id,
         produce_type: selected.produce_type,
-        pickup_address: selected.harvest_location || prev.pickup_address,
         seller_id: selected.farmer_id || prev.seller_id,
-        requested_quantity_kg: prev.requested_quantity_kg || String(selected.available_quantity_kg || selected.harvested_quantity_kg || ''),
+        requested_quantity_kg: prev.requested_quantity_kg || String(selected.available_kg || ''),
       }))
     }
   }
@@ -85,6 +80,10 @@ export default function OrderCreatePage() {
     e.preventDefault()
     setError('')
 
+    if (!form.batch_id) {
+      setError('Please select a batch for this order.')
+      return
+    }
     if (!form.seller_id) {
       setError('Please select a verified seller/farmer.')
       return
@@ -110,13 +109,10 @@ export default function OrderCreatePage() {
       const payload = {
         seller_id: form.seller_id.trim(),
         produce_type: form.produce_type.trim(),
-        batch_id: form.batch_id ? form.batch_id.trim() : null,
+        batch_id: form.batch_id.trim(),
         requested_quantity_kg: qty,
         unit_price_paise: unitPricePaise,
         preferred_delivery_date: form.preferred_delivery_date,
-        pickup_address: form.pickup_address.trim(),
-        delivery_address: form.delivery_address.trim(),
-        handling_requirements: form.handling_requirements ? form.handling_requirements.trim() : null,
       }
 
       const res = await ordersApi.create(payload)
@@ -170,14 +166,15 @@ export default function OrderCreatePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
-                  Select Provenance Batch (Optional)
+                  Select Provenance Batch *
                 </label>
                 <Select
                   value={form.batch_id}
+                  required
                   onChange={(e) => handleBatchSelect(e.target.value)}
                   className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
-                  <option value="">No specific batch (Open market)</option>
+                  <option value="">Select a batch</option>
                   {batches.map(b => (
                     <option key={b.id || b._id || b.batch_id} value={b.id || b._id}>
                       {b.batch_id} — {b.produce_type} ({b.harvest_location || 'Field Origin'})
@@ -274,50 +271,6 @@ export default function OrderCreatePage() {
                 value={form.preferred_delivery_date}
                 onChange={handleChange}
                 className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
-                Farm / Warehouse Pickup Address *
-              </label>
-              <Input
-                type="text"
-                required
-                name="pickup_address"
-                value={form.pickup_address}
-                onChange={handleChange}
-                placeholder="e.g. Green Valley Farms, Sector 4, Nashik, MH"
-                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
-                Buyer Destination Address *
-              </label>
-              <Input
-                type="text"
-                required
-                name="delivery_address"
-                value={form.delivery_address}
-                onChange={handleChange}
-                placeholder="e.g. Central Produce Terminal, APMC Market, Vashi, Navi Mumbai"
-                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
-                Cold Chain & Handling Requirements
-              </label>
-              <Textarea
-                name="handling_requirements"
-                rows={3}
-                value={form.handling_requirements}
-                onChange={handleChange}
-                placeholder="Reefer transit between 2°C - 4°C, ventilated plastic crates, max stack height 6 units"
-                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
               />
             </div>
 

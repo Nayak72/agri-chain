@@ -33,7 +33,7 @@ const CAPABILITIES = [
   {
     icon: Warehouse,
     title: 'Warehouse Intake & Grading',
-    desc: 'Physical receipt logging with exact weight reconciliation and quality grading inspections.',
+    desc: 'Physical receipt logging with exact weight reconciliation.',
     accent: 'slate',
   },
   {
@@ -45,7 +45,7 @@ const CAPABILITIES = [
   {
     icon: Thermometer,
     title: 'Cold-Chain Monitoring',
-    desc: 'Simulated real-time sensor streams tracking temperature and humidity excursions across reefer transit.',
+    desc: 'On-demand simulated readings track temperature and humidity excursions during reefer transit.',
     accent: 'harvest',
   },
   {

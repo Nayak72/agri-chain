@@ -12,7 +12,7 @@ import { StatusBadge } from '../../components/common/StatusBadge'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/ui/table'
 import { EmptyState } from '../../components/common/EmptyState'
 
-const STATUSES = ['ALL', 'CREATED', 'SUBMITTED', 'ACCEPTED', 'REJECTED', 'FULFILLED', 'CANCELLED']
+const STATUSES = ['ALL', 'PLACED', 'ACCEPTED', 'REJECTED', 'FULFILLED', 'CANCELLED', 'FAILED']
 
 export default function OrdersListPage() {
   const navigate = useNavigate()
@@ -29,9 +29,7 @@ export default function OrdersListPage() {
   const orderList = Array.isArray(orders) ? orders : orders?.items || []
   const filtered = orderList.filter(o => {
     const matchesSearch = o.order_id?.toLowerCase().includes(search.toLowerCase()) ||
-      o.produce_type?.toLowerCase().includes(search.toLowerCase()) ||
-      o.pickup_address?.toLowerCase().includes(search.toLowerCase()) ||
-      o.delivery_address?.toLowerCase().includes(search.toLowerCase())
+      o.produce_type?.toLowerCase().includes(search.toLowerCase())
     const matchesStatus = statusFilter === 'ALL' || o.status === statusFilter
     return matchesSearch && matchesStatus
   })
@@ -77,7 +75,7 @@ export default function OrdersListPage() {
           <Search className="w-4 h-4 text-[#7A887E] absolute left-3.5 top-1/2 -translate-y-1/2" />
           <Input
             type="text"
-            placeholder="Search order ID, commodity, address..."
+            placeholder="Search order ID or commodity..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10 bg-white/90 border-[#E1DDD0] text-sm text-[#26312A] placeholder:text-[#7A887E] focus-visible:ring-[#244634]"

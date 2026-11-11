@@ -138,7 +138,7 @@ export default function FreightBookingsListPage() {
                       <span className="text-[#244634] font-bold mx-1.5">→</span>
                       <span className="text-[#1B2A20] font-semibold">{b.destination_city}</span>
                     </TableCell>
-                    <TableCell className="text-[#26312A] font-semibold">{formatWeight(b.total_cargo_weight_kg || b.cargo_quantity_kg)}</TableCell>
+                    <TableCell className="text-[#26312A] font-semibold">{formatWeight(b.cargo_quantity_kg)}</TableCell>
                     <TableCell className="text-[#526357]">{b.preferred_vehicle_category}</TableCell>
                     <TableCell>
                       {b.refrigeration_required ? (

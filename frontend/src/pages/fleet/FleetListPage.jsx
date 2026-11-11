@@ -154,8 +154,6 @@ export default function FleetListPage() {
 
                     <div className="space-y-1.5 text-xs font-mono text-[#526357]">
                       <div>Type: <span className="text-[#26312A] font-medium">{v.vehicle_type}</span></div>
-                      <div>Fitness Expiry: <span className="text-[#B36B21]">{formatDate(v.fitness_expiry)}</span></div>
-                      <div>Insurance: <span className="text-[#526357]">{formatDate(v.insurance_expiry)}</span></div>
                     </div>
                   </div>
 

@@ -6,16 +6,10 @@ from app.schemas.common import BaseSchema
 
 class DriverBase(BaseModel):
     transporter_id: str
-    name: str = Field(..., min_length=2, max_length=100)
+    name: str = Field(...)
     phone: str
-    email: Optional[str] = None
-    license_number: str = Field(..., min_length=5, max_length=20)
-    license_expiry: date
-    address: str = Field(..., min_length=5, max_length=200)
-    city: str = Field(..., min_length=2, max_length=100)
-    state: str = Field(..., min_length=2, max_length=100)
-    pincode: str = Field(..., pattern=r"^\d{6}$")
-    experience_years: int = Field(0, ge=0)
+    city: str = Field(...)
+    state: str = Field(...)
 
 
 class DriverCreate(DriverBase):
@@ -23,16 +17,10 @@ class DriverCreate(DriverBase):
 
 
 class DriverUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=2, max_length=100)
+    name: Optional[str] = Field(None)
     phone: Optional[str] = None
-    email: Optional[str] = None
-    license_number: Optional[str] = Field(None, min_length=5, max_length=20)
-    license_expiry: Optional[date] = None
-    address: Optional[str] = Field(None, min_length=5, max_length=200)
-    city: Optional[str] = Field(None, min_length=2, max_length=100)
-    state: Optional[str] = Field(None, min_length=2, max_length=100)
-    pincode: Optional[str] = Field(None, pattern=r"^\d{6}$")
-    experience_years: Optional[int] = Field(None, ge=0)
+    city: Optional[str] = Field(None)
+    state: Optional[str] = Field(None)
     status: Optional[str] = None
     current_assignment: Optional[str] = None
 

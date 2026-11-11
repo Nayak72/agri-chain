@@ -33,22 +33,21 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.upload_directory, exist_ok=True)
     
     app.state.supports_transactions = await connect_to_mongo()
-    if settings.app_env == "production" and not app.state.supports_transactions:
-        raise RuntimeError("Production requires a MongoDB replica set")
+    if not app.state.supports_transactions and not settings.allow_standalone_dev:
+        await close_mongo_connection()
+        raise RuntimeError("MongoDB transactions required: run a replica set")
+    if not app.state.supports_transactions:
+        logger.warning("ALLOW_STANDALONE_DEV enabled: writes are not transactional")
     
     from app.db.mongodb import get_database
     db = get_database()
     await create_indexes(db)
     await seed_initial_data(db)
-    from app.services.sensor_simulator import simulator_manager
-    await simulator_manager.resume_running(db)
     
     logger.info("AgriChain backend started successfully")
     yield
     
     logger.info("Shutting down AgriChain backend...")
-    from app.services.sensor_simulator import simulator_manager
-    await simulator_manager.shutdown()
     await close_mongo_connection()
     logger.info("AgriChain backend shut down complete")
 

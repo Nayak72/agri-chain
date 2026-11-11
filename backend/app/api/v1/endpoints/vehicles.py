@@ -18,33 +18,23 @@ router = APIRouter()
 
 class VehicleCreate(BaseModel):
     transporter_id: Optional[str] = None
-    registration_number: str = Field(..., pattern=r"^[A-Z0-9]{5,20}$")
+    registration_number: str = Field(...)
     category: VehicleCategory
     vehicle_type: VehicleType
-    max_payload_kg: float = Field(..., gt=0, le=100000.0)
+    max_payload_kg: float = Field(..., gt=0)
     refrigeration_available: bool = False
-    temperature_min: Optional[float] = Field(None, ge=-50.0, le=50.0)
-    temperature_max: Optional[float] = Field(None, ge=-50.0, le=50.0)
-    registration_expiry: date
-    insurance_expiry: date
-    fitness_expiry: date
-    last_maintenance_date: Optional[date] = None
-    next_maintenance_date: Optional[date] = None
+    temperature_min: Optional[float] = Field(None, ge=-50.0)
+    temperature_max: Optional[float] = Field(None, ge=-50.0)
     model_config = ConfigDict(extra="forbid")
 
 
 class VehicleUpdate(BaseModel):
     category: Optional[VehicleCategory] = None
     vehicle_type: Optional[VehicleType] = None
-    max_payload_kg: Optional[float] = Field(None, gt=0, le=100000.0)
+    max_payload_kg: Optional[float] = Field(None, gt=0)
     refrigeration_available: Optional[bool] = None
-    temperature_min: Optional[float] = Field(None, ge=-50.0, le=50.0)
-    temperature_max: Optional[float] = Field(None, ge=-50.0, le=50.0)
-    registration_expiry: Optional[date] = None
-    insurance_expiry: Optional[date] = None
-    fitness_expiry: Optional[date] = None
-    last_maintenance_date: Optional[date] = None
-    next_maintenance_date: Optional[date] = None
+    temperature_min: Optional[float] = Field(None, ge=-50.0)
+    temperature_max: Optional[float] = Field(None, ge=-50.0)
     model_config = ConfigDict(extra="forbid")
 
 
@@ -61,11 +51,6 @@ class VehicleResponse(BaseModel):
     temperature_min: Optional[float] = None
     temperature_max: Optional[float] = None
     status: VehicleStatus
-    registration_expiry: date
-    insurance_expiry: date
-    fitness_expiry: date
-    last_maintenance_date: Optional[date] = None
-    next_maintenance_date: Optional[date] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -132,7 +117,7 @@ async def create_vehicle(
 @router.get("", response_model=List[VehicleResponse])
 async def list_vehicles(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1),
     transporter_id: Optional[str] = None,
     category: Optional[VehicleCategory] = None,
     status: Optional[VehicleStatus] = None,

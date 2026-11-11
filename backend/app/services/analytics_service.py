@@ -10,9 +10,9 @@ class AnalyticsService:
         db = get_database()
         query = filters or {}
         total = await db.shipments.count_documents(query)
-        active = await db.shipments.count_documents({**query, "status": {"$in": ["IN_TRANSIT", "AT_CHECKPOINT", "OUT_FOR_DELIVERY"]}})
+        active = await db.shipments.count_documents({**query, "status": {"$in": ["IN_TRANSIT", "OUT_FOR_DELIVERY"]}})
         completed = await db.shipments.count_documents({**query, "status": "DELIVERED"})
-        delayed = await db.shipments.count_documents({**query, "status": "DELAYED"})
+        delayed = await db.shipments.count_documents({**query, "$expr": {"$gt": ["$actual_arrival_time", "$expected_arrival_time"]}})
         cancelled = await db.shipments.count_documents({**query, "status": "CANCELLED"})
         return {
             "total_shipments": total,
@@ -111,7 +111,7 @@ class AnalyticsService:
         # Calculate actual weights
         shipment_weight_pipeline = [
             {"$match": {**query, "status": {"$in": ["DELIVERED", "PARTIALLY_DELIVERED"]}}},
-            {"$group": {"_id": None, "total_weight": {"$sum": "$total_cargo_weight_kg"}}}
+            {"$group": {"_id": None, "total_weight": {"$sum": "$cargo_quantity_kg"}}}
         ]
         weight_res = await db.shipments.aggregate(shipment_weight_pipeline).to_list(1)
         total_dispatched_kg = float(weight_res[0]["total_weight"]) if weight_res and weight_res[0].get("total_weight") else 0.0
@@ -163,13 +163,11 @@ class AnalyticsService:
         db = get_database()
         total_readings = await db.sensor_readings.count_documents({})
         normal_readings = await db.sensor_readings.count_documents({"status": "NORMAL"})
-        warning_readings = await db.sensor_readings.count_documents({"status": "WARNING"})
         critical_readings = await db.sensor_readings.count_documents({"status": "CRITICAL"})
         compliance = (normal_readings / total_readings * 100) if total_readings > 0 else None
         return {
             "total_readings": total_readings,
             "normal_readings": normal_readings,
-            "warning_readings": warning_readings,
             "critical_readings": critical_readings,
             "compliance_percentage": round(compliance, 2) if compliance is not None else None,
             "active_alerts": await db.sensor_alerts.count_documents({"status": "ACTIVE"}),

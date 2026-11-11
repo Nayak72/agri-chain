@@ -1,56 +1,35 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { authClient, apiClient, tokenStore } from '../api/client.js'
 
-describe('Auth Client & Interceptor Loop Prevention', () => {
+describe('Access-token-only authentication', () => {
   beforeEach(() => {
     tokenStore.clear()
-    vi.restoreAllMocks()
+    window.history.pushState({}, '', '/login')
   })
 
-  it('authClient is a distinct instance from apiClient', () => {
-    expect(authClient).toBeDefined()
-    expect(apiClient).toBeDefined()
+  it('uses a separate unauthenticated client', () => {
     expect(authClient).not.toBe(apiClient)
-  })
-
-  it('authClient does not attach Bearer token from tokenStore', () => {
-    tokenStore.set('mock-token-xyz')
-    // authClient request interceptors list is empty or does not set Authorization
-    const reqConfig = { headers: {} }
-    // authClient does not have the Bearer token interceptor
     expect(authClient.interceptors.request.handlers.length).toBe(0)
   })
 
-  it('apiClient has Bearer token request interceptor', async () => {
-    tokenStore.set('mock-token-abc')
-    const config = { headers: {} }
+  it('attaches the in-memory access token', () => {
+    tokenStore.set('access-token')
     const handler = apiClient.interceptors.request.handlers[0].fulfilled
-    const transformed = handler(config)
-    expect(transformed.headers.Authorization).toBe('Bearer mock-token-abc')
+    expect(handler({ headers: {} }).headers.Authorization).toBe('Bearer access-token')
   })
 
-  it('apiClient response interceptor does NOT attempt token refresh on /auth/ endpoints', async () => {
-    const errorHandler = apiClient.interceptors.response.handlers[0].rejected
-    const fake401AuthError = {
-      config: { url: '/auth/login', _retry: false },
-      response: { status: 401, data: { detail: 'Invalid credentials' } },
-    }
-
-    // Calling errorHandler on /auth/login must reject immediately without calling refresh
-    await expect(errorHandler(fake401AuthError)).rejects.toEqual(fake401AuthError)
-    // _retry must remain false, proving it did NOT try to refresh
-    expect(fake401AuthError.config._retry).toBe(false)
+  it('clears the token on 401 without retrying', async () => {
+    tokenStore.set('expired-token')
+    const error = { response: { status: 401 }, config: { url: '/orders' } }
+    await expect(apiClient.interceptors.response.handlers[0].rejected(error)).rejects.toBe(error)
+    expect(tokenStore.get()).toBeNull()
+    expect(error.config._retry).toBeUndefined()
   })
 
-  it('apiClient response interceptor does NOT attempt token refresh on /auth/refresh', async () => {
-    const errorHandler = apiClient.interceptors.response.handlers[0].rejected
-    const fake401RefreshError = {
-      config: { url: '/auth/refresh', _retry: false },
-      response: { status: 401, data: { detail: 'Refresh token revoked or unknown' } },
-    }
-
-    await expect(errorHandler(fake401RefreshError)).rejects.toEqual(fake401RefreshError)
-    expect(fake401RefreshError.config._retry).toBe(false)
+  it('keeps the token on a non-authentication error', async () => {
+    tokenStore.set('access-token')
+    const error = { response: { status: 403 }, config: { url: '/orders' } }
+    await expect(apiClient.interceptors.response.handlers[0].rejected(error)).rejects.toBe(error)
+    expect(tokenStore.get()).toBe('access-token')
   })
 })
-

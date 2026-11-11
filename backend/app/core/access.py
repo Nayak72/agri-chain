@@ -92,9 +92,12 @@ async def assert_can_view_shipment(db: AsyncIOMotorDatabase, user: dict, shipmen
 
     if role == UserRole.WAREHOUSE_MANAGER:
         warehouse_ids = await get_warehouses_for_user(db, user)
-        # Check if origin/destination warehouse matches
-        if shipment.get("origin_warehouse_id") in warehouse_ids or shipment.get("destination_warehouse_id") in warehouse_ids:
+        inventory = await db.inventory_items.find_one({
+            "warehouse_id": {"$in": warehouse_ids},
+            "batch_id": {"$in": shipment.get("batch_ids", [])},
+        })
+        if inventory:
             return
-        raise ForbiddenError("Shipment does not route through any of your warehouses")
+        raise ForbiddenError("Shipment does not contain stock from your warehouse")
 
     raise ForbiddenError("Role not permitted to view this shipment")

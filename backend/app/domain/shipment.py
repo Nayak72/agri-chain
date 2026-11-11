@@ -1,12 +1,13 @@
 from dataclasses import dataclass
-from app.core.constants import SHIPMENT_STATUS_TRANSITIONS, ShipmentStatus, UserRole
+from app.core.constants import ShipmentStatus, UserRole
+from app.services.shipment_workflow import ALLOWED_TRANSITIONS
 
 
 @dataclass(frozen=True)
 class ShipmentStateMachine:
     """Validate shipment transitions without depending on FastAPI or MongoDB."""
 
-    transitions = SHIPMENT_STATUS_TRANSITIONS
+    transitions = {ShipmentStatus(k): frozenset(ShipmentStatus(v) for v in values) for k, values in ALLOWED_TRANSITIONS.items()}
 
     @classmethod
     def can_transition(cls, current: ShipmentStatus, target: ShipmentStatus) -> bool:

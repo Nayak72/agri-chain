@@ -1,8 +1,7 @@
-import hashlib
 import time
 from datetime import datetime, timezone
 from typing import Optional, Union
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from bson import ObjectId
@@ -10,7 +9,7 @@ from bson import ObjectId
 from app.db.mongodb import get_database
 from app.core.security import (
     verify_password, get_password_hash,
-    create_token_pair, create_refresh_token, decode_token, hash_refresh_jti
+    create_token_pair
 )
 from app.core.permissions import Role, ROLE_PERMISSIONS, get_current_user
 from app.core.exceptions import (
@@ -42,9 +41,9 @@ def _check_login_rate_limit(request: Request, email: str) -> None:
 
 class UserRegister(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=8)
-    full_name: str = Field(..., min_length=2, max_length=100)
-    phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")
+    password: str = Field(...)
+    full_name: str = Field(...)
+    phone: Optional[str] = Field(None)
     role: UserRole = UserRole.FARMER
     model_config = ConfigDict(extra="forbid")
 
@@ -57,7 +56,6 @@ class UserLogin(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
     user: dict
 
@@ -65,20 +63,6 @@ class TokenResponse(BaseModel):
 class RegistrationPendingResponse(BaseModel):
     status: str = "PENDING_APPROVAL"
     user: dict
-
-
-class RefreshTokenRequest(BaseModel):
-    refresh_token: Optional[str] = None
-    model_config = ConfigDict(extra="forbid")
-
-
-class ActivateDriverRequest(BaseModel):
-    invitation_token: str = Field(..., min_length=10)
-    password: str = Field(..., min_length=8)
-    email: Optional[EmailStr] = None
-    full_name: Optional[str] = Field(None, min_length=2, max_length=100)
-    phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")
-    model_config = ConfigDict(extra="forbid")
 
 
 class UserResponse(BaseModel):
@@ -114,34 +98,8 @@ def _user_payload(user: dict) -> dict:
     }
 
 
-async def _store_refresh_token(db: AsyncIOMotorDatabase, token: str, user_id: str) -> None:
-    payload = decode_token(token)
-    if not payload or not payload.get("jti") or not payload.get("family_id"):
-        raise UnauthorizedError("Invalid refresh token")
-    expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
-    await db.refresh_tokens.insert_one({
-        "jti_hash": hash_refresh_jti(payload["jti"]),
-        "user_id": user_id,
-        "family_id": payload["family_id"],
-        "expires_at": expires_at,
-        "created_at": datetime.now(timezone.utc),
-        "rotated_at": None,
-        "revoked_at": None,
-    })
-
-
-def _set_refresh_cookie(response: Response, token: str) -> None:
-    from app.core.config import get_settings
-    settings = get_settings()
-    response.set_cookie(
-        settings.refresh_cookie_name, token, httponly=True, secure=settings.cookie_secure,
-        samesite="lax", max_age=settings.jwt_refresh_token_expire_days * 86400,
-        path="/api/v1/auth"
-    )
-
-
 @router.post("/register", response_model=Union[TokenResponse, RegistrationPendingResponse])
-async def register(user_data: UserRegister, response: Response, db: AsyncIOMotorDatabase = Depends(get_database)):
+async def register(user_data: UserRegister, db: AsyncIOMotorDatabase = Depends(get_database)):
     clean_email = normalize_email(user_data.email)
     existing = await db.users.find_one({"email": clean_email})
     if existing:
@@ -177,13 +135,11 @@ async def register(user_data: UserRegister, response: Response, db: AsyncIOMotor
         }
     
     tokens = create_token_pair(str(result.inserted_id), clean_email, user_doc["role"])
-    await _store_refresh_token(db, tokens["refresh_token"], str(result.inserted_id))
-    _set_refresh_cookie(response, tokens["refresh_token"])
     return TokenResponse(**tokens, user=_user_payload(user_doc))
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(credentials: UserLogin, response: Response, request: Request, db: AsyncIOMotorDatabase = Depends(get_database)):
+async def login(credentials: UserLogin, request: Request, db: AsyncIOMotorDatabase = Depends(get_database)):
     clean_email = normalize_email(credentials.email)
     _check_login_rate_limit(request, clean_email)
     
@@ -210,191 +166,6 @@ async def login(credentials: UserLogin, response: Response, request: Request, db
         {"$set": {"last_login": datetime.now(timezone.utc)}}
     )
     
-    await _store_refresh_token(db, tokens["refresh_token"], str(user["_id"]))
-    _set_refresh_cookie(response, tokens["refresh_token"])
-    return TokenResponse(**tokens, user=_user_payload(user))
-
-
-@router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(
-    response: Response, raw_request: Request, request: RefreshTokenRequest | None = None,
-    db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    from app.core.config import get_settings
-    settings = get_settings()
-    token = (request.refresh_token if request else None) or raw_request.cookies.get(settings.refresh_cookie_name)
-    payload = decode_token(token) if token else None
-    if not payload or payload.get("type") != "refresh":
-        raise UnauthorizedError("Invalid refresh token")
-
-    jti = payload.get("jti")
-    family_id = payload.get("family_id")
-    if not jti or not family_id:
-        raise UnauthorizedError("Invalid refresh token payload")
-
-    token_doc = await db.refresh_tokens.find_one({"jti_hash": hash_refresh_jti(jti)})
-    if not token_doc:
-        raise UnauthorizedError("Refresh token revoked or unknown")
-    
-    if token_doc.get("rotated_at") or token_doc.get("revoked_at"):
-        await db.refresh_tokens.update_many({"family_id": family_id}, {"$set": {"revoked_at": datetime.now(timezone.utc)}})
-        raise UnauthorizedError("Refresh token reuse detected")
-    
-    rotated = await db.refresh_tokens.update_one(
-        {"_id": token_doc["_id"], "rotated_at": None, "revoked_at": None},
-        {"$set": {"rotated_at": datetime.now(timezone.utc)}}
-    )
-    if rotated.modified_count != 1:
-        raise UnauthorizedError("Refresh token reuse detected")
-
-    user_sub = payload.get("sub")
-    if not user_sub or not ObjectId.is_valid(user_sub):
-        raise UnauthorizedError("Invalid token subject")
-    
-    user = await db.users.find_one({"_id": ObjectId(user_sub)})
-    if not user or not user.get("is_active", True):
-        raise UnauthorizedError("User not found or inactive")
-    if not user.get("is_approved", True):
-        raise AccountPendingApprovalError()
-    
-    # Generate new token pair preserving family_id
-    from app.core.security import create_access_token
-    new_access = create_access_token({"sub": str(user["_id"]), "email": user["email"], "role": user["role"]})
-    new_refresh = create_refresh_token({"sub": str(user["_id"]), "email": user["email"], "role": user["role"], "family_id": family_id})
-    
-    await _store_refresh_token(db, new_refresh, str(user["_id"]))
-    _set_refresh_cookie(response, new_refresh)
-    return TokenResponse(
-        access_token=new_access,
-        refresh_token=new_refresh,
-        token_type="bearer",
-        user=_user_payload(user)
-    )
-
-
-@router.post("/logout")
-async def logout(response: Response, raw_request: Request, db: AsyncIOMotorDatabase = Depends(get_database)):
-    from app.core.config import get_settings
-    settings = get_settings()
-    user_id = None
-    
-    auth_header = raw_request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        payload = decode_token(auth_header.split(" ")[1])
-        if payload:
-            user_id = payload.get("sub")
-    
-    if not user_id:
-        cookie_token = raw_request.cookies.get(settings.refresh_cookie_name)
-        if cookie_token:
-            payload = decode_token(cookie_token)
-            if payload:
-                user_id = payload.get("sub")
-    
-    if user_id:
-        await db.refresh_tokens.update_many(
-            {"user_id": user_id, "revoked_at": None},
-            {"$set": {"revoked_at": datetime.now(timezone.utc)}}
-        )
-    
-    response.delete_cookie(settings.refresh_cookie_name, path="/api/v1/auth")
-    return {"message": "Logged out successfully"}
-
-
-@router.post("/activate-driver")
-async def activate_driver(
-    body: ActivateDriverRequest,
-    response: Response,
-    db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    """
-    Activate account from secure invitation link and set driver's chosen password.
-    Atomically validates token hash, pending status, expiration, and email match.
-    """
-    now = datetime.now(timezone.utc)
-    token_hash = hashlib.sha256(body.invitation_token.encode("utf-8")).hexdigest()
-
-    # Atomically validate & redeem pending, unexpired invitation
-    invite = await db.driver_invitations.find_one_and_update(
-        {
-            "token_hash": token_hash,
-            "status": "PENDING",
-            "expires_at": {"$gt": now}
-        },
-        {
-            "$set": {
-                "status": "ACCEPTED",
-                "accepted_at": now,
-                "updated_at": now
-            }
-        }
-    )
-    if not invite:
-        existing = await db.driver_invitations.find_one({"token_hash": token_hash})
-        if existing:
-            if existing.get("status") == "ACCEPTED":
-                raise ConflictError("Invitation token has already been used")
-            elif existing.get("expires_at") and existing["expires_at"].replace(tzinfo=timezone.utc) <= now:
-                raise UnauthorizedError("Invitation token has expired")
-            else:
-                raise UnauthorizedError("Invitation token is no longer valid")
-        raise UnauthorizedError("Invalid or expired invitation token")
-
-    clean_invite_email = normalize_email(invite["email"])
-
-    # Validate email match if body.email provided
-    if body.email:
-        clean_body_email = normalize_email(str(body.email))
-        if clean_body_email != clean_invite_email:
-            # Revert token status so it is not consumed if activation failed on email mismatch
-            await db.driver_invitations.update_one(
-                {"_id": invite["_id"]},
-                {"$set": {"status": "PENDING", "accepted_at": None}}
-            )
-            raise ForbiddenError("Activation email does not match invitation recipient")
-
-    driver = await db.drivers.find_one({"_id": ObjectId(invite["driver_id"])})
-    if not driver:
-        raise NotFoundError("Driver Record", invite["driver_id"])
-
-    # Check if user already exists
-    user = await db.users.find_one({"email": clean_invite_email})
-    if not user:
-        full_name = body.full_name or driver.get("name", "Driver")
-        phone = body.phone or driver.get("phone")
-        user_doc = {
-            "email": clean_invite_email,
-            "password_hash": get_password_hash(body.password),
-            "full_name": full_name,
-            "phone": phone,
-            "role": UserRole.DRIVER.value,
-            "is_active": True,
-            "is_approved": True,
-            "created_at": now,
-            "updated_at": now,
-        }
-        res = await db.users.insert_one(user_doc)
-        user_id = str(res.inserted_id)
-        user = user_doc
-    else:
-        user_id = str(user["_id"])
-        await db.users.update_one(
-            {"_id": user["_id"]},
-            {"$set": {
-                "password_hash": get_password_hash(body.password),
-                "is_approved": True,
-                "is_active": True,
-                "role": UserRole.DRIVER.value,
-                "updated_at": now
-            }}
-        )
-
-    # Link user to driver record
-    await db.drivers.update_one({"_id": driver["_id"]}, {"$set": {"user_id": user_id, "updated_at": now}})
-
-    tokens = create_token_pair(user_id, clean_invite_email, UserRole.DRIVER.value)
-    await _store_refresh_token(db, tokens["refresh_token"], user_id)
-    _set_refresh_cookie(response, tokens["refresh_token"])
     return TokenResponse(**tokens, user=_user_payload(user))
 
 

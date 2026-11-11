@@ -8,15 +8,17 @@ from bson import ObjectId
 from app.db.mongodb import get_database
 from app.core.permissions import get_current_admin_user
 from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError
-from app.core.constants import UserRole
+from app.core.constants import UserRole, LedgerEventType
+from app.db.unit_of_work import run_in_txn
+from app.services.ledger_service import append_ledger_block
 from app.schemas.validators import escape_search
 
 router = APIRouter()
 
 
 class UserUpdate(BaseModel):
-    full_name: Optional[str] = Field(None, min_length=2, max_length=100)
-    phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")
+    full_name: Optional[str] = Field(None)
+    phone: Optional[str] = Field(None)
     is_active: Optional[bool] = None
     model_config = ConfigDict(extra="forbid")
 
@@ -31,7 +33,7 @@ class UserListResponse(BaseModel):
 @router.get("", response_model=UserListResponse)
 async def list_users(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1),
     role: Optional[UserRole] = None,
     is_active: Optional[bool] = None,
     search: Optional[str] = None,
@@ -143,12 +145,21 @@ async def approve_user(
         raise ValidationError("Invalid user ID")
     
     now = datetime.now(timezone.utc)
-    result = await db.users.update_one(
-        {"_id": ObjectId(user_id)},
-        {"$set": {"is_approved": True, "updated_at": now}}
-    )
-    if result.matched_count == 0:
-        raise NotFoundError("User", user_id)
+    async def approve_transaction(session):
+        result = await db.users.update_one(
+            {"_id": ObjectId(user_id), "is_approved": {"$ne": True}},
+            {"$set": {"is_approved": True, "updated_at": now}}, session=session,
+        )
+        if result.matched_count == 0:
+            raise NotFoundError("Unapproved user", user_id)
+        await append_ledger_block(
+            db, event_type=LedgerEventType.USER_APPROVED,
+            entity_type="USER", entity_id=user_id,
+            actor_id=current_user["sub"], actor_role=current_user["role"],
+            event_summary="User approved", payload={"user_id": user_id}, session=session,
+        )
+
+    await run_in_txn(approve_transaction)
     
     return {"message": "User approved successfully"}
 

@@ -11,7 +11,7 @@ from app.core.permissions import get_current_user
 from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError, ConflictError
 from app.core.constants import UserRole, FreightBookingStatus, LedgerEventType
 from app.services.ledger_service import append_ledger_block
-from app.db.unit_of_work import uow
+from app.db.unit_of_work import run_in_txn
 from app.utils.serialization import to_response
 from app.utils.mongo import to_mongo, resolve_doc
 from app.schemas.validators import validate_date_order
@@ -21,17 +21,11 @@ router = APIRouter()
 
 class FreightQuotationCreate(BaseModel):
     booking_id: str
-    proposed_vehicle_category: str = Field(..., min_length=2, max_length=50)
+    proposed_vehicle_category: str = Field(...)
     freight_base_charge_paise: int = Field(..., ge=0)
-    handling_charge_paise: int = Field(0, ge=0)
     fuel_surcharge_paise: int = Field(0, ge=0)
-    other_charges_paise: int = Field(0, ge=0)
-    planned_distance_km: float = Field(..., gt=0, le=50000.0)
-    estimated_transit_hours: float = Field(..., gt=0, le=1000.0)
-    expected_pickup_date: date
-    expected_delivery_date: date
-    validity_days: int = Field(7, gt=0, le=90)
-    additional_terms: Optional[str] = Field(None, max_length=1000)
+    planned_distance_km: float = Field(..., gt=0)
+    estimated_transit_hours: float = Field(..., gt=0)
     model_config = ConfigDict(extra="forbid")
 
 
@@ -47,16 +41,10 @@ class FreightQuotationResponse(BaseModel):
     transporter_id: str
     proposed_vehicle_category: str
     freight_base_charge_paise: int
-    handling_charge_paise: int = 0
     fuel_surcharge_paise: int = 0
-    other_charges_paise: int = 0
     total_freight_charge_paise: int
     planned_distance_km: float
     estimated_transit_hours: float
-    expected_pickup_date: date
-    expected_delivery_date: date
-    validity_date: Optional[datetime] = None
-    additional_terms: Optional[str] = None
     status: str
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -81,8 +69,6 @@ async def create_freight_quotation(
     
     t_id = str(transporter["_id"]) if transporter else current_user["sub"]
     
-    validate_date_order(quotation_data.expected_pickup_date, quotation_data.expected_delivery_date,
-                        "expected_pickup_date", "expected_delivery_date")
 
     booking = await resolve_doc(db.freight_bookings, quotation_data.booking_id, "Freight Booking", business_key="booking_id")
     
@@ -107,9 +93,7 @@ async def create_freight_quotation(
     
     total_charge = (
         quotation_data.freight_base_charge_paise +
-        quotation_data.handling_charge_paise +
-        quotation_data.fuel_surcharge_paise +
-        quotation_data.other_charges_paise
+        quotation_data.fuel_surcharge_paise
     )
     
     quotation_id = generate_quotation_id()
@@ -117,7 +101,6 @@ async def create_freight_quotation(
         quotation_id = generate_quotation_id()
 
     now = datetime.now(timezone.utc)
-    validity_date = now + timedelta(days=quotation_data.validity_days)
     
     quotation_doc = {
         "quotation_id": quotation_id,
@@ -125,22 +108,16 @@ async def create_freight_quotation(
         "transporter_id": t_id,
         "proposed_vehicle_category": quotation_data.proposed_vehicle_category,
         "freight_base_charge_paise": quotation_data.freight_base_charge_paise,
-        "handling_charge_paise": quotation_data.handling_charge_paise,
         "fuel_surcharge_paise": quotation_data.fuel_surcharge_paise,
-        "other_charges_paise": quotation_data.other_charges_paise,
         "total_freight_charge_paise": total_charge,
         "planned_distance_km": quotation_data.planned_distance_km,
         "estimated_transit_hours": quotation_data.estimated_transit_hours,
-        "expected_pickup_date": quotation_data.expected_pickup_date,
-        "expected_delivery_date": quotation_data.expected_delivery_date,
-        "validity_date": validity_date,
-        "additional_terms": quotation_data.additional_terms,
         "status": "SUBMITTED",
         "created_at": now,
         "updated_at": now,
     }
     
-    async with uow() as session:
+    async def _transaction(session):
         result = await db.freight_quotations.insert_one(to_mongo(quotation_doc), session=session)
         quotation_doc["_id"] = result.inserted_id
         
@@ -149,31 +126,15 @@ async def create_freight_quotation(
             {"$set": {"status": FreightBookingStatus.QUOTED.value, "updated_at": now}},
             session=session
         )
+    await run_in_txn(_transaction)
         
-        await append_ledger_block(
-            db,
-            event_type=LedgerEventType.FREIGHT_QUOTATION_SUBMITTED,
-            entity_type="FREIGHT_QUOTATION",
-            entity_id=str(result.inserted_id),
-            actor_id=current_user["sub"],
-            actor_role=current_user["role"],
-            event_summary=f"Freight quotation {quotation_id} submitted for booking {booking.get('booking_id')}",
-            payload={
-                "quotation_id": quotation_id,
-                "booking_id": booking.get("booking_id"),
-                "total_charge_paise": total_charge,
-                "transporter_id": t_id,
-            },
-            session=session
-        )
-    
     return to_response(FreightQuotationResponse, quotation_doc)
 
 
 @router.get("", response_model=List[FreightQuotationResponse])
 async def list_freight_quotations(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1),
     booking_id: Optional[str] = None,
     status: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
@@ -245,14 +206,6 @@ async def accept_freight_quotation(
     if quotation.get("status") != "SUBMITTED":
         raise ValidationError(f"Quotation cannot be accepted in status '{quotation.get('status')}'")
     
-    # Check validity date
-    validity = quotation.get("validity_date")
-    if validity:
-        if validity.tzinfo is None:
-            validity = validity.replace(tzinfo=timezone.utc)
-        if validity < datetime.now(timezone.utc):
-            raise ValidationError("Quotation has expired and can no longer be accepted")
-
     booking = await resolve_doc(db.freight_bookings, quotation["booking_id"], "Freight Booking", business_key="booking_id")
     if booking.get("status") not in [
         FreightBookingStatus.REQUESTED.value, FreightBookingStatus.QUOTATION_PENDING.value, FreightBookingStatus.QUOTED.value,
@@ -271,7 +224,7 @@ async def accept_freight_quotation(
     
     qid = quotation["_id"]
     now = datetime.now(timezone.utc)
-    async with uow() as session:
+    async def _transaction(session):
         await db.freight_quotations.update_one(
             {"_id": qid},
             {"$set": {"status": "ACCEPTED", "updated_at": now}},
@@ -309,6 +262,7 @@ async def accept_freight_quotation(
             },
             session=session
         )
+    await run_in_txn(_transaction)
     
     updated = await db.freight_quotations.find_one({"_id": qid})
     return to_response(FreightQuotationResponse, updated)

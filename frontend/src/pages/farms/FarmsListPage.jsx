@@ -125,7 +125,7 @@ export default function FarmsListPage() {
                     <div className="flex justify-between items-start gap-2 mb-3">
                       <div>
                         <span className="text-[10px] font-mono uppercase tracking-widest text-[#7A887E] block mb-1">
-                          PIN: {farm.pincode}
+                          {farm.city}
                         </span>
                         <h3 className="text-lg font-serif font-bold text-[#1B2A20] group-hover:text-[#244634] transition-colors truncate max-w-[220px]">
                           {farm.name}
@@ -141,40 +141,20 @@ export default function FarmsListPage() {
 
                     <p className="text-xs text-[#526357] line-clamp-2 mb-4 flex items-start gap-1.5">
                       <MapPin className="w-3.5 h-3.5 shrink-0 text-[#7A887E] mt-0.5" />
-                      <span>{farm.address}, {farm.city}, {farm.state}</span>
+                      <span>{farm.city}, {farm.state}</span>
                     </p>
 
                     <div className="grid grid-cols-2 gap-3 py-3 border-y border-[#ECE7DA] mb-4 text-xs font-mono">
                       <div>
-                        <span className="text-[#7A887E] block text-[10px] uppercase">Area</span>
-                        <span className="text-[#26312A] font-semibold">{farm.area_hectares ? `${farm.area_hectares} ha` : '—'}</span>
+                        <span className="text-[#7A887E] block text-[10px] uppercase">Location</span>
+                        <span className="text-[#26312A] font-semibold">{farm.city}</span>
                       </div>
                       <div>
                         <span className="text-[#7A887E] block text-[10px] uppercase">Registered</span>
                         <span className="text-[#26312A]">{formatDate(farm.created_at)}</span>
                       </div>
                     </div>
-
-                    {farm.certifications && farm.certifications.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mb-4">
-                        {farm.certifications.slice(0, 3).map((c, i) => (
-                          <span
-                            key={i}
-                            className="text-[10px] font-mono px-2 py-0.5 bg-[#E8EFE9] text-[#244634] rounded-md border border-[#C3D4C7] flex items-center gap-1"
-                          >
-                            <Award className="w-2.5 h-2.5 text-[#3F7C56]" />
-                            {c}
-                          </span>
-                        ))}
-                        {farm.certifications.length > 3 && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 bg-[#F2EFE7] text-[#526357] rounded-md">
-                            +{farm.certifications.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
-
                   <div className="flex items-center justify-between text-xs text-[#526357] group-hover:text-[#244634] transition-colors pt-2 border-t border-[#F2EFE7]">
                     <span className="font-medium">Inspect Node</span>
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />

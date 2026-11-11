@@ -19,18 +19,18 @@ router = APIRouter()
 
 class ProduceCreate(BaseModel):
     produce_type: ProduceType
-    name: str = Field(..., min_length=2, max_length=100)
+    name: str = Field(...)
     category: ProduceCategory
-    unit: str = Field("kg", min_length=1, max_length=20)
-    description: Optional[str] = Field(None, max_length=1000)
+    unit: str = Field("kg")
+    description: Optional[str] = Field(None)
     model_config = ConfigDict(extra="forbid")
 
 
 class ProduceUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=2, max_length=100)
+    name: Optional[str] = Field(None)
     category: Optional[ProduceCategory] = None
-    unit: Optional[str] = Field(None, min_length=1, max_length=20)
-    description: Optional[str] = Field(None, max_length=1000)
+    unit: Optional[str] = Field(None)
+    description: Optional[str] = Field(None)
     is_active: Optional[bool] = None
     model_config = ConfigDict(extra="forbid")
 
@@ -77,8 +77,8 @@ async def list_produce(
     category: Optional[ProduceCategory] = None,
     is_active: Optional[bool] = None,
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    q: Optional[str] = Query(None, max_length=100),
+    page_size: int = Query(20, ge=1),
+    q: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):

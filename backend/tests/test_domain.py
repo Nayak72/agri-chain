@@ -14,8 +14,8 @@ def test_shipment_state_machine_exposes_allowed_actions():
 
 def test_fefo_allocator_uses_earliest_expiry_first():
     batches = [
-        {"id": "late", "available_quantity_kg": 100, "shelf_life_end": datetime(2026, 3, 1, tzinfo=timezone.utc)},
-        {"id": "early", "available_quantity_kg": 40, "shelf_life_end": datetime(2026, 1, 1, tzinfo=timezone.utc)},
+        {"id": "late", "available_kg": 100, "shelf_life_end": datetime(2026, 3, 1, tzinfo=timezone.utc)},
+        {"id": "early", "available_kg": 40, "shelf_life_end": datetime(2026, 1, 1, tzinfo=timezone.utc)},
     ]
     assert fefo_allocate(batches, 60) == [{"batch_id": "early", "quantity_kg": 40}, {"batch_id": "late", "quantity_kg": 20}]
 

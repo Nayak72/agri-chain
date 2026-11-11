@@ -72,9 +72,6 @@ export default function DriverDetailPage() {
                 </Badge>
               </div>
               <h1 className="text-3xl font-serif font-bold text-[#1B2A20] tracking-tight">{driver.name}</h1>
-              <p className="text-sm text-[#526357] mt-1.5 font-mono">
-                License: <span className="text-[#244634] font-bold">{driver.license_number}</span> • Valid until {formatDate(driver.license_expiry)}
-              </p>
             </div>
 
             <div className="flex gap-3">
@@ -109,10 +106,6 @@ export default function DriverDetailPage() {
                 <dd className="text-[#26312A]">{driver.transporter_id}</dd>
               </div>
               <div className="flex justify-between py-2 border-b border-[#ECE7DA]">
-                <dt className="text-[#7A887E]">Commercial Experience</dt>
-                <dd className="text-[#244634] font-bold">{driver.experience_years} Years</dd>
-              </div>
-              <div className="flex justify-between py-2 border-b border-[#ECE7DA]">
                 <dt className="text-[#7A887E]">Current Assignment</dt>
                 <dd className="text-[#26312A] font-semibold">{driver.current_assignment || 'None (Standby)'}</dd>
               </div>
@@ -128,7 +121,7 @@ export default function DriverDetailPage() {
           <CardContent className="p-6 flex flex-col justify-between h-full">
             <div>
               <h3 className="text-xs font-mono text-[#526357] uppercase tracking-widest font-semibold mb-4">
-                Contact & Residential Address
+                Contact & location
               </h3>
               <div className="space-y-3 font-mono text-xs">
                 <div className="flex items-start gap-2">
@@ -139,17 +132,10 @@ export default function DriverDetailPage() {
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <Mail className="w-3.5 h-3.5 text-[#7A887E] mt-0.5" />
-                  <div>
-                    <span className="text-[#7A887E] block text-[10px] uppercase font-semibold">Email</span>
-                    <span className="text-[#526357]">{driver.email || 'Not provided'}</span>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
                   <MapPin className="w-3.5 h-3.5 text-[#7A887E] mt-0.5" />
                   <div>
-                    <span className="text-[#7A887E] block text-[10px] uppercase font-semibold">Permanent Address</span>
-                    <span className="text-[#26312A] font-sans">{driver.address}, {driver.city}, {driver.state} — {driver.pincode}</span>
+                    <span className="text-[#7A887E] block text-[10px] uppercase font-semibold">Location</span>
+                    <span className="text-[#26312A] font-sans">{driver.city}, {driver.state}</span>
                   </div>
                 </div>
               </div>

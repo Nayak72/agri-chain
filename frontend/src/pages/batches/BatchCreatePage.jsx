@@ -34,13 +34,11 @@ export default function BatchCreatePage() {
   const [form, setForm] = useState({
     farm_id: initialFarmId,
     produce_type: initialProduceType,
-    harvest_date: new Date().toISOString().split('T')[0],
     harvest_location: '',
     initial_quantity_kg: '',
     quality_grade: 'GRADE_A',
     packaging_type: 'CRATE',
     estimated_shelf_life_days: '14',
-    handling_requirements: '',
   })
 
   // Autofill farm location if selected
@@ -79,13 +77,11 @@ export default function BatchCreatePage() {
       const payload = {
         farm_id: form.farm_id,
         produce_type: form.produce_type,
-        harvest_date: form.harvest_date,
         harvest_location: form.harvest_location.trim(),
         initial_quantity_kg: qty,
         quality_grade: form.quality_grade,
         packaging_type: form.packaging_type,
         estimated_shelf_life_days: days,
-        handling_requirements: form.handling_requirements ? form.handling_requirements.trim() : null,
       }
 
       const res = await batchesApi.create(payload)
@@ -179,19 +175,6 @@ export default function BatchCreatePage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
-                  Harvest Date *
-                </label>
-                <Input
-                  type="date"
-                  name="harvest_date"
-                  required
-                  value={form.harvest_date}
-                  onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
-                />
-              </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
@@ -276,20 +259,6 @@ export default function BatchCreatePage() {
                   onChange={handleChange}
                   placeholder="14"
                   className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
-                  Special Handling Requirements
-                </label>
-                <Input
-                  type="text"
-                  name="handling_requirements"
-                  value={form.handling_requirements}
-                  onChange={handleChange}
-                  placeholder="Keep at 4°C - 8°C, Relative Humidity 85%"
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
                 />
               </div>
             </div>

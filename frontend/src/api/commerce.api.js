@@ -63,7 +63,6 @@ export const checkpointsApi = {
   list: (params) => apiClient.get('/checkpoints', { params }),
   get: (id) => apiClient.get(`/checkpoints/${id}`),
   create: (data) => apiClient.post('/checkpoints', data),
-  update: (id, data) => apiClient.patch(`/checkpoints/${id}`, data),
 }
 
 

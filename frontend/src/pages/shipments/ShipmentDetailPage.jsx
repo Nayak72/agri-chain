@@ -21,7 +21,7 @@ import {
   XCircle,
   FileText
 } from 'lucide-react'
-import { shipmentsApi, checkpointsApi } from '../../api/commerce.api'
+import { shipmentsApi, checkpointsApi, freightBookingsApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
 import { ROLES, normalizeRole } from '../../constants/roles'
 import { formatWeight, formatDate, formatDateTime, formatStatus, getApiError } from '../../utils'
@@ -29,15 +29,13 @@ import PageHeader from '../../components/common/PageHeader'
 import StatusBadge from '../../components/common/StatusBadge'
 
 const TIMELINE_STAGES = [
-  { key: 'BOOKING_CONFIRMED', label: 'Booking Confirmed', desc: 'Freight quotation accepted and dispatch authorized' },
   { key: 'DRIVER_ASSIGNED', label: 'Driver & Fleet Bound', desc: 'Commercial fleet asset and driver assigned' },
-  { key: 'LOADING', label: 'Cargo Loading', desc: 'Batch payload verified and loaded at origin' },
   { key: 'LOADED', label: 'Cargo Loaded', desc: 'Scale weight verified and manifests signed' },
   { key: 'DISPATCHED', label: 'Dispatched', desc: 'Outbound departure logged on cryptographic audit ledger' },
   { key: 'IN_TRANSIT', label: 'In Transit', desc: 'Active cold-chain telemetry and corridor checkpoint tracking active' },
   { key: 'ARRIVED_AT_DESTINATION', label: 'Arrived at Destination', desc: 'Consignment arrived at destination facility' },
-  { key: 'OUT_FOR_DELIVERY', label: 'Out for Delivery', desc: 'Local delivery transit and receiver inspection' },
-  { key: 'DELIVERED', label: 'Delivered', desc: 'Destination delivery inspection and sign-off' },
+  { key: 'OUT_FOR_DELIVERY', label: 'Out for Delivery', desc: 'Local delivery transit and buyer proof of delivery' },
+  { key: 'DELIVERED', label: 'Delivered', desc: 'Buyer proof of delivery recorded' },
 ]
 
 export default function ShipmentDetailPage() {
@@ -57,8 +55,6 @@ export default function ShipmentDetailPage() {
   const [checkpointForm, setCheckpointForm] = useState({
     name: '',
     city: '',
-    state: '',
-    notes: '',
   })
 
   const { data: shipment, isLoading, error } = useQuery({
@@ -67,6 +63,11 @@ export default function ShipmentDetailPage() {
   })
 
   const sId = shipment?.id || shipment?._id || id
+  const { data: booking } = useQuery({
+    queryKey: ['shipment-booking', shipment?.booking_id],
+    queryFn: () => freightBookingsApi.get(shipment.booking_id).then(r => r.data),
+    enabled: !!shipment?.booking_id,
+  })
 
   // Checkpoints query
   const { data: checkpointsData, isLoading: checkpointsLoading } = useQuery({
@@ -155,19 +156,11 @@ export default function ShipmentDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shipment-checkpoints', sId] })
       setShowCheckpointModal(false)
-      setCheckpointForm({ name: '', city: '', state: '', notes: '' })
+      setCheckpointForm({ name: '', city: '' })
       setActionError('')
     },
     onError: (err) => {
       setActionError(getApiError(err, 'Checkpoint creation failed.').message)
-    },
-  })
-
-  // Update Checkpoint mutation (e.g. Arrived or Departed)
-  const updateCheckpointMutation = useMutation({
-    mutationFn: ({ cpId, data }) => checkpointsApi.update(cpId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shipment-checkpoints', sId] })
     },
   })
 
@@ -182,8 +175,8 @@ export default function ShipmentDetailPage() {
 
   const handleCheckpointSubmit = (e) => {
     e.preventDefault()
-    if (!checkpointForm.name.trim() || !checkpointForm.city.trim() || !checkpointForm.state.trim()) {
-      setActionError('Please provide milestone name, city, and state.')
+    if (!checkpointForm.name.trim() || !checkpointForm.city.trim()) {
+      setActionError('Please provide milestone name and city.')
       return
     }
 
@@ -191,9 +184,6 @@ export default function ShipmentDetailPage() {
       shipment_id: sId,
       name: checkpointForm.name.trim(),
       city: checkpointForm.city.trim(),
-      state: checkpointForm.state.trim(),
-      sequence: checkpoints.length + 1,
-      notes: checkpointForm.notes ? checkpointForm.notes.trim() : undefined,
     })
   }
 
@@ -238,8 +228,8 @@ export default function ShipmentDetailPage() {
           { label: shipment.shipment_id || sId }
         ]}
         title={shipment.shipment_id || sId}
-        description={`Corridor Route: ${shipment.pickup_city} (${shipment.pickup_state}) → ${shipment.destination_city} (${shipment.destination_state})`}
-        badge={<StatusBadge status={shipment.status} />}
+        description={booking ? `Corridor Route: ${booking.pickup_city} (${booking.pickup_state}) → ${booking.destination_city} (${booking.destination_state})` : "Loading route"}
+        badge={<><StatusBadge status={shipment.status} />{shipment.is_delayed && <span className="ml-2 rounded bg-amber-100 px-2 py-1 text-amber-800">Delayed</span>}</> }
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Simulation Shortcut */}
@@ -252,10 +242,10 @@ export default function ShipmentDetailPage() {
             </button>
 
             {/* Loading Action */}
-            {['DRIVER_ASSIGNED', 'LOADING'].includes(shipment.status) && (
+            {['DRIVER_ASSIGNED'].includes(shipment.status) && (
               <button
                 onClick={() => {
-                  setActualWeight(String(shipment.total_cargo_weight_kg || 2000))
+                  setActualWeight(String(shipment.cargo_quantity_kg || 2000))
                   setActualPackageCount(String(shipment.package_count || 100))
                   setShowLoadModal(true)
                 }}
@@ -288,7 +278,7 @@ export default function ShipmentDetailPage() {
             )}
 
             {/* Arrive at Destination Action */}
-            {['IN_TRANSIT', 'CHECKPOINT_REACHED', 'AT_CHECKPOINT'].includes(shipment.status) && (
+            {['IN_TRANSIT'].includes(shipment.status) && (
               <button
                 onClick={() => arriveMutation.mutate()}
                 disabled={arriveMutation.isPending}
@@ -320,7 +310,7 @@ export default function ShipmentDetailPage() {
             )}
 
             {/* Cancel Action */}
-            {['BOOKING_CONFIRMED', 'DRIVER_ASSIGNED', 'LOADING', 'LOADED'].includes(shipment.status) && (
+            {['DRIVER_ASSIGNED', 'LOADED', 'DISPATCHED', 'IN_TRANSIT'].includes(shipment.status) && (
               <button
                 onClick={() => {
                   if (window.confirm('Are you sure you want to cancel this shipment consignment?')) {
@@ -405,7 +395,7 @@ export default function ShipmentDetailPage() {
                 <h3 className="text-base font-bold text-stone-900">Corridor Milestones & Checkpoints</h3>
               </div>
 
-              {isOperator && (
+              {userRole === ROLES.DRIVER && shipment.status === 'IN_TRANSIT' && (
                 <button
                   onClick={() => setShowCheckpointModal(true)}
                   className="px-3 py-1.5 rounded-lg bg-stone-100 border border-stone-200 hover:bg-stone-200/80 text-stone-700 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all"
@@ -429,30 +419,12 @@ export default function ShipmentDetailPage() {
                   <div key={cp.id || cp._id} className="py-3 flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2 font-sans">
-                        <span className="text-xs font-bold text-stone-900 font-mono">#{cp.sequence} {cp.name}</span>
-                        <span className="text-[11px] text-stone-500 font-sans">({cp.city}, {cp.state})</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                          cp.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-stone-100 text-stone-600'
-                        }`}>
-                          {cp.status}
-                        </span>
+                        <span className="text-xs font-bold text-stone-900 font-mono">{cp.name}</span>
+                        <span className="text-[11px] text-stone-500 font-sans">({cp.city})</span>
                       </div>
-                      {cp.notes && <p className="text-[11px] text-stone-500 mt-0.5 font-sans">{cp.notes}</p>}
+                      <p className="text-[11px] text-stone-500 mt-0.5 font-sans">{cp.recorded_at ? new Date(cp.recorded_at).toLocaleString() : ''}</p>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {isOperator && cp.status !== 'COMPLETED' && (
-                        <button
-                          onClick={() => updateCheckpointMutation.mutate({
-                            cpId: cp.id || cp._id,
-                            data: { actual_arrival: new Date().toISOString(), status: 'COMPLETED' }
-                          })}
-                          className="px-2.5 py-1 rounded bg-[#244634] hover:bg-[#1b3527] text-[10px] text-white font-mono font-medium transition-colors"
-                        >
-                          Mark Arrived
-                        </button>
-                      )}
-                    </div>
                   </div>
                 ))}
               </div>
@@ -477,11 +449,17 @@ export default function ShipmentDetailPage() {
                 <span className="text-stone-900 font-bold text-sm">{shipment.driver_id || 'Not assigned'}</span>
               </div>
               <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
-                <span className="text-[10px] text-stone-500 uppercase block font-sans">Cargo Weight</span>
+                <span className="text-[10px] text-stone-500 uppercase block font-sans">Planned cargo weight</span>
                 <span className="text-emerald-700 font-bold text-sm">
-                  {formatWeight(shipment.total_cargo_weight_kg || shipment.cargo_quantity_kg)}
+                  {formatWeight(shipment.cargo_quantity_kg)}
                 </span>
               </div>
+              {shipment.loaded_weight_kg != null && (
+                <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                  <span className="text-[10px] text-stone-500 uppercase block font-sans">Loaded weight</span>
+                  <span className="text-emerald-700 font-bold text-sm">{formatWeight(shipment.loaded_weight_kg)}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -597,28 +575,6 @@ export default function ShipmentDetailPage() {
                     className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-stone-600 uppercase font-semibold">State *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Maharashtra"
-                    value={checkpointForm.state}
-                    onChange={(e) => setCheckpointForm({ ...checkpointForm, state: e.target.value })}
-                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] text-stone-600 uppercase font-semibold">Notes</label>
-                <input
-                  type="text"
-                  placeholder="Vehicle inspected, seals intact"
-                  value={checkpointForm.notes}
-                  onChange={(e) => setCheckpointForm({ ...checkpointForm, notes: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
-                />
               </div>
 
               <div className="flex gap-3 pt-3 border-t border-stone-100">

@@ -71,7 +71,7 @@ export default function BatchDetailPage() {
               <h1 className="text-3xl font-mono font-bold text-[#1B2A20] tracking-tight">{batch.batch_id}</h1>
               <p className="text-[#526357] text-sm mt-1.5 flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-[#7A887E] shrink-0" />
-                <span>Harvested at {batch.harvest_location} on {formatDate(batch.harvest_date)}</span>
+                <span>Registered at {batch.harvest_location}</span>
               </p>
             </div>
 
@@ -95,7 +95,7 @@ export default function BatchDetailPage() {
         <Card className="bg-white/90 border-[#E1DDD0]">
           <CardContent className="p-6">
             <h3 className="text-xs font-mono text-[#526357] uppercase tracking-widest font-semibold mb-4">
-              Quantity Allocation Ledger
+              Batch quantity and available stock
             </h3>
             <div className="space-y-3 font-mono text-xs">
               <div className="flex justify-between items-center py-2 border-b border-[#ECE7DA]">
@@ -104,19 +104,7 @@ export default function BatchDetailPage() {
               </div>
               <div className="flex justify-between items-center py-2 border-b border-[#ECE7DA]">
                 <span className="text-[#7A887E]">Available In Stock</span>
-                <span className="text-[#244634] font-bold">{formatWeight(batch.available_quantity_kg ?? batch.initial_quantity_kg)}</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-[#ECE7DA]">
-                <span className="text-[#7A887E]">Reserved for Orders</span>
-                <span className="text-[#B36B21] font-semibold">{formatWeight(batch.reserved_quantity_kg ?? 0)}</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-[#ECE7DA]">
-                <span className="text-[#7A887E]">Dispatched in Transit</span>
-                <span className="text-[#2F6586] font-semibold">{formatWeight(batch.dispatched_quantity_kg ?? 0)}</span>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-[#7A887E]">Damaged / Rejected</span>
-                <span className="text-[#9E3A2B] font-semibold">{formatWeight(batch.rejected_quantity_kg ?? 0)}</span>
+                <span className="text-[#244634] font-bold">{formatWeight(batch.available_kg ?? 0)}</span>
               </div>
             </div>
           </CardContent>
@@ -147,10 +135,6 @@ export default function BatchDetailPage() {
                   <dd className="text-[#244634] cursor-pointer hover:underline font-semibold" onClick={() => navigate(`/farms/${batch.farm_id}`)}>
                     {batch.farm_id}
                   </dd>
-                </div>
-                <div className="flex justify-between py-2">
-                  <dt className="text-[#7A887E]">Handling Protocol</dt>
-                  <dd className="text-[#26312A]">{batch.handling_requirements || 'Standard agricultural handling'}</dd>
                 </div>
               </dl>
             </div>

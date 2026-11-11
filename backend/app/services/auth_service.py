@@ -44,15 +44,3 @@ class AuthService:
         if not user.get("is_approved", True):
             raise UnauthorizedError("Account pending approval")
         return create_token_pair(str(user["_id"]), user["email"], user["role"])
-
-    @staticmethod
-    async def refresh(refresh_token: str):
-        from app.core.security import decode_token
-        payload = decode_token(refresh_token)
-        if not payload or payload.get("type") != "refresh":
-            raise UnauthorizedError("Invalid refresh token")
-        db = get_database()
-        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
-        if not user or not user.get("is_active", True):
-            raise UnauthorizedError("User not found or inactive")
-        return create_token_pair(str(user["_id"]), user["email"], user["role"])

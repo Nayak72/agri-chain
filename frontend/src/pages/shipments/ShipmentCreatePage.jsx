@@ -120,7 +120,6 @@ export default function ShipmentCreatePage() {
         accepted_quotation_id: form.accepted_quotation_id.trim(),
         vehicle_id: form.vehicle_id.trim(),
         driver_id: form.driver_id.trim(),
-        planned_checkpoints: [],
       }
 
       const res = await shipmentsApi.create(payload)
@@ -196,7 +195,7 @@ export default function ShipmentCreatePage() {
               <option value="">Select confirmed freight booking...</option>
               {bookings.map(b => (
                 <option key={b.id || b._id} value={b.id || b._id}>
-                  {b.booking_id} — {b.pickup_city} to {b.destination_city} ({b.total_cargo_weight_kg} kg)
+                  {b.booking_id} — {b.pickup_city} to {b.destination_city} ({b.cargo_quantity_kg} kg)
                 </option>
               ))}
             </select>
@@ -207,11 +206,11 @@ export default function ShipmentCreatePage() {
             <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 text-xs font-mono text-stone-700 space-y-2">
               <div className="flex justify-between font-bold text-[#244634]">
                 <span>Route: {selectedBookingDetails.pickup_city} → {selectedBookingDetails.destination_city}</span>
-                <span>{formatWeight(selectedBookingDetails.total_cargo_weight_kg)}</span>
+                <span>{formatWeight(selectedBookingDetails.cargo_quantity_kg)}</span>
               </div>
               <div className="flex justify-between text-stone-600 text-[11px] font-sans">
-                <span>Pickup: {selectedBookingDetails.pickup_address}</span>
-                <span>Destination: {selectedBookingDetails.destination_address}</span>
+                <span>Pickup: {selectedBookingDetails.pickup_city}</span>
+                <span>Destination: {selectedBookingDetails.destination_city}</span>
               </div>
               <div className="text-[11px] text-emerald-800 font-semibold font-mono">
                 Linked Accepted Quote: {selectedBookingDetails.accepted_quotation_id}
@@ -255,7 +254,7 @@ export default function ShipmentCreatePage() {
                 <option value="">Select available driver...</option>
                 {drivers.map(d => (
                   <option key={d.id || d._id} value={d.id || d._id} disabled={d.status !== 'AVAILABLE'}>
-                    {d.full_name || d.name} (Lic: {d.license_number}) — {d.status}
+                    {d.full_name || d.name} — {d.status}
                   </option>
                 ))}
               </select>

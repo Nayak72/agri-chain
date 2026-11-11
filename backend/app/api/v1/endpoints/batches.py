@@ -12,11 +12,19 @@ from app.core.permissions import get_current_user
 from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError
 from app.core.constants import ProduceType, QualityGrade, PackagingType, BatchStatus, UserRole, LedgerEventType
 from app.services.ledger_service import append_ledger_block
+from app.db.unit_of_work import run_in_txn
 from app.utils.serialization import to_response
 from app.utils.mongo import to_mongo, resolve_doc
 from app.schemas.validators import validate_shelf_life
 
 router = APIRouter()
+
+
+async def _with_stock(db, batch):
+    result = dict(batch)
+    rows = await db.inventory_items.find({"batch_id": str(batch["_id"])}).to_list(100)
+    result["available_kg"] = sum(float(row.get("available_kg", 0)) for row in rows)
+    return result
 
 
 def generate_batch_id(produce_type: ProduceType, farm_location: str) -> str:
@@ -30,20 +38,17 @@ def generate_batch_id(produce_type: ProduceType, farm_location: str) -> str:
 class BatchCreate(BaseModel):
     produce_type: ProduceType
     farm_id: str
-    harvest_date: date
-    harvest_location: str = Field(..., min_length=1, max_length=100)
-    initial_quantity_kg: float = Field(..., gt=0, le=1000000.0, allow_inf_nan=False)
+    harvest_location: str = Field(...)
+    initial_quantity_kg: float = Field(..., gt=0, allow_inf_nan=False)
     quality_grade: QualityGrade = QualityGrade.GRADE_A
     packaging_type: PackagingType = PackagingType.CRATE
-    estimated_shelf_life_days: int = Field(..., gt=0, le=3650)
-    handling_requirements: Optional[str] = Field(None, max_length=1000)
+    estimated_shelf_life_days: int = Field(..., gt=0)
     model_config = ConfigDict(extra="forbid")
 
 
 class BatchUpdate(BaseModel):
     quality_grade: Optional[QualityGrade] = None
     packaging_type: Optional[PackagingType] = None
-    handling_requirements: Optional[str] = Field(None, max_length=1000)
     model_config = ConfigDict(extra="forbid")
 
 
@@ -53,18 +58,12 @@ class BatchResponse(BaseModel):
     produce_type: ProduceType
     farmer_id: str
     farm_id: str
-    harvest_date: date
     harvest_location: str
     initial_quantity_kg: float
-    available_quantity_kg: float
-    reserved_quantity_kg: float
-    dispatched_quantity_kg: float
-    accepted_quantity_kg: float
-    rejected_quantity_kg: float
+    available_kg: Optional[float] = None
     quality_grade: QualityGrade
     packaging_type: PackagingType
     estimated_shelf_life_end: date
-    handling_requirements: Optional[str] = None
     status: BatchStatus
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -98,8 +97,7 @@ async def create_batch(
         raise ValidationError(f"Produce type {produce_type_val} is deactivated in the catalogue")
     
     shelf_life_days = validate_shelf_life(batch_data.estimated_shelf_life_days)
-    harvest_datetime = datetime.combine(batch_data.harvest_date, datetime.min.time(), tzinfo=timezone.utc)
-    shelf_life_end = (harvest_datetime + timedelta(days=shelf_life_days)).date()
+    shelf_life_end = (datetime.now(timezone.utc) + timedelta(days=shelf_life_days)).date()
     
     batch_id = generate_batch_id(batch_data.produce_type, batch_data.harvest_location)
     while await db.produce_batches.find_one({"batch_id": batch_id}):
@@ -111,37 +109,30 @@ async def create_batch(
         "produce_type": produce_type_val,
         "farmer_id": farmer_id,
         "farm_id": str(farm["_id"]),
-        "harvest_date": batch_data.harvest_date,
         "harvest_location": batch_data.harvest_location.strip(),
         "initial_quantity_kg": batch_data.initial_quantity_kg,
-        "available_quantity_kg": batch_data.initial_quantity_kg,
-        "reserved_quantity_kg": 0.0,
-        "dispatched_quantity_kg": 0.0,
-        "accepted_quantity_kg": 0.0,
-        "rejected_quantity_kg": 0.0,
         "quality_grade": batch_data.quality_grade.value if hasattr(batch_data.quality_grade, "value") else batch_data.quality_grade,
         "packaging_type": batch_data.packaging_type.value if hasattr(batch_data.packaging_type, "value") else batch_data.packaging_type,
         "estimated_shelf_life_end": shelf_life_end,
-        "handling_requirements": batch_data.handling_requirements,
         "status": BatchStatus.CREATED.value,
         "created_by": current_user["sub"],
         "created_at": now,
         "updated_at": now,
     }
     
-    result = await db.produce_batches.insert_one(to_mongo(batch_doc))
-    batch_doc["_id"] = result.inserted_id
-    
-    await append_ledger_block(
-        db,
-        event_type=LedgerEventType.PRODUCE_BATCH_CREATED,
-        entity_type="PRODUCE_BATCH",
-        entity_id=str(result.inserted_id),
-        actor_id=current_user["sub"],
-        actor_role=current_user["role"],
-        event_summary=f"Batch {batch_id} created for {produce_type_val}",
-        payload={"batch_id": batch_id, "initial_quantity_kg": batch_data.initial_quantity_kg}
-    )
+    async def create_transaction(session):
+        result = await db.produce_batches.insert_one(to_mongo(batch_doc), session=session)
+        batch_doc["_id"] = result.inserted_id
+        await append_ledger_block(
+            db, event_type=LedgerEventType.PRODUCE_BATCH_CREATED,
+            entity_type="PRODUCE_BATCH", entity_id=str(result.inserted_id),
+            actor_id=current_user["sub"], actor_role=current_user["role"],
+            event_summary=f"Batch {batch_id} created for {produce_type_val}",
+            payload={"batch_id": batch_id, "initial_quantity_kg": batch_data.initial_quantity_kg},
+            session=session,
+        )
+
+    await run_in_txn(create_transaction)
     
     return to_response(BatchResponse, batch_doc)
 
@@ -149,7 +140,7 @@ async def create_batch(
 @router.get("", response_model=List[BatchResponse])
 async def list_batches(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1),
     produce_type: Optional[ProduceType] = None,
     status: Optional[BatchStatus] = None,
     farm_id: Optional[str] = None,
@@ -159,10 +150,9 @@ async def list_batches(
     conditions = []
     if current_user["role"] == UserRole.FARMER:
         conditions.append({"farmer_id": current_user["sub"]})
-    elif current_user["role"] in [UserRole.WAREHOUSE_MANAGER, UserRole.BUYER]:
+    elif current_user["role"] == UserRole.BUYER:
         conditions.append({"status": {"$in": [
-            BatchStatus.AT_WAREHOUSE.value, BatchStatus.INSPECTED.value, BatchStatus.PACKAGED.value,
-            BatchStatus.AT_WAREHOUSE, BatchStatus.INSPECTED, BatchStatus.PACKAGED
+            BatchStatus.AT_WAREHOUSE.value
         ]}})
     
     if produce_type:
@@ -178,7 +168,7 @@ async def list_batches(
     
     query = {"$and": conditions} if conditions else {}
     batches = await db.produce_batches.find(query).sort("created_at", -1).skip((page - 1) * page_size).limit(page_size).to_list(page_size)
-    return [to_response(BatchResponse, b) for b in batches]
+    return [to_response(BatchResponse, await _with_stock(db, b)) for b in batches]
 
 
 @router.get("/{batch_id}", response_model=BatchResponse)
@@ -192,7 +182,7 @@ async def get_batch(
     if current_user["role"] == UserRole.FARMER and batch["farmer_id"] != current_user["sub"]:
         raise ForbiddenError("Not authorized to view this batch")
     
-    return to_response(BatchResponse, batch)
+    return to_response(BatchResponse, await _with_stock(db, batch))
 
 
 @router.patch("/{batch_id}", response_model=BatchResponse)
@@ -220,17 +210,6 @@ async def update_batch(
     await db.produce_batches.update_one(
         {"_id": batch["_id"]},
         {"$set": to_mongo(update_data)}
-    )
-    
-    await append_ledger_block(
-        db,
-        event_type=LedgerEventType.PRODUCE_BATCH_UPDATED,
-        entity_type="PRODUCE_BATCH",
-        entity_id=str(batch["_id"]),
-        actor_id=current_user["sub"],
-        actor_role=current_user["role"],
-        event_summary=f"Batch {batch['batch_id']} updated",
-        payload=to_mongo(update_data)
     )
     
     updated = await db.produce_batches.find_one({"_id": batch["_id"]})

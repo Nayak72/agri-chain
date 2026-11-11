@@ -23,19 +23,12 @@ class ShipmentResponse(BaseSchema, ShipmentBase):
     buyer_id: str
     transporter_id: str
     cargo_quantity_kg: float
-    total_cargo_weight_kg: float
+    loaded_weight_kg: Optional[float] = None
     package_count: int
-    pickup_address: str
-    pickup_city: str
-    pickup_state: str
-    destination_address: str
-    destination_city: str
-    destination_state: str
     planned_dispatch_time: Optional[datetime] = None
     expected_arrival_time: Optional[datetime] = None
     actual_dispatch_time: Optional[datetime] = None
     actual_arrival_time: Optional[datetime] = None
     status: str
-    exception_flags: List[str]
     created_at: datetime
     updated_at: datetime

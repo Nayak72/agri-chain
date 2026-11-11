@@ -14,7 +14,7 @@ from app.core.exceptions import ValidationError, NotFoundError
 from app.api.v1.endpoints.inventory import WarehouseReceiptCreate, create_warehouse_receipt
 from app.api.v1.endpoints.purchase_orders import PurchaseOrderCreate
 from app.api.v1.endpoints.freight_bookings import FreightBookingCreate
-from app.api.v1.endpoints.delivery import DeliveryReportCreate
+from app.api.v1.endpoints.delivery import ConfirmDeliveryRequest
 from app.core.constants import UserRole, InspectionResult, QualityGrade
 from unittest.mock import AsyncMock, MagicMock
 from datetime import date, datetime, timezone
@@ -28,13 +28,11 @@ class TestWarehouseWeightReconciliation:
         receipt = WarehouseReceiptCreate(
             warehouse_id=str(ObjectId()),
             batch_id=str(ObjectId()),
-            farmer_id=str(ObjectId()),
             received_weight_kg=5000.0,
             accepted_weight_kg=4800.0,
             damaged_weight_kg=150.0,
             rejected_weight_kg=50.0,
             inspection_result=InspectionResult.PASSED,
-            quality_grade=QualityGrade.GRADE_A,
             packaging_condition="GOOD",
             storage_location="Bay 1",
         )
@@ -46,7 +44,7 @@ class TestWarehouseWeightReconciliation:
         """Backend endpoint rejects intake when weights do not sum up."""
         mock_db = MagicMock()
         mock_db.warehouses.find_one = AsyncMock(return_value={"_id": ObjectId(), "manager_id": "mgr1"})
-        mock_db.produce_batches.find_one = AsyncMock(return_value={"_id": ObjectId(), "produce_type": "TOMATO"})
+        mock_db.produce_batches.find_one = AsyncMock(return_value={"_id": ObjectId(), "produce_type": "TOMATO", "status": "CREATED", "initial_quantity_kg": 5000})
 
         wh_id = str(ObjectId())
         batch_id = str(ObjectId())
@@ -54,13 +52,11 @@ class TestWarehouseWeightReconciliation:
         receipt_data = WarehouseReceiptCreate(
             warehouse_id=wh_id,
             batch_id=batch_id,
-            farmer_id=str(ObjectId()),
             received_weight_kg=5000.0,
             accepted_weight_kg=4800.0,
             damaged_weight_kg=100.0,
             rejected_weight_kg=50.0,  # Sum = 4950 != 5000
             inspection_result=InspectionResult.PASSED,
-            quality_grade=QualityGrade.GRADE_A,
             packaging_condition="GOOD",
             storage_location="Bay 1",
         )
@@ -82,11 +78,9 @@ class TestInputValidationAndObjectIds:
     def test_negative_weight_rejected(self):
         """Pydantic rejects negative cargo weights."""
         with pytest.raises(PydanticValidationError):
-            DeliveryReportCreate(
-                shipment_id=str(ObjectId()),
+            ConfirmDeliveryRequest(
                 delivered_quantity_kg=-500.0,  # Negative weight invalid
                 received_by="Receiver",
-                received_at=datetime.now(timezone.utc),
             )
 
     def test_invalid_object_id_detection(self):

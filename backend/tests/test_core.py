@@ -4,7 +4,7 @@ import pytest
 import asyncio
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
-from app.core.security import get_password_hash, verify_password, create_access_token, create_refresh_token, decode_token
+from app.core.security import get_password_hash, verify_password, create_access_token, decode_token
 from app.services.ledger_service import (
     canonical_json, calculate_block_hash, GENESIS_HASH, append_ledger_block,
     verify_ledger_integrity, verify_entity_history
@@ -25,13 +25,6 @@ class TestSecurity:
         assert payload["sub"] == "user123"
         assert payload["role"] == "FARMER"
 
-    def test_refresh_token_is_typed_and_rotatable(self):
-        token = create_refresh_token({"sub": "user123", "role": "FARMER"})
-        payload = decode_token(token)
-        assert payload is not None
-        assert payload["type"] == "refresh"
-        assert payload["jti"]
-        assert payload["family_id"]
 
 
 class TestLedgerCanonicalization:
@@ -163,15 +156,8 @@ class TestMonetaryCalculations:
 
 class TestShipmentTransitions:
     def test_valid_transitions(self):
-        from app.core.constants import SHIPMENT_STATUS_TRANSITIONS, ShipmentStatus
-        
-        # BOOKING_REQUESTED can go to BOOKING_CONFIRMED or CANCELLED
-        assert ShipmentStatus.BOOKING_CONFIRMED in SHIPMENT_STATUS_TRANSITIONS[ShipmentStatus.BOOKING_REQUESTED]
-        assert ShipmentStatus.CANCELLED in SHIPMENT_STATUS_TRANSITIONS[ShipmentStatus.BOOKING_REQUESTED]
-        
-        # DELIVERED is terminal (no transitions out)
-        assert len(SHIPMENT_STATUS_TRANSITIONS[ShipmentStatus.DELIVERED]) == 0
-        
-        # Cannot go from LOADED to DELIVERED directly (must go through DISPATCHED)
-        assert ShipmentStatus.DELIVERED not in SHIPMENT_STATUS_TRANSITIONS[ShipmentStatus.LOADED]
-        assert ShipmentStatus.DISPATCHED in SHIPMENT_STATUS_TRANSITIONS[ShipmentStatus.LOADED]
+        from app.services.shipment_workflow import ALLOWED_TRANSITIONS
+        assert ALLOWED_TRANSITIONS["DRIVER_ASSIGNED"] == ["LOADED", "CANCELLED"]
+        assert ALLOWED_TRANSITIONS["DELIVERED"] == []
+        assert "DELIVERED" not in ALLOWED_TRANSITIONS["LOADED"]
+        assert "DISPATCHED" in ALLOWED_TRANSITIONS["LOADED"]

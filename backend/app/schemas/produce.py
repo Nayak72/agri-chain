@@ -6,9 +6,9 @@ from app.schemas.common import BaseSchema
 
 class ProduceBase(BaseModel):
     produce_type: str
-    name: str = Field(..., min_length=2, max_length=100)
+    name: str = Field(...)
     category: str
-    unit: str = Field(..., min_length=1, max_length=20)
+    unit: str = Field(...)
     description: Optional[str] = None
 
 
@@ -17,9 +17,9 @@ class ProduceCreate(ProduceBase):
 
 
 class ProduceUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=2, max_length=100)
+    name: Optional[str] = Field(None)
     category: Optional[str] = None
-    unit: Optional[str] = Field(None, min_length=1, max_length=20)
+    unit: Optional[str] = Field(None)
     description: Optional[str] = None
     is_active: Optional[bool] = None
 

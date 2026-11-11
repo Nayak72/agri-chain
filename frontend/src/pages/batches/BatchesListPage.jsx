@@ -114,7 +114,7 @@ export default function BatchesListPage() {
               <TableRow className="border-[#ECE7DA] hover:bg-transparent">
                 <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E] py-3.5">Batch ID</TableHead>
                 <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Commodity</TableHead>
-                <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Harvest Date</TableHead>
+                <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Registered</TableHead>
                 <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Grade</TableHead>
                 <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Initial / Available</TableHead>
                 <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Status</TableHead>
@@ -132,7 +132,7 @@ export default function BatchesListPage() {
                   >
                     <TableCell className="font-bold text-[#244634] py-4">{b.batch_id}</TableCell>
                     <TableCell className="text-[#26312A] font-sans font-medium">{b.produce_type}</TableCell>
-                    <TableCell className="text-[#526357]">{formatDate(b.harvest_date)}</TableCell>
+                    <TableCell className="text-[#526357]">{formatDate(b.created_at)}</TableCell>
                     <TableCell>
                       <span className="px-2 py-0.5 rounded bg-[#E8EFE9] text-[#244634] font-semibold text-[10px] border border-[#C3D4C7]">
                         {b.quality_grade || 'GRADE_A'}
@@ -141,7 +141,7 @@ export default function BatchesListPage() {
                     <TableCell className="text-[#26312A]">
                       <span>{formatWeight(b.initial_quantity_kg)}</span>
                       <span className="text-[#7A887E] mx-1">/</span>
-                      <span className="text-[#244634] font-bold">{formatWeight(b.available_quantity_kg ?? b.initial_quantity_kg)}</span>
+                      <span className="text-[#244634] font-bold">{formatWeight(b.available_kg ?? 0)}</span>
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={b.status || 'AVAILABLE'} />

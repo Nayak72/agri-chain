@@ -84,7 +84,7 @@ export default function ShipmentsListPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          {['ALL', 'BOOKING_CONFIRMED', 'LOADING', 'DISPATCHED', 'IN_TRANSIT', 'DELIVERED'].map(st => (
+          {['ALL', 'DRIVER_ASSIGNED', 'LOADED', 'DISPATCHED', 'IN_TRANSIT', 'DELIVERED'].map(st => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
@@ -149,7 +149,7 @@ export default function ShipmentsListPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-stone-800 font-semibold">
-                        {formatWeight(s.total_cargo_weight_kg || s.cargo_quantity_kg)}
+                        {formatWeight(s.cargo_quantity_kg)}
                       </td>
                       <td className="px-6 py-4 text-stone-600 font-sans">
                         <div className="font-medium text-stone-800">{s.vehicle_id || 'Unassigned'}</div>

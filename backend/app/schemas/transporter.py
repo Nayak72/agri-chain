@@ -5,14 +5,14 @@ from app.schemas.common import BaseSchema
 
 
 class TransporterBase(BaseModel):
-    company_name: str = Field(..., min_length=2, max_length=100)
-    contact_person: str = Field(..., min_length=2, max_length=100)
+    company_name: str = Field(...)
+    contact_person: str = Field(...)
     email: str
     phone: str
-    address: str = Field(..., min_length=5, max_length=200)
-    city: str = Field(..., min_length=2, max_length=100)
-    state: str = Field(..., min_length=2, max_length=100)
-    pincode: str = Field(..., pattern=r"^\d{6}$")
+    address: str = Field(...)
+    city: str = Field(...)
+    state: str = Field(...)
+    pincode: str = Field(...)
     gst_number: Optional[str] = None
     license_number: Optional[str] = None
     bank_account: Optional[str] = None
@@ -24,14 +24,14 @@ class TransporterCreate(TransporterBase):
 
 
 class TransporterUpdate(BaseModel):
-    company_name: Optional[str] = Field(None, min_length=2, max_length=100)
-    contact_person: Optional[str] = Field(None, min_length=2, max_length=100)
+    company_name: Optional[str] = Field(None)
+    contact_person: Optional[str] = Field(None)
     email: Optional[str] = None
     phone: Optional[str] = None
-    address: Optional[str] = Field(None, min_length=5, max_length=200)
-    city: Optional[str] = Field(None, min_length=2, max_length=100)
-    state: Optional[str] = Field(None, min_length=2, max_length=100)
-    pincode: Optional[str] = Field(None, pattern=r"^\d{6}$")
+    address: Optional[str] = Field(None)
+    city: Optional[str] = Field(None)
+    state: Optional[str] = Field(None)
+    pincode: Optional[str] = Field(None)
     gst_number: Optional[str] = None
     license_number: Optional[str] = None
     bank_account: Optional[str] = None

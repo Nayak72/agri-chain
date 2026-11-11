@@ -84,7 +84,6 @@ export default function AnalyticsPage() {
 
   const coldChainDistribution = coldChainData ? [
     { name: 'Normal', value: coldChainData.normal_readings || 0, color: '#10b981' },
-    { name: 'Warning', value: coldChainData.warning_readings || 0, color: '#f59e0b' },
     { name: 'Critical', value: coldChainData.critical_readings || 0, color: '#ef4444' },
   ] : []
 

@@ -123,7 +123,7 @@ export default function WarehousesListPage() {
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <span className="text-[10px] font-mono uppercase tracking-widest text-[#7A887E] block mb-1">
-                          PIN: {wh.pincode}
+                          {wh.city}
                         </span>
                         <h3 className="text-lg font-serif font-bold text-[#1B2A20] group-hover:text-[#244634] transition-colors truncate max-w-[220px]">
                           {wh.name}
@@ -139,7 +139,7 @@ export default function WarehousesListPage() {
 
                     <p className="text-xs text-[#526357] line-clamp-2 mb-4 flex items-start gap-1.5">
                       <MapPin className="w-3.5 h-3.5 shrink-0 text-[#7A887E] mt-0.5" />
-                      <span>{wh.address}, {wh.city}, {wh.state}</span>
+                      <span>{wh.city}, {wh.state}</span>
                     </p>
 
                     <div className="grid grid-cols-2 gap-3 py-3 border-y border-[#ECE7DA] mb-4 text-xs font-mono">

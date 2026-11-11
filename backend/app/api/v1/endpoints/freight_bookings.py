@@ -13,7 +13,7 @@ from app.core.constants import (
     FreightBookingStatus, VehicleCategory, ProduceType, UserRole, LedgerEventType
 )
 from app.services.ledger_service import append_ledger_block
-from app.db.unit_of_work import uow
+from app.db.unit_of_work import run_in_txn
 from app.utils.serialization import to_response
 from app.utils.mongo import to_mongo, resolve_doc
 from app.schemas.validators import validate_date_order, validate_temperature_range
@@ -24,37 +24,30 @@ router = APIRouter()
 class FreightBookingCreate(BaseModel):
     purchase_order_id: str
     batch_ids: List[str]
-    cargo_quantity_kg: float = Field(..., gt=0, le=1000000.0)
-    total_cargo_weight_kg: float = Field(..., gt=0, le=1000000.0)
-    package_count: int = Field(..., gt=0, le=100000)
-    pickup_address: str = Field(..., min_length=2, max_length=200)
-    pickup_city: str = Field(..., min_length=2, max_length=100)
-    pickup_state: str = Field(..., min_length=2, max_length=100)
-    destination_address: str = Field(..., min_length=2, max_length=200)
-    destination_city: str = Field(..., min_length=2, max_length=100)
-    destination_state: str = Field(..., min_length=2, max_length=100)
+    cargo_quantity_kg: float = Field(..., gt=0)
+    package_count: int = Field(..., gt=0)
+    pickup_city: str = Field(...)
+    pickup_state: str = Field(...)
+    destination_city: str = Field(...)
+    destination_state: str = Field(...)
     requested_pickup_date: date
     required_delivery_date: date
     preferred_vehicle_category: VehicleCategory
     refrigeration_required: bool = False
     temperature_min: Optional[float] = None
     temperature_max: Optional[float] = None
-    packaging_details: Optional[str] = Field(None, max_length=500)
-    special_handling_instructions: Optional[str] = Field(None, max_length=1000)
+    packaging_details: Optional[str] = Field(None)
     model_config = ConfigDict(extra="forbid")
 
 
 class FreightBookingUpdate(BaseModel):
-    pickup_address: Optional[str] = Field(None, min_length=2, max_length=200)
-    pickup_city: Optional[str] = Field(None, min_length=2, max_length=100)
-    pickup_state: Optional[str] = Field(None, min_length=2, max_length=100)
-    destination_address: Optional[str] = Field(None, min_length=2, max_length=200)
-    destination_city: Optional[str] = Field(None, min_length=2, max_length=100)
-    destination_state: Optional[str] = Field(None, min_length=2, max_length=100)
+    pickup_city: Optional[str] = Field(None)
+    pickup_state: Optional[str] = Field(None)
+    destination_city: Optional[str] = Field(None)
+    destination_state: Optional[str] = Field(None)
     requested_pickup_date: Optional[date] = None
     required_delivery_date: Optional[date] = None
-    packaging_details: Optional[str] = Field(None, max_length=500)
-    special_handling_instructions: Optional[str] = Field(None, max_length=1000)
+    packaging_details: Optional[str] = Field(None)
     model_config = ConfigDict(extra="forbid")
 
 
@@ -66,12 +59,9 @@ class FreightBookingResponse(BaseModel):
     seller_id: Optional[str] = None
     batch_ids: List[str]
     cargo_quantity_kg: float
-    total_cargo_weight_kg: float
     package_count: int
-    pickup_address: str
     pickup_city: str
     pickup_state: str
-    destination_address: str
     destination_city: str
     destination_state: str
     requested_pickup_date: date
@@ -81,7 +71,6 @@ class FreightBookingResponse(BaseModel):
     temperature_min: Optional[float] = None
     temperature_max: Optional[float] = None
     packaging_details: Optional[str] = None
-    special_handling_instructions: Optional[str] = None
     accepted_quotation_id: Optional[str] = None
     status: FreightBookingStatus
     created_at: Optional[datetime] = None
@@ -112,17 +101,21 @@ async def create_freight_booking(
     if current_user["role"] == UserRole.FARMER and po["seller_id"] != current_user["sub"]:
         raise ForbiddenError("Not authorized for this purchase order")
     
-    if po["status"] not in ["ACCEPTED", "IN_FULFILLMENT"]:
+    if po["status"] != "ACCEPTED":
         raise ValidationError("Purchase order must be accepted before creating freight booking")
 
     # Cross-check cargo quantity against PO requested quantity
-    po_qty = float(po.get("requested_quantity_kg", 0.0))
-    if po_qty > 0 and abs(booking_data.cargo_quantity_kg - po_qty) > 0.1:
+    po_qty = float(po.get("accepted_quantity_kg", 0.0))
+    if po_qty <= 0 or abs(booking_data.cargo_quantity_kg - po_qty) > 0.001:
         raise ValidationError(f"Cargo quantity {booking_data.cargo_quantity_kg}kg must match PO quantity {po_qty}kg")
+    if len(booking_data.batch_ids) != 1:
+        raise ValidationError("Booking must contain exactly the purchase order batch")
 
     # Verify batches belong to PO seller
     for batch_id in booking_data.batch_ids:
         batch = await resolve_doc(db.produce_batches, batch_id, "Batch", business_key="batch_id")
+        if str(batch["_id"]) != po.get("batch_id"):
+            raise ValidationError("Booking batch must match the purchase order batch")
         if batch.get("farmer_id") != po["seller_id"] and current_user["role"] != UserRole.ADMIN:
             raise ValidationError(f"Batch {batch_id} does not belong to the purchase order seller")
     
@@ -138,12 +131,9 @@ async def create_freight_booking(
         "seller_id": po["seller_id"],
         "batch_ids": booking_data.batch_ids,
         "cargo_quantity_kg": booking_data.cargo_quantity_kg,
-        "total_cargo_weight_kg": booking_data.total_cargo_weight_kg,
         "package_count": booking_data.package_count,
-        "pickup_address": booking_data.pickup_address.strip(),
         "pickup_city": booking_data.pickup_city.strip(),
         "pickup_state": booking_data.pickup_state.strip(),
-        "destination_address": booking_data.destination_address.strip(),
         "destination_city": booking_data.destination_city.strip(),
         "destination_state": booking_data.destination_state.strip(),
         "requested_pickup_date": booking_data.requested_pickup_date,
@@ -153,7 +143,6 @@ async def create_freight_booking(
         "temperature_min": booking_data.temperature_min,
         "temperature_max": booking_data.temperature_max,
         "packaging_details": booking_data.packaging_details,
-        "special_handling_instructions": booking_data.special_handling_instructions,
         "status": FreightBookingStatus.REQUESTED.value if hasattr(FreightBookingStatus.REQUESTED, "value") else FreightBookingStatus.REQUESTED,
         "accepted_quotation_id": None,
         "created_by": current_user["sub"],
@@ -161,25 +150,26 @@ async def create_freight_booking(
         "updated_at": now,
     }
     
-    result = await db.freight_bookings.insert_one(to_mongo(booking_doc))
-    booking_doc["_id"] = result.inserted_id
-    
-    await append_ledger_block(
-        db,
-        event_type=LedgerEventType.FREIGHT_BOOKING_CREATED,
-        entity_type="FREIGHT_BOOKING",
-        entity_id=str(result.inserted_id),
-        actor_id=current_user["sub"],
-        actor_role=current_user["role"],
-        event_summary=f"Freight booking {booking_id} created for PO {po.get('order_id', str(po['_id']))}",
-        payload={
-            "booking_id": booking_id,
-            "purchase_order_id": po.get("order_id", str(po["_id"])),
-            "cargo_weight_kg": booking_data.total_cargo_weight_kg,
-            "pickup": f"{booking_data.pickup_city}, {booking_data.pickup_state}",
-            "destination": f"{booking_data.destination_city}, {booking_data.destination_state}",
-        }
-    )
+    async def _transaction(session):
+        claim = await db.purchase_orders.update_one(
+            {"_id": po["_id"], "status": "ACCEPTED"}, {"$set": {"updated_at": now}}, session=session,
+        )
+        if claim.matched_count == 0:
+            raise ConflictError("Purchase order is no longer accepted")
+        result = await db.freight_bookings.insert_one(to_mongo(booking_doc), session=session)
+        booking_doc["_id"] = result.inserted_id
+        await append_ledger_block(
+            db, event_type=LedgerEventType.FREIGHT_BOOKING_CREATED,
+            entity_type="FREIGHT_BOOKING", entity_id=str(result.inserted_id),
+            actor_id=current_user["sub"], actor_role=current_user["role"],
+            event_summary=f"Freight booking {booking_id} created for PO {po.get('order_id', str(po['_id']))}",
+            payload={"booking_id": booking_id, "purchase_order_id": po.get("order_id", str(po["_id"])),
+                     "cargo_weight_kg": booking_data.cargo_quantity_kg,
+                     "pickup": f"{booking_data.pickup_city}, {booking_data.pickup_state}",
+                     "destination": f"{booking_data.destination_city}, {booking_data.destination_state}"},
+            session=session,
+        )
+    await run_in_txn(_transaction)
     
     return to_response(FreightBookingResponse, booking_doc)
 
@@ -187,7 +177,7 @@ async def create_freight_booking(
 @router.get("", response_model=List[FreightBookingResponse])
 async def list_freight_bookings(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1),
     status: Optional[FreightBookingStatus] = None,
     purchase_order_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
@@ -311,7 +301,7 @@ async def cancel_freight_booking(
         raise ValidationError(f"Cannot cancel booking with status {booking.get('status')}")
 
     now = datetime.now(timezone.utc)
-    async with uow() as session:
+    async def _transaction(session):
         await db.freight_bookings.update_one(
             {"_id": booking["_id"]},
             {"$set": {"status": FreightBookingStatus.CANCELLED.value, "updated_at": now}},
@@ -323,17 +313,7 @@ async def cancel_freight_booking(
             {"$set": {"status": "REJECTED", "updated_at": now}},
             session=session
         )
-        await append_ledger_block(
-            db,
-            event_type=LedgerEventType.FREIGHT_BOOKING_CANCELLED if hasattr(LedgerEventType, "FREIGHT_BOOKING_CANCELLED") else "FREIGHT_BOOKING_CANCELLED",
-            entity_type="FREIGHT_BOOKING",
-            entity_id=str(booking["_id"]),
-            actor_id=current_user["sub"],
-            actor_role=current_user["role"],
-            event_summary=f"Freight booking {booking.get('booking_id')} cancelled",
-            payload={"booking_id": booking.get("booking_id")},
-            session=session
-        )
+    await run_in_txn(_transaction)
 
     updated = await db.freight_bookings.find_one({"_id": booking["_id"]})
     return to_response(FreightBookingResponse, updated)
