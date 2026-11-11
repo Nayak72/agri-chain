@@ -23,7 +23,7 @@ npm run dev
 
 The API is at `http://localhost:8000/api/v1`, Swagger at `http://localhost:8000/docs`, and the Vite UI at `http://localhost:5173`.
 
-For a fresh demo database, run `python backend/scripts/seed_demo.py` from the repository root. The seed creates one account per role, a 2,000 kg Nashik tomato batch, a Bengaluru warehouse, and two refrigerated vehicles and drivers. The seeded accounts use `DemoPass123!` and their email addresses are `<role>@agrichain.com` (the named farmer, warehouse, transporter, driver, and buyer accounts use the `1` suffix). The second driver is a fleet record without a separate login.
+For a fresh demo database, run `python backend/scripts/seed_demo.py` from the repository root. The seed creates one account per role, a 2,000 kg Nashik tomato batch, a Bengaluru warehouse, and two refrigerated vehicles and drivers. The accounts use the role passwords shown on the login page (`Admin123!`, `Farmer123!`, `Warehouse123!`, `Transporter123!`, `Driver123!`, and `Buyer123!`). Their email addresses are `<role>@agrichain.com` (the named farmer, warehouse, transporter, driver, and buyer accounts use the `1` suffix). The second driver is a fleet record without a separate login.
 
 ## Workflow
 

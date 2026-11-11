@@ -21,6 +21,15 @@ USERS = [
     ("buyer1", "BUYER", "Bengaluru Buyer"),
 ]
 
+PASSWORD_BY_ROLE = {
+    "ADMIN": "Admin123!",
+    "FARMER": "Farmer123!",
+    "WAREHOUSE_MANAGER": "Warehouse123!",
+    "TRANSPORTER": "Transporter123!",
+    "DRIVER": "Driver123!",
+    "BUYER": "Buyer123!",
+}
+
 
 async def ensure(db, collection, key, document):
     existing = await db[collection].find_one(key)
@@ -39,7 +48,7 @@ async def seed():
         for name, role, full_name in USERS:
             email = f"{name}@agrichain.com"
             users[role] = await ensure(db, "users", {"email": email}, {
-                "email": email, "password_hash": get_password_hash("DemoPass123!"),
+                "email": email, "password_hash": get_password_hash(PASSWORD_BY_ROLE[role]),
                 "full_name": full_name, "role": role, "is_active": True,
                 "is_approved": True, "created_at": now, "updated_at": now,
             })
@@ -104,7 +113,7 @@ async def seed():
                 )
             await run_in_txn(create_batch)
         print("Demo ready: six roles, Nashik tomato batch (2000 kg), Bengaluru warehouse, two reefers and drivers.")
-        print("Demo login password for each seeded user: DemoPass123!")
+        print("Demo passwords follow Role123! (for example, Admin123!).")
     finally:
         await close_mongo_connection()
 
