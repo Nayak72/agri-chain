@@ -172,7 +172,7 @@ export default function ColdChainPage() {
             <button
               onClick={() => fetchTelemetry()}
               disabled={loading}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 shadow-xs transition-colors"
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono rounded-lg border border-stone-200 glass-control text-stone-700 hover:bg-stone-50 shadow-xs transition-colors"
             >
               Refresh readings
             </button>
@@ -195,7 +195,7 @@ export default function ColdChainPage() {
       )}
 
       {/* Shipment Selector Banner */}
-      <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+      <div className="rounded-xl border border-stone-200 glass-panel-strong p-4 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-3">
             <label className="text-xs font-mono font-semibold uppercase text-stone-500 shrink-0">
@@ -204,7 +204,7 @@ export default function ColdChainPage() {
             <select
               value={selectedShipmentId}
               onChange={(e) => setSelectedShipmentId(e.target.value)}
-              className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] w-full sm:w-80 font-mono"
+              className="glass-control border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] w-full sm:w-80 font-mono"
             >
               {shipments.length === 0 ? (
                 <option value="">No shipments found</option>
@@ -239,7 +239,7 @@ export default function ColdChainPage() {
       </div>
 
       {/* Simulation Control Deck */}
-      {canManageReadings && <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+      {canManageReadings && <div className="rounded-2xl border border-stone-200 glass-panel-strong p-6 shadow-xs">
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-stone-100">
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-[#244634]" />
@@ -258,7 +258,7 @@ export default function ColdChainPage() {
             <select
               value={scenario}
               onChange={(e) => setScenario(e.target.value)}
-              className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono"
+              className="w-full glass-control border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono"
             >
               {SCENARIOS.map((sc) => (
                 <option key={sc.value} value={sc.value}>
@@ -287,7 +287,7 @@ export default function ColdChainPage() {
       {/* Telemetry Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Temperature Card */}
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+        <div className="rounded-xl border border-stone-200 glass-panel-strong p-4 shadow-xs">
           <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
             <span className="flex items-center gap-1.5 font-semibold">
               <Thermometer className="h-4 w-4 text-[#244634]" />
@@ -316,7 +316,7 @@ export default function ColdChainPage() {
         </div>
 
         {/* Humidity Card */}
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+        <div className="rounded-xl border border-stone-200 glass-panel-strong p-4 shadow-xs">
           <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
             <span className="flex items-center gap-1.5 font-semibold">
               <Droplets className="h-4 w-4 text-emerald-700" />
@@ -335,7 +335,7 @@ export default function ColdChainPage() {
         </div>
 
         {/* Total Readings */}
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+        <div className="rounded-xl border border-stone-200 glass-panel-strong p-4 shadow-xs">
           <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
             <span className="flex items-center gap-1.5 font-semibold">
               <Activity className="h-4 w-4 text-purple-700" />
@@ -352,7 +352,7 @@ export default function ColdChainPage() {
         </div>
 
         {/* Active Alerts */}
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+        <div className="rounded-xl border border-stone-200 glass-panel-strong p-4 shadow-xs">
           <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
             <span className="flex items-center gap-1.5 font-semibold">
               <ShieldAlert className="h-4 w-4 text-rose-600" />
@@ -370,7 +370,7 @@ export default function ColdChainPage() {
       </div>
 
       {/* Main Dual-Axis Recharts Telemetry Graph */}
-      <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+      <div className="rounded-2xl border border-stone-200 glass-panel-strong p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-stone-100">
           <div>
             <h2 className="text-base font-semibold text-stone-900 flex items-center gap-2">
@@ -482,7 +482,7 @@ export default function ColdChainPage() {
       </div>
 
       {/* Sensor SLA Excursion Alerts Section */}
-      <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+      <div className="rounded-2xl border border-stone-200 glass-panel-strong p-6 shadow-xs">
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-stone-100">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -581,7 +581,7 @@ export default function ColdChainPage() {
       {/* Acknowledge / Resolve Modal */}
       {activeAlertModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl animate-fade-in-up">
+          <div className="w-full max-w-md rounded-2xl border border-stone-200 glass-panel-strong p-6 shadow-xl animate-fade-in-up">
             <h3 className="text-lg font-bold text-stone-900 mb-1">
               Resolve Sensor Excursion
             </h3>
@@ -599,7 +599,7 @@ export default function ColdChainPage() {
                   value={correctiveAction}
                   onChange={(e) => setCorrectiveAction(e.target.value)}
                   placeholder="e.g. Reefer setpoint adjusted to 10°C and verified."
-                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-sans"
+                  className="w-full glass-control border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-sans"
                   required
                 />
               </div>
@@ -608,7 +608,7 @@ export default function ColdChainPage() {
                 <button
                   type="button"
                   onClick={() => setActiveAlertModal(null)}
-                  className="px-4 py-2 rounded-lg border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 text-xs font-mono uppercase transition-colors"
+                  className="px-4 py-2 rounded-lg border border-stone-200 glass-control hover:bg-stone-50 text-stone-700 text-xs font-mono uppercase transition-colors"
                 >
                   Cancel
                 </button>

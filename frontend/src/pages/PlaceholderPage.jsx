@@ -7,7 +7,7 @@ export default function PlaceholderPage({ title, desc }) {
 
   return (
     <div className="max-w-screen-2xl mx-auto px-4 lg:px-8 py-16 flex flex-col items-center justify-center text-center">
-      <div className="w-16 h-16 rounded-2xl bg-surface border border-border text-forest flex items-center justify-center mb-5 shadow-xs">
+      <div className="w-16 h-16 rounded-2xl glass-panel border border-border text-forest flex items-center justify-center mb-5 shadow-xs">
         <Compass className="w-8 h-8 stroke-[1.8]" />
       </div>
       <h1 className="text-2xl font-bold text-ink-primary font-serif mb-2">{title || 'Operational Module'}</h1>

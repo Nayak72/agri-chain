@@ -130,7 +130,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F6F4EC] text-[#26312A] flex flex-col justify-center py-12 sm:px-6 lg:px-8 selection:bg-forest/20 selection:text-forest">
+    <div className="glass-shell min-h-screen text-[#26312A] flex flex-col justify-center py-12 sm:px-6 lg:px-8 selection:bg-forest/20 selection:text-forest">
       <div className="sm:mx-auto sm:w-full sm:max-w-xl px-4">
         
         {/* Brand Header */}
@@ -155,7 +155,7 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <div className="bg-surface border border-border rounded-3xl p-6 sm:p-8 shadow-sm">
+        <div className="glass-panel border border-border rounded-3xl p-6 sm:p-8 shadow-sm">
           {formError && (
             <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-800 text-xs sm:text-sm">
               <AlertCircle className="w-5 h-5 shrink-0 text-red-600 mt-0.5" />
@@ -177,7 +177,7 @@ export default function RegisterPage() {
                   value={formData.full_name}
                   onChange={(e) => handleChange('full_name', e.target.value)}
                   placeholder="e.g. Ramesh Patel"
-                  className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 glass-control border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all"
                 />
               </div>
             </div>
@@ -196,7 +196,7 @@ export default function RegisterPage() {
                     value={formData.email}
                     onChange={(e) => handleChange('email', e.target.value)}
                     placeholder="name@example.com"
-                    className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all font-mono"
+                    className="w-full pl-10 pr-4 py-2.5 glass-control border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all font-mono"
                   />
                 </div>
               </div>
@@ -212,7 +212,7 @@ export default function RegisterPage() {
                     value={formData.phone}
                     onChange={(e) => handleChange('phone', e.target.value)}
                     placeholder="+91 98765 43210"
-                    className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all font-mono"
+                    className="w-full pl-10 pr-4 py-2.5 glass-control border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all font-mono"
                   />
                 </div>
               </div>
@@ -234,7 +234,7 @@ export default function RegisterPage() {
                       className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start gap-3.5 ${
                         isSelected
                           ? 'border-forest bg-forest/5 shadow-xs'
-                          : 'border-border bg-surface hover:bg-surface-muted/50'
+                          : 'border-border glass-control hover:bg-surface-muted/50'
                       }`}
                     >
                       <div
@@ -283,7 +283,7 @@ export default function RegisterPage() {
                     value={formData.password}
                     onChange={(e) => handleChange('password', e.target.value)}
                     placeholder="Min 6 characters"
-                    className="w-full pl-10 pr-10 py-2.5 bg-surface border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all font-mono"
+                    className="w-full pl-10 pr-10 py-2.5 glass-control border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all font-mono"
                   />
                   <button
                     type="button"
@@ -307,7 +307,7 @@ export default function RegisterPage() {
                     value={formData.confirm_password}
                     onChange={(e) => handleChange('confirm_password', e.target.value)}
                     placeholder="Repeat password"
-                    className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all font-mono"
+                    className="w-full pl-10 pr-4 py-2.5 glass-control border border-border rounded-xl text-ink-primary text-sm placeholder:text-ink-tertiary focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/15 transition-all font-mono"
                   />
                 </div>
               </div>

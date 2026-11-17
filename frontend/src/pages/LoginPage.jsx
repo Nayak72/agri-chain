@@ -97,7 +97,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen w-full bg-[#F6F4EC] text-[#26312A] font-sans flex items-center justify-center p-4 lg:p-8">
+    <div className="relative min-h-screen w-full glass-shell text-[#26312A] font-sans flex items-center justify-center p-4 lg:p-8">
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
         
         {/* Left hero column */}
@@ -124,7 +124,7 @@ export default function LoginPage() {
               return (
                 <div
                   key={card.title}
-                  className="p-5 rounded-2xl bg-surface border border-border shadow-2xs hover:shadow-xs transition-all"
+                  className="p-5 rounded-2xl glass-panel border border-border shadow-2xs hover:shadow-xs transition-all"
                 >
                   <div className="w-10 h-10 rounded-xl bg-forest/10 border border-forest/15 text-forest flex items-center justify-center mb-3">
                     <Icon className="w-5 h-5 stroke-[2]" />
@@ -139,7 +139,7 @@ export default function LoginPage() {
 
         {/* Right auth card */}
         <div className="w-full max-w-md mx-auto animate-fade-in-up">
-          <div className="bg-surface rounded-3xl border border-border p-8 sm:p-10 shadow-sm">
+          <div className="glass-panel-strong rounded-3xl border border-border p-8 sm:p-10 shadow-sm">
             
             {/* Header */}
             <div className="mb-8 text-center">
@@ -175,7 +175,7 @@ export default function LoginPage() {
                       touched.email && !validateEmail(email)
                         ? 'border-red-400 focus:border-red-500 ring-red-100'
                         : 'border-border focus:border-forest'
-                    } bg-surface px-3.5 py-2.5 text-sm text-ink-primary placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-forest/15 transition-all font-mono`}
+                    } glass-control px-3.5 py-2.5 text-sm text-ink-primary placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-forest/15 transition-all font-mono`}
                     placeholder="user@agrichain.com"
                   />
                   {touched.email && validateEmail(email) && (
@@ -202,7 +202,7 @@ export default function LoginPage() {
                       touched.password && password.length < 6
                         ? 'border-red-400 focus:border-red-500 ring-red-100'
                         : 'border-border focus:border-forest'
-                    } bg-surface px-3.5 py-2.5 text-sm text-ink-primary placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-forest/15 transition-all font-mono pr-11`}
+                    } glass-control px-3.5 py-2.5 text-sm text-ink-primary placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-forest/15 transition-all font-mono pr-11`}
                     placeholder="••••••••"
                   />
                   <button

@@ -3,7 +3,7 @@ import { Clock, ShieldAlert, ArrowLeft, CheckCircle2 } from 'lucide-react'
 
 export default function PendingApprovalPage() {
   return (
-    <div className="min-h-screen bg-[#F6F4EC] text-[#26312A] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 selection:bg-forest/20 selection:text-forest">
+    <div className="glass-shell min-h-screen text-[#26312A] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 selection:bg-forest/20 selection:text-forest">
       <div className="max-w-md w-full mx-auto">
         <div className="text-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center mx-auto mb-4 shadow-xs">
@@ -17,7 +17,7 @@ export default function PendingApprovalPage() {
           </p>
         </div>
 
-        <div className="bg-surface border border-border rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+        <div className="glass-panel border border-border rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
           <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-900 text-xs leading-relaxed space-y-2">
             <div className="font-bold flex items-center gap-2 text-sm text-amber-900">
               <ShieldAlert className="w-4 h-4 text-amber-700" />

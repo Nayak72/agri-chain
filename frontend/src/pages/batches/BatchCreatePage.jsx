@@ -107,7 +107,7 @@ export default function BatchCreatePage() {
         BATCH_REGISTRY
       </Button>
 
-      <Card className="bg-white/95 border-[#E1DDD0] shadow-sm">
+      <Card className="glass-panel-strong border-[#E1DDD0] shadow-sm">
         <CardHeader className="border-b border-[#ECE7DA] pb-6">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2 h-2 rounded-full bg-[#3F7C56]" />
@@ -142,7 +142,7 @@ export default function BatchCreatePage() {
                   required
                   value={form.farm_id}
                   onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
                   <option value="">Select origin farm...</option>
                   {farmItems.map(f => (
@@ -162,7 +162,7 @@ export default function BatchCreatePage() {
                   required
                   value={form.produce_type}
                   onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
                   <option value="">Select commodity type...</option>
                   {produceItems.map(p => (
@@ -187,7 +187,7 @@ export default function BatchCreatePage() {
                   value={form.harvest_location}
                   onChange={handleChange}
                   placeholder="Field Plot B-12, Nashik East"
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 />
               </div>
             </div>
@@ -206,7 +206,7 @@ export default function BatchCreatePage() {
                   value={form.initial_quantity_kg}
                   onChange={handleChange}
                   placeholder="5000"
-                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
                 />
               </div>
 
@@ -218,7 +218,7 @@ export default function BatchCreatePage() {
                   name="quality_grade"
                   value={form.quality_grade}
                   onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
                   <option value="GRADE_A">GRADE_A (Export Quality)</option>
                   <option value="GRADE_B">GRADE_B (Domestic Standard)</option>
@@ -234,7 +234,7 @@ export default function BatchCreatePage() {
                   name="packaging_type"
                   value={form.packaging_type}
                   onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
                   <option value="CRATE">CRATE</option>
                   <option value="BAG">BAG / SACK</option>
@@ -258,7 +258,7 @@ export default function BatchCreatePage() {
                   value={form.estimated_shelf_life_days}
                   onChange={handleChange}
                   placeholder="14"
-                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
                 />
               </div>
             </div>
@@ -268,7 +268,7 @@ export default function BatchCreatePage() {
                 type="button"
                 variant="outline"
                 onClick={() => navigate('/batches')}
-                className="flex-1 bg-white border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
+                className="flex-1 glass-control border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
               >
                 Cancel
               </Button>

@@ -100,7 +100,7 @@ export default function VehicleCreatePage() {
         FLEET_INVENTORY
       </Button>
 
-      <Card className="bg-white/95 border-[#E1DDD0] shadow-sm">
+      <Card className="glass-panel-strong border-[#E1DDD0] shadow-sm">
         <CardHeader className="border-b border-[#ECE7DA] pb-6">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2 h-2 rounded-full bg-[#244634]" />
@@ -137,7 +137,7 @@ export default function VehicleCreatePage() {
                   value={form.registration_number}
                   onChange={handleChange}
                   placeholder="MH-15-DC-4421"
-                  className="bg-white border-[#E1DDD0] uppercase font-mono focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] uppercase font-mono focus-visible:ring-[#244634]"
                 />
               </div>
 
@@ -149,7 +149,7 @@ export default function VehicleCreatePage() {
                   name="category"
                   value={form.category}
                   onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
                   <option value="REEFER_14FT">Refrigerated Truck (14ft)</option>
                   <option value="REEFER_20FT">Refrigerated Truck (20ft)</option>
@@ -172,7 +172,7 @@ export default function VehicleCreatePage() {
                   value={form.vehicle_type}
                   onChange={handleChange}
                   placeholder="Tata Ultra T.7 Reefer"
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 />
               </div>
 
@@ -188,7 +188,7 @@ export default function VehicleCreatePage() {
                   value={form.max_payload_kg}
                   onChange={handleChange}
                   placeholder="3500"
-                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
                 />
               </div>
             </div>
@@ -217,7 +217,7 @@ export default function VehicleCreatePage() {
                       name="temperature_min"
                       value={form.temperature_min}
                       onChange={handleChange}
-                      className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                      className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                     />
                   </div>
                   <div className="space-y-1">
@@ -228,7 +228,7 @@ export default function VehicleCreatePage() {
                       name="temperature_max"
                       value={form.temperature_max}
                       onChange={handleChange}
-                      className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                      className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                     />
                   </div>
                 </div>
@@ -240,7 +240,7 @@ export default function VehicleCreatePage() {
                 type="button"
                 variant="outline"
                 onClick={() => navigate('/fleet')}
-                className="flex-1 bg-white border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
+                className="flex-1 glass-control border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
               >
                 Cancel
               </Button>

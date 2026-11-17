@@ -137,7 +137,7 @@ export default function ShipmentCreatePage() {
   if (userRole !== ROLES.TRANSPORTER) {
     return (
       <div className="max-w-xl mx-auto px-4 py-16 text-center">
-        <div className="p-8 rounded-2xl bg-white border border-rose-200 shadow-sm">
+        <div className="p-8 rounded-2xl glass-panel border border-rose-200 shadow-sm">
           <ShieldAlert className="w-12 h-12 text-rose-600 mx-auto mb-3" />
           <h2 className="text-lg font-bold text-stone-900">Transporter Authorization Required</h2>
           <p className="text-xs text-stone-500 mt-2 mb-6 leading-relaxed">
@@ -171,7 +171,7 @@ export default function ShipmentCreatePage() {
         }
       />
 
-      <div className="bg-white border border-stone-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+      <div className="glass-panel border border-stone-200 rounded-2xl p-6 sm:p-8 shadow-sm">
         {error && (
           <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-rose-600" />
@@ -190,7 +190,7 @@ export default function ShipmentCreatePage() {
               name="booking_id"
               value={form.booking_id}
               onChange={(e) => handleBookingSelect(e.target.value)}
-              className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-2.5 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono transition-colors"
+              className="w-full glass-control border border-stone-200 rounded-lg px-4 py-2.5 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono transition-colors"
             >
               <option value="">Select confirmed freight booking...</option>
               {bookings.map(b => (
@@ -229,7 +229,7 @@ export default function ShipmentCreatePage() {
                 name="vehicle_id"
                 value={form.vehicle_id}
                 onChange={handleChange}
-                className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-2.5 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono transition-colors"
+                className="w-full glass-control border border-stone-200 rounded-lg px-4 py-2.5 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono transition-colors"
               >
                 <option value="">Select available vehicle...</option>
                 {vehicles.map(v => (
@@ -249,7 +249,7 @@ export default function ShipmentCreatePage() {
                 name="driver_id"
                 value={form.driver_id}
                 onChange={handleChange}
-                className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-2.5 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono transition-colors"
+                className="w-full glass-control border border-stone-200 rounded-lg px-4 py-2.5 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono transition-colors"
               >
                 <option value="">Select available driver...</option>
                 {drivers.map(d => (
@@ -261,7 +261,7 @@ export default function ShipmentCreatePage() {
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-stone-50 border border-stone-200 text-xs text-stone-600 leading-relaxed font-sans">
+          <div className="p-4 rounded-xl glass-inset border border-stone-200 text-xs text-stone-600 leading-relaxed font-sans">
             <span className="text-stone-900 font-semibold">State Machine Progression:</span> Shipment creation transitions status directly to <span className="text-[#244634] font-mono font-bold">DRIVER_ASSIGNED</span>. Vehicle and driver status will be locked to <span className="text-amber-700 font-mono font-bold">ASSIGNED</span> until delivery finalization.
           </div>
 
@@ -269,7 +269,7 @@ export default function ShipmentCreatePage() {
             <button
               type="button"
               onClick={() => navigate('/shipments')}
-              className="px-5 py-2.5 rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 font-medium text-sm transition-all"
+              className="px-5 py-2.5 rounded-lg border border-stone-200 glass-control text-stone-700 hover:bg-stone-50 font-medium text-sm transition-all"
             >
               Cancel
             </button>

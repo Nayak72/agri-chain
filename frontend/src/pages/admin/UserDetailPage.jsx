@@ -110,7 +110,7 @@ export default function UserDetailPage() {
   if (isError || !userProfile) {
     return (
       <div className="max-w-xl mx-auto py-16 text-center space-y-4">
-        <div className="p-8 rounded-2xl bg-white border border-stone-200 shadow-sm">
+        <div className="p-8 rounded-2xl glass-panel border border-stone-200 shadow-sm">
           <ShieldAlert className="w-12 h-12 text-rose-500 mx-auto mb-3" />
           <h3 className="text-lg font-bold text-stone-900">User Record Not Found</h3>
           <p className="text-xs text-stone-500 mt-1 mb-6">
@@ -146,7 +146,7 @@ export default function UserDetailPage() {
           <div className="flex items-center gap-2.5">
             <Link
               to="/users"
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 shadow-xs transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-stone-200 glass-control text-stone-700 hover:bg-stone-50 shadow-xs transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Directory</span>
@@ -182,13 +182,13 @@ export default function UserDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Left Column: Profile Details */}
         <div className="md:col-span-2 space-y-6">
-          <div className="p-6 sm:p-8 rounded-2xl bg-white border border-stone-200 shadow-xs space-y-5">
+          <div className="p-6 sm:p-8 rounded-2xl glass-panel border border-stone-200 shadow-xs space-y-5">
             <h2 className="text-base font-bold text-stone-900 pb-3 border-b border-stone-100">
               Identity & Contact Records
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
-              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+              <div className="p-3.5 rounded-xl glass-inset border border-stone-200">
                 <span className="text-stone-500 block mb-1 font-sans">Email Address</span>
                 <span className="text-stone-900 font-semibold text-sm flex items-center gap-2">
                   <Mail className="w-4 h-4 text-[#244634]" />
@@ -196,7 +196,7 @@ export default function UserDetailPage() {
                 </span>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+              <div className="p-3.5 rounded-xl glass-inset border border-stone-200">
                 <span className="text-stone-500 block mb-1 font-sans">Phone Number</span>
                 <span className="text-stone-900 font-semibold text-sm flex items-center gap-2">
                   <Phone className="w-4 h-4 text-emerald-700" />
@@ -204,7 +204,7 @@ export default function UserDetailPage() {
                 </span>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+              <div className="p-3.5 rounded-xl glass-inset border border-stone-200">
                 <span className="text-stone-500 block mb-1 font-sans">Created At</span>
                 <span className="text-stone-700 text-xs flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-stone-400" />
@@ -212,7 +212,7 @@ export default function UserDetailPage() {
                 </span>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+              <div className="p-3.5 rounded-xl glass-inset border border-stone-200">
                 <span className="text-stone-500 block mb-1 font-sans">Last Updated</span>
                 <span className="text-stone-700 text-xs flex items-center gap-2">
                   <Clock className="w-4 h-4 text-stone-400" />
@@ -235,13 +235,13 @@ export default function UserDetailPage() {
 
         {/* Right Column: Status & Admin Controls */}
         <div className="space-y-6">
-          <div className="p-6 rounded-2xl bg-white border border-stone-200 shadow-xs space-y-5">
+          <div className="p-6 rounded-2xl glass-panel border border-stone-200 shadow-xs space-y-5">
             <h3 className="text-base font-bold text-stone-900 pb-3 border-b border-stone-100 font-sans">
               Account Status & Controls
             </h3>
 
             <div className="space-y-3">
-              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 flex items-center justify-between">
+              <div className="p-3.5 rounded-xl glass-inset border border-stone-200 flex items-center justify-between">
                 <div>
                   <span className="text-[11px] font-mono uppercase text-stone-500 font-semibold block">Approval</span>
                   <span className="text-xs font-bold text-stone-900 font-sans">
@@ -255,7 +255,7 @@ export default function UserDetailPage() {
                 )}
               </div>
 
-              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 flex items-center justify-between">
+              <div className="p-3.5 rounded-xl glass-inset border border-stone-200 flex items-center justify-between">
                 <div>
                   <span className="text-[11px] font-mono uppercase text-stone-500 font-semibold block">Activity State</span>
                   <span className="text-xs font-bold text-stone-900 font-sans">
@@ -310,7 +310,7 @@ export default function UserDetailPage() {
       {/* Edit Profile Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-stone-200 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl animate-fade-in-up">
+          <div className="glass-panel border border-stone-200 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl animate-fade-in-up">
             <h3 className="text-base font-bold text-stone-900">Edit User Profile</h3>
 
             <div className="space-y-3">
@@ -320,7 +320,7 @@ export default function UserDetailPage() {
                   type="text"
                   value={editForm.full_name}
                   onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                  className="w-full px-3.5 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 text-xs focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
+                  className="w-full px-3.5 py-2 glass-control border border-stone-200 rounded-lg text-stone-900 text-xs focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                 />
               </div>
 
@@ -330,7 +330,7 @@ export default function UserDetailPage() {
                   type="text"
                   value={editForm.phone}
                   onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                  className="w-full px-3.5 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 text-xs focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
+                  className="w-full px-3.5 py-2 glass-control border border-stone-200 rounded-lg text-stone-900 text-xs focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                 />
               </div>
 
@@ -339,7 +339,7 @@ export default function UserDetailPage() {
                 <select
                   value={editForm.role}
                   onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                  className="w-full px-3.5 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 text-xs focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
+                  className="w-full px-3.5 py-2 glass-control border border-stone-200 rounded-lg text-stone-900 text-xs focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                 >
                   {ALL_ROLES.map((r) => (
                     <option key={r} value={r}>
@@ -354,7 +354,7 @@ export default function UserDetailPage() {
               <button
                 type="button"
                 onClick={() => setShowEditModal(false)}
-                className="flex-1 py-2 rounded-lg border border-stone-200 bg-white text-stone-700 text-xs font-semibold hover:bg-stone-50"
+                className="flex-1 py-2 rounded-lg border border-stone-200 glass-control text-stone-700 text-xs font-semibold hover:bg-stone-50"
               >
                 Cancel
               </button>

@@ -111,7 +111,7 @@ export default function TransportersListPage() {
               size="sm"
               onClick={() => refetch()}
               disabled={isFetching}
-              className="gap-2 bg-white/80 border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
+              className="gap-2 glass-control border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
               <span>Sync</span>
@@ -149,7 +149,7 @@ export default function TransportersListPage() {
             placeholder="Search company, city, contact person..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-white/90 border-[#E1DDD0] text-sm text-[#26312A] placeholder:text-[#7A887E] focus-visible:ring-[#244634]"
+            className="pl-10 glass-control border-[#E1DDD0] text-sm text-[#26312A] placeholder:text-[#7A887E] focus-visible:ring-[#244634]"
           />
         </div>
         <div className="text-xs font-mono text-[#526357] flex items-center gap-1.5 self-end sm:self-center">
@@ -191,7 +191,7 @@ export default function TransportersListPage() {
             return (
               <Card
                 key={tId}
-                className="bg-white/90 border-[#E1DDD0] hover:border-[#244634]/40 hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+                className="glass-panel border-[#E1DDD0] hover:border-[#244634]/40 hover:shadow-md transition-all duration-300 flex flex-col justify-between"
               >
                 <CardContent className="p-6 flex flex-col justify-between h-full">
                   <div>
@@ -242,8 +242,8 @@ export default function TransportersListPage() {
 
       {/* Onboard Modal */}
       {showRegisterModal && (
-        <div className="fixed inset-0 z-50 bg-[#1B2A20]/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <Card className="bg-white border-[#E1DDD0] max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 glass-overlay flex items-center justify-center p-4">
+          <Card className="glass-dialog border-[#E1DDD0] max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 pb-3 border-b border-[#ECE7DA]">
               <div>
                 <h3 className="text-lg font-serif font-bold text-[#1B2A20]">Onboard Logistics Carrier</h3>
@@ -264,7 +264,7 @@ export default function TransportersListPage() {
                     value={form.company_name}
                     onChange={(e) => setForm({ ...form, company_name: e.target.value })}
                     placeholder="e.g. MahaCold Logistics Pvt Ltd"
-                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                   />
                 </div>
 
@@ -277,7 +277,7 @@ export default function TransportersListPage() {
                       value={form.contact_person}
                       onChange={(e) => setForm({ ...form, contact_person: e.target.value })}
                       placeholder="Suresh Patil"
-                      className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                      className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                     />
                   </div>
                   <div className="space-y-1">
@@ -288,7 +288,7 @@ export default function TransportersListPage() {
                       value={form.phone}
                       onChange={(e) => setForm({ ...form, phone: e.target.value })}
                       placeholder="+91 98765 43210"
-                      className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                      className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                     />
                   </div>
                 </div>
@@ -301,7 +301,7 @@ export default function TransportersListPage() {
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     placeholder="contact@mahacold.com"
-                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                   />
                 </div>
 
@@ -313,7 +313,7 @@ export default function TransportersListPage() {
                     value={form.address}
                     onChange={(e) => setForm({ ...form, address: e.target.value })}
                     placeholder="Plot 42, Transport Nagar"
-                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                   />
                 </div>
 
@@ -324,7 +324,7 @@ export default function TransportersListPage() {
                     placeholder="City"
                     value={form.city}
                     onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                   />
                   <Input
                     type="text"
@@ -332,7 +332,7 @@ export default function TransportersListPage() {
                     placeholder="State"
                     value={form.state}
                     onChange={(e) => setForm({ ...form, state: e.target.value })}
-                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                   />
                   <Input
                     type="text"
@@ -341,7 +341,7 @@ export default function TransportersListPage() {
                     placeholder="Pincode"
                     value={form.pincode}
                     onChange={(e) => setForm({ ...form, pincode: e.target.value })}
-                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                   />
                 </div>
 
@@ -353,7 +353,7 @@ export default function TransportersListPage() {
                       value={form.gst_number}
                       onChange={(e) => setForm({ ...form, gst_number: e.target.value })}
                       placeholder="27AABCM1234F1Z5"
-                      className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                      className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                     />
                   </div>
                   <div className="space-y-1">
@@ -363,7 +363,7 @@ export default function TransportersListPage() {
                       value={form.license_number}
                       onChange={(e) => setForm({ ...form, license_number: e.target.value })}
                       placeholder="MH-TR-2024-9988"
-                      className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                      className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                     />
                   </div>
                 </div>
@@ -373,7 +373,7 @@ export default function TransportersListPage() {
                     type="button"
                     variant="outline"
                     onClick={() => setShowRegisterModal(false)}
-                    className="flex-1 bg-white border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7] text-xs font-mono"
+                    className="flex-1 glass-control border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7] text-xs font-mono"
                   >
                     Cancel
                   </Button>

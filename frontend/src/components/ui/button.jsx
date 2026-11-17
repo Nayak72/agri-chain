@@ -3,14 +3,14 @@ import { cva } from '@/lib/cva'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest/30 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer',
+  'glass-button inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest/30 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer',
   {
     variants: {
       variant: {
         primary:
           'bg-forest text-white shadow-sm hover:bg-forest-dark active:scale-[0.98]',
         secondary:
-          'bg-surface text-ink-primary border border-border hover:bg-surface-muted hover:border-border/80 active:scale-[0.98]',
+          'glass-control text-ink-primary border hover:bg-surface-muted hover:border-border/80 active:scale-[0.98]',
         outline:
           'border border-forest/80 text-forest hover:bg-forest/5 active:scale-[0.98]',
         ghost:

@@ -138,7 +138,7 @@ export default function OrderCreatePage() {
         ORDERS_REGISTRY
       </Button>
 
-      <Card className="bg-white/95 border-[#E1DDD0] shadow-sm">
+      <Card className="glass-panel-strong border-[#E1DDD0] shadow-sm">
         <CardHeader className="border-b border-[#ECE7DA] pb-6">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2 h-2 rounded-full bg-[#244634]" />
@@ -172,7 +172,7 @@ export default function OrderCreatePage() {
                   value={form.batch_id}
                   required
                   onChange={(e) => handleBatchSelect(e.target.value)}
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
                   <option value="">Select a batch</option>
                   {batches.map(b => (
@@ -192,7 +192,7 @@ export default function OrderCreatePage() {
                   required
                   value={form.produce_type}
                   onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
                   <option value="">Select commodity...</option>
                   {produceItems.map(p => (
@@ -213,7 +213,7 @@ export default function OrderCreatePage() {
                 required
                 value={form.seller_id}
                 onChange={handleChange}
-                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
               >
                 <option value="">Select verified farmer...</option>
                 {farmers.map(f => (
@@ -238,7 +238,7 @@ export default function OrderCreatePage() {
                   value={form.requested_quantity_kg}
                   onChange={handleChange}
                   placeholder="2500"
-                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
                 />
               </div>
 
@@ -255,7 +255,7 @@ export default function OrderCreatePage() {
                   value={form.unit_price_inr}
                   onChange={handleChange}
                   placeholder="35.50"
-                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
                 />
               </div>
             </div>
@@ -270,7 +270,7 @@ export default function OrderCreatePage() {
                 name="preferred_delivery_date"
                 value={form.preferred_delivery_date}
                 onChange={handleChange}
-                className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                className="glass-control border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
               />
             </div>
 
@@ -279,7 +279,7 @@ export default function OrderCreatePage() {
                 type="button"
                 variant="outline"
                 onClick={() => navigate('/purchase-orders')}
-                className="bg-white border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
+                className="glass-control border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
               >
                 Cancel
               </Button>

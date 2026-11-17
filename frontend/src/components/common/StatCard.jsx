@@ -26,7 +26,7 @@ export function StatCard({
     <Tag
       onClick={onClick}
       className={cn(
-        'group relative flex flex-col justify-between p-5 rounded-2xl border border-stone-200 bg-white text-left shadow-xs transition-all duration-200',
+        'group relative flex flex-col justify-between p-5 rounded-2xl border glass-metric text-left',
         onClick && 'hover:shadow-md hover:-translate-y-0.5 cursor-pointer',
         alert && 'border-rose-300 bg-rose-50/20 shadow-[0_0_15px_rgba(244,63,94,0.06)]',
         className

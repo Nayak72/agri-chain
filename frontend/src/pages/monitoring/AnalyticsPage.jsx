@@ -118,7 +118,7 @@ export default function AnalyticsPage() {
           <button
             onClick={fetchAllAnalytics}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 shadow-xs transition-colors"
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono rounded-lg border border-stone-200 glass-control text-stone-700 hover:bg-stone-50 shadow-xs transition-colors"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-stone-400' : 'text-stone-500'}`} />
             <span>Refresh Analytics</span>
@@ -186,7 +186,7 @@ export default function AnalyticsPage() {
         <div className="space-y-6">
           {/* Top KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
                 <span>Total Shipments</span>
                 <Truck className="h-4 w-4 text-[#244634]" />
@@ -199,7 +199,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
                 <span>On-Time Delivery</span>
                 <Percent className="h-4 w-4 text-emerald-700" />
@@ -212,7 +212,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
                 <span>Avg Transit Duration</span>
                 <Clock className="h-4 w-4 text-purple-700" />
@@ -225,7 +225,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
                 <span>Delayed Rate</span>
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -242,7 +242,7 @@ export default function AnalyticsPage() {
           {/* Dual Charts in Overview */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Shipment Pipeline Bar Chart */}
-            <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+            <div className="rounded-2xl border border-stone-200 glass-panel-strong p-6 shadow-xs">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-900 mb-4 flex items-center gap-2 font-mono">
                 <BarChart3 className="h-4 w-4 text-[#244634]" />
                 Shipment Status Distribution
@@ -277,7 +277,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Quality Compliance Pie Chart */}
-            <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+            <div className="rounded-2xl border border-stone-200 glass-panel-strong p-6 shadow-xs">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-900 mb-4 flex items-center gap-2 font-mono">
                 <Thermometer className="h-4 w-4 text-emerald-700" />
                 Cold-Chain Telemetry Health
@@ -327,7 +327,7 @@ export default function AnalyticsPage() {
       {activeTab === 'freight' && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="text-xs font-mono uppercase text-stone-500 mb-1">Total Freight Spend</div>
               <div className="text-2xl font-bold font-mono text-emerald-700">
                 {formatCurrency(freightData?.total_freight_expenditure_paise ?? 0)}
@@ -335,7 +335,7 @@ export default function AnalyticsPage() {
               <div className="text-xs text-stone-500 mt-1 font-sans">Aggregated expenditure</div>
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="text-xs font-mono uppercase text-stone-500 mb-1">Avg Freight Cost</div>
               <div className="text-2xl font-bold font-mono text-stone-900">
                 {formatCurrency(freightData?.average_freight_cost_paise ?? 0)}
@@ -343,7 +343,7 @@ export default function AnalyticsPage() {
               <div className="text-xs text-stone-500 mt-1 font-sans">Per shipment booking</div>
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="text-xs font-mono uppercase text-stone-500 mb-1">Cost Per Kilogram</div>
               <div className="text-2xl font-bold font-mono text-[#244634]">
                 ₹{freightData?.freight_cost_per_kg ? freightData.freight_cost_per_kg.toFixed(2) : '0.00'} / kg
@@ -351,7 +351,7 @@ export default function AnalyticsPage() {
               <div className="text-xs text-stone-500 mt-1 font-sans">Transport unit economic rate</div>
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="text-xs font-mono uppercase text-stone-500 mb-1">Avg Quotation Value</div>
               <div className="text-2xl font-bold font-mono text-purple-700">
                 {formatCurrency(freightData?.average_quotation_value_paise ?? 0)}
@@ -361,7 +361,7 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Transporter wise spend */}
-          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+          <div className="rounded-2xl border border-stone-200 glass-panel-strong p-6 shadow-xs">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-900 mb-4 font-mono">
               Carrier / Transporter Spend Distribution (INR)
             </h2>
@@ -400,7 +400,7 @@ export default function AnalyticsPage() {
       {activeTab === 'quality' && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="text-xs font-mono uppercase text-stone-500 mb-1">Cold-Chain Compliance</div>
               <div className="text-2xl font-bold font-mono text-emerald-700">
                 {qualityData?.cold_chain_compliance_percentage != null
@@ -410,7 +410,7 @@ export default function AnalyticsPage() {
               <div className="text-xs text-stone-500 mt-1 font-sans">Readings within safety limits</div>
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="text-xs font-mono uppercase text-stone-500 mb-1">Damage Rate</div>
               <div className="text-2xl font-bold font-mono text-amber-700">
                 {qualityData?.damage_rate_percentage ?? 0}%
@@ -418,7 +418,7 @@ export default function AnalyticsPage() {
               <div className="text-xs text-stone-500 mt-1 font-sans">Transit loss percentage</div>
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="text-xs font-mono uppercase text-stone-500 mb-1">Total Cargo Handled</div>
               <div className="text-2xl font-bold font-mono text-stone-900">
                 {(qualityData?.total_dispatched_quantity_kg ?? 0).toLocaleString()} kg
@@ -426,7 +426,7 @@ export default function AnalyticsPage() {
               <div className="text-xs text-stone-500 mt-1 font-sans">Dispatched volume</div>
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="text-xs font-mono uppercase text-stone-500 mb-1">Temperature Excursions</div>
               <div className="text-2xl font-bold font-mono text-rose-700">
                 {qualityData?.temperature_excursion_count ?? 0}
@@ -436,7 +436,7 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Cargo Acceptance Breakdown */}
-          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+          <div className="rounded-2xl border border-stone-200 glass-panel-strong p-6 shadow-xs">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-900 mb-4 font-mono">
               Cargo Delivery Acceptance vs Transit Damage (Kilograms)
             </h2>
@@ -468,7 +468,7 @@ export default function AnalyticsPage() {
       {activeTab === 'fleet' && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="text-xs font-mono uppercase text-stone-500 mb-1">Fleet Utilization</div>
               <div className="text-2xl font-bold font-mono text-[#244634]">
                 {fleetData?.vehicle_utilization_percentage ?? 0}%
@@ -476,7 +476,7 @@ export default function AnalyticsPage() {
               <div className="text-xs text-stone-500 mt-1 font-sans">Vehicles assigned in missions</div>
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="text-xs font-mono uppercase text-stone-500 mb-1">Total Fleet Size</div>
               <div className="text-2xl font-bold font-mono text-stone-900">
                 {fleetData?.total_vehicles ?? 0}
@@ -484,7 +484,7 @@ export default function AnalyticsPage() {
               <div className="text-xs text-stone-500 mt-1 font-sans">{fleetData?.available_vehicles ?? 0} available</div>
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="text-xs font-mono uppercase text-stone-500 mb-1">Active Drivers</div>
               <div className="text-2xl font-bold font-mono text-purple-700">
                 {fleetData?.total_drivers ?? 0}
@@ -492,7 +492,7 @@ export default function AnalyticsPage() {
               <div className="text-xs text-stone-500 mt-1 font-sans">{fleetData?.available_drivers ?? 0} on duty / standby</div>
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+            <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="text-xs font-mono uppercase text-stone-500 mb-1">Maintenance Fleet</div>
               <div className="text-2xl font-bold font-mono text-amber-700">
                 {fleetData?.maintenance_vehicles ?? 0}
@@ -501,7 +501,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+          <div className="rounded-2xl border border-stone-200 glass-panel-strong p-6 shadow-xs">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-900 mb-4 font-mono">
               Fleet Operational Availability Breakdown
             </h2>

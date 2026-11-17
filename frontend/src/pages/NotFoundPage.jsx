@@ -7,7 +7,7 @@ export default function NotFoundPage() {
 
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-4">
-      <div className="w-16 h-16 rounded-2xl bg-surface border border-border text-forest flex items-center justify-center mb-5 shadow-xs">
+      <div className="w-16 h-16 rounded-2xl glass-panel border border-border text-forest flex items-center justify-center mb-5 shadow-xs">
         <FileQuestion className="w-8 h-8 stroke-[1.8]" />
       </div>
       <div className="text-xs font-mono font-semibold uppercase tracking-wider text-forest mb-1">

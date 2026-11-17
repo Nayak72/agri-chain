@@ -199,7 +199,7 @@ export default function ShipmentDetailPage() {
   if (error || !shipment) {
     return (
       <div className="max-w-xl mx-auto py-16 text-center">
-        <div className="p-8 rounded-2xl bg-white border border-stone-200 shadow-sm">
+        <div className="p-8 rounded-2xl glass-panel border border-stone-200 shadow-sm">
           <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
           <h2 className="text-xl font-bold text-stone-900 mb-1">Shipment Not Found</h2>
           <p className="text-stone-500 text-sm mb-6">Could not retrieve shipment record for ID: {id}</p>
@@ -339,7 +339,7 @@ export default function ShipmentDetailPage() {
         {/* Connected Vertical Timeline & Corridor Checkpoints */}
         <div className="lg:col-span-2 space-y-6">
           {/* Vertical Progress Timeline */}
-          <div className="bg-white border border-stone-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+          <div className="glass-panel border border-stone-200 rounded-2xl p-6 sm:p-8 shadow-sm">
             <div className="mb-6 flex justify-between items-center pb-4 border-b border-stone-100">
               <h2 className="text-base font-bold text-stone-900 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#244634]" />
@@ -388,7 +388,7 @@ export default function ShipmentDetailPage() {
           </div>
 
           {/* Corridor Route Checkpoints Card */}
-          <div className="bg-white border border-stone-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-5">
+          <div className="glass-panel border border-stone-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-5">
             <div className="flex items-center justify-between pb-4 border-b border-stone-100">
               <div className="flex items-center gap-2">
                 <MapPin className="w-5 h-5 text-[#244634]" />
@@ -435,27 +435,27 @@ export default function ShipmentDetailPage() {
         {/* Assets & Telematics Sidebar */}
         <div className="space-y-6">
           {/* Asset Assignments Card */}
-          <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="glass-panel border border-stone-200 rounded-2xl p-6 shadow-sm space-y-4">
             <h3 className="text-xs font-mono text-stone-500 uppercase tracking-widest font-semibold">
               Assigned Assets
             </h3>
             <div className="space-y-3 font-mono text-xs">
-              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+              <div className="p-3.5 rounded-xl glass-inset border border-stone-200">
                 <span className="text-[10px] text-stone-500 uppercase block font-sans">Fleet Vehicle</span>
                 <span className="text-stone-900 font-bold text-sm">{shipment.vehicle_id || 'Not assigned'}</span>
               </div>
-              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+              <div className="p-3.5 rounded-xl glass-inset border border-stone-200">
                 <span className="text-[10px] text-stone-500 uppercase block font-sans">Commercial Driver</span>
                 <span className="text-stone-900 font-bold text-sm">{shipment.driver_id || 'Not assigned'}</span>
               </div>
-              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+              <div className="p-3.5 rounded-xl glass-inset border border-stone-200">
                 <span className="text-[10px] text-stone-500 uppercase block font-sans">Planned cargo weight</span>
                 <span className="text-emerald-700 font-bold text-sm">
                   {formatWeight(shipment.cargo_quantity_kg)}
                 </span>
               </div>
               {shipment.loaded_weight_kg != null && (
-                <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                <div className="p-3.5 rounded-xl glass-inset border border-stone-200">
                   <span className="text-[10px] text-stone-500 uppercase block font-sans">Loaded weight</span>
                   <span className="text-emerald-700 font-bold text-sm">{formatWeight(shipment.loaded_weight_kg)}</span>
                 </div>
@@ -464,7 +464,7 @@ export default function ShipmentDetailPage() {
           </div>
 
           {/* Sensor Telematics Quick Link Card */}
-          <div className="bg-white border border-emerald-200 rounded-2xl p-6 shadow-sm relative overflow-hidden space-y-3">
+          <div className="glass-panel-strong border border-emerald-200 rounded-2xl p-6 shadow-sm relative overflow-hidden space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded border border-emerald-200 uppercase tracking-wider font-bold">
                 TELEMETRY ACTIVE
@@ -489,7 +489,7 @@ export default function ShipmentDetailPage() {
       {/* Cargo Loading Modal */}
       {showLoadModal && (
         <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-stone-200 rounded-2xl p-6 max-w-md w-full shadow-xl animate-fade-in-up">
+          <div className="glass-dialog border border-stone-200 rounded-2xl p-6 max-w-md w-full shadow-xl animate-fade-in-up">
             <h3 className="text-lg font-bold text-stone-900 mb-1">Verify Cargo Loading</h3>
             <p className="text-xs text-stone-500 mb-4 font-sans">
               Enter verified gross scale weight and package count at loading bay origin.
@@ -504,7 +504,7 @@ export default function ShipmentDetailPage() {
                   required
                   value={actualWeight}
                   onChange={(e) => setActualWeight(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
+                  className="w-full glass-control border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                 />
               </div>
 
@@ -516,7 +516,7 @@ export default function ShipmentDetailPage() {
                   required
                   value={actualPackageCount}
                   onChange={(e) => setActualPackageCount(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
+                  className="w-full glass-control border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                 />
               </div>
 
@@ -544,7 +544,7 @@ export default function ShipmentDetailPage() {
       {/* Corridor Checkpoint Modal */}
       {showCheckpointModal && (
         <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-stone-200 rounded-2xl p-6 max-w-md w-full shadow-xl animate-fade-in-up">
+          <div className="glass-dialog border border-stone-200 rounded-2xl p-6 max-w-md w-full shadow-xl animate-fade-in-up">
             <h3 className="text-lg font-bold text-stone-900 mb-1">Log Route Checkpoint</h3>
             <p className="text-xs text-stone-500 mb-4 font-sans">
               Record physical milestone transit along corridor route.
@@ -559,7 +559,7 @@ export default function ShipmentDetailPage() {
                   placeholder="e.g. Igatpuri Ghath Checkpoint"
                   value={checkpointForm.name}
                   onChange={(e) => setCheckpointForm({ ...checkpointForm, name: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
+                  className="w-full glass-control border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                 />
               </div>
 
@@ -572,7 +572,7 @@ export default function ShipmentDetailPage() {
                     placeholder="e.g. Igatpuri"
                     value={checkpointForm.city}
                     onChange={(e) => setCheckpointForm({ ...checkpointForm, city: e.target.value })}
-                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
+                    className="w-full glass-control border border-stone-200 rounded-lg px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                   />
                 </div>
               </div>

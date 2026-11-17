@@ -337,7 +337,7 @@ export default function DashboardPage() {
                   <button
                     key={act.label}
                     onClick={() => navigate(act.path)}
-                    className="w-full text-left p-3.5 rounded-xl border border-border bg-surface hover:border-forest/40 hover:bg-forest/5 hover:shadow-xs transition-all duration-150 cursor-pointer group flex items-start gap-3.5"
+                    className="w-full text-left p-3.5 rounded-xl border border-border glass-control hover:border-forest/40 hover:bg-forest/5 hover:shadow-xs transition-all duration-150 cursor-pointer group flex items-start gap-3.5"
                   >
                     <div className="w-9 h-9 rounded-lg bg-surface-muted border border-border flex items-center justify-center text-forest group-hover:bg-forest group-hover:text-white transition-colors shrink-0 mt-0.5">
                       <Icon className="w-4 h-4 stroke-[2]" />

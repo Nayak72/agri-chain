@@ -63,7 +63,7 @@ export default function ProduceCreatePage() {
         PRODUCE_CATALOG
       </Button>
 
-      <Card className="bg-white/95 border-[#E1DDD0] shadow-sm">
+      <Card className="glass-panel-strong border-[#E1DDD0] shadow-sm">
         <CardHeader className="border-b border-[#ECE7DA] pb-6">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2 h-2 rounded-full bg-[#244634]" />
@@ -101,7 +101,7 @@ export default function ProduceCreatePage() {
                 value={form.name}
                 onChange={handleChange}
                 placeholder="e.g. Alphonso Mangoes (Ratnagiri)"
-                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
               />
             </div>
 
@@ -117,7 +117,7 @@ export default function ProduceCreatePage() {
                   value={form.produce_type}
                   onChange={handleChange}
                   placeholder="e.g. MANGO_ALPHONSO"
-                  className="bg-white border-[#E1DDD0] uppercase font-mono focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] uppercase font-mono focus-visible:ring-[#244634]"
                 />
               </div>
               <div className="space-y-1.5">
@@ -128,7 +128,7 @@ export default function ProduceCreatePage() {
                   name="category"
                   value={form.category}
                   onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
                   <option value="FRUITS">FRUITS</option>
                   <option value="VEGETABLES">VEGETABLES</option>
@@ -153,7 +153,7 @@ export default function ProduceCreatePage() {
                 value={form.unit}
                 onChange={handleChange}
                 placeholder="e.g. KG, CRATE, TON"
-                className="bg-white border-[#E1DDD0] uppercase font-mono focus-visible:ring-[#244634]"
+                className="glass-control border-[#E1DDD0] uppercase font-mono focus-visible:ring-[#244634]"
               />
             </div>
 
@@ -167,7 +167,7 @@ export default function ProduceCreatePage() {
                 value={form.description}
                 onChange={handleChange}
                 placeholder="Optimal temperature range, humidity requirements, ventilation..."
-                className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
               />
             </div>
 
@@ -176,7 +176,7 @@ export default function ProduceCreatePage() {
                 type="button"
                 variant="outline"
                 onClick={() => navigate('/produce')}
-                className="flex-1 bg-white border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
+                className="flex-1 glass-control border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
               >
                 Cancel
               </Button>

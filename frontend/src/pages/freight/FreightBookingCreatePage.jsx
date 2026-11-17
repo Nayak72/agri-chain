@@ -176,7 +176,7 @@ export default function FreightBookingCreatePage() {
         BOOKINGS_DISPATCH
       </Button>
 
-      <Card className="bg-white/95 border-[#E1DDD0] shadow-sm">
+      <Card className="glass-panel-strong border-[#E1DDD0] shadow-sm">
         <CardHeader className="border-b border-[#ECE7DA] pb-6">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2 h-2 rounded-full bg-[#B36B21]" />
@@ -210,7 +210,7 @@ export default function FreightBookingCreatePage() {
                   required
                   value={form.purchase_order_id}
                   onChange={(e) => handlePoSelect(e.target.value)}
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
                   <option value="">Select accepted order...</option>
                   {acceptedOrders.map(po => (
@@ -229,7 +229,7 @@ export default function FreightBookingCreatePage() {
                   required
                   value={form.batch_ids[0] || ''}
                   onChange={(e) => setForm({ ...form, batch_ids: [e.target.value] })}
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
                   <option value="">Select produce batch...</option>
                   {batches.map(b => (
@@ -254,7 +254,7 @@ export default function FreightBookingCreatePage() {
                   name="package_count"
                   value={form.package_count}
                   onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
                 />
               </div>
 
@@ -266,7 +266,7 @@ export default function FreightBookingCreatePage() {
                   name="preferred_vehicle_category"
                   value={form.preferred_vehicle_category}
                   onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
                   <option value="REFRIGERATED_TRUCK">Refrigerated Truck (14ft / 3.5 Ton)</option>
                   <option value="REEFER_20FT">Refrigerated Truck (20ft / 7 Ton)</option>
@@ -288,7 +288,7 @@ export default function FreightBookingCreatePage() {
                   name="requested_pickup_date"
                   value={form.requested_pickup_date}
                   onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
                 />
               </div>
 
@@ -302,12 +302,12 @@ export default function FreightBookingCreatePage() {
                   name="required_delivery_date"
                   value={form.required_delivery_date}
                   onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] font-mono focus-visible:ring-[#244634]"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 rounded-2xl bg-[#F2EFE7]/50 border border-[#ECE7DA]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 rounded-2xl glass-inset border border-[#ECE7DA]">
               {/* Pickup */}
               <div className="space-y-2.5">
                 <div className="text-xs font-mono font-bold text-[#244634] uppercase flex items-center gap-2">
@@ -322,7 +322,7 @@ export default function FreightBookingCreatePage() {
                     required
                     value={form.pickup_city}
                     onChange={handleChange}
-                    className="bg-white border-[#E1DDD0] text-xs font-sans focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-sans focus-visible:ring-[#244634]"
                   />
                   <Input
                     type="text"
@@ -331,7 +331,7 @@ export default function FreightBookingCreatePage() {
                     required
                     value={form.pickup_state}
                     onChange={handleChange}
-                    className="bg-white border-[#E1DDD0] text-xs font-sans focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-sans focus-visible:ring-[#244634]"
                   />
                 </div>
               </div>
@@ -350,7 +350,7 @@ export default function FreightBookingCreatePage() {
                     required
                     value={form.destination_city}
                     onChange={handleChange}
-                    className="bg-white border-[#E1DDD0] text-xs font-sans focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-sans focus-visible:ring-[#244634]"
                   />
                   <Input
                     type="text"
@@ -359,7 +359,7 @@ export default function FreightBookingCreatePage() {
                     required
                     value={form.destination_state}
                     onChange={handleChange}
-                    className="bg-white border-[#E1DDD0] text-xs font-sans focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-sans focus-visible:ring-[#244634]"
                   />
                 </div>
               </div>
@@ -396,7 +396,7 @@ export default function FreightBookingCreatePage() {
                       name="temperature_min"
                       value={form.temperature_min}
                       onChange={handleChange}
-                      className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                      className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                     />
                   </div>
                   <div className="space-y-1">
@@ -407,7 +407,7 @@ export default function FreightBookingCreatePage() {
                       name="temperature_max"
                       value={form.temperature_max}
                       onChange={handleChange}
-                      className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                      className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                     />
                   </div>
                 </div>
@@ -419,7 +419,7 @@ export default function FreightBookingCreatePage() {
                 type="button"
                 variant="outline"
                 onClick={() => navigate('/freight-bookings')}
-                className="bg-white border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
+                className="glass-control border-[#E1DDD0] text-[#26312A] hover:bg-[#F2EFE7]"
               >
                 Cancel
               </Button>

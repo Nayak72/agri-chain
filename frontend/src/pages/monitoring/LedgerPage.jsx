@@ -156,7 +156,7 @@ export default function LedgerPage() {
             <button
               onClick={fetchLedgerData}
               disabled={loading}
-              className="p-2 rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 shadow-xs transition-colors"
+              className="p-2 rounded-lg border border-stone-200 glass-control text-stone-700 hover:bg-stone-50 shadow-xs transition-colors"
               title="Refresh ledger"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -202,7 +202,7 @@ export default function LedgerPage() {
 
       {/* Ledger summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+        <div className="rounded-xl border border-stone-200 glass-panel-strong p-4 shadow-xs">
           <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
             <span>Total Blocks</span>
             <Layers className="h-4 w-4 text-[#244634]" />
@@ -215,7 +215,7 @@ export default function LedgerPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+        <div className="rounded-xl border border-stone-200 glass-panel-strong p-4 shadow-xs">
           <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
             <span>Algorithm</span>
             <Lock className="h-4 w-4 text-emerald-700" />
@@ -226,12 +226,12 @@ export default function LedgerPage() {
           <div className="text-xs text-stone-500 mt-1 font-sans">NIST FIPS 180-4 Standard</div>
         </div>
 
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs col-span-2">
+        <div className="rounded-xl border border-stone-200 glass-panel-strong p-4 shadow-xs col-span-2">
           <div className="flex items-center justify-between text-stone-500 text-xs font-mono uppercase mb-2">
             <span>Head Block Hash</span>
             <Hash className="h-4 w-4 text-purple-700" />
           </div>
-          <div className="text-xs font-mono text-stone-700 truncate bg-stone-50 px-2.5 py-1.5 rounded-lg border border-stone-200 flex items-center justify-between">
+          <div className="text-xs font-mono text-stone-700 truncate glass-inset px-2.5 py-1.5 rounded-lg border border-stone-200 flex items-center justify-between">
             <span className="truncate">{blocks.length > 0 ? blocks[0].hash : 'GENESIS'}</span>
             <button
               onClick={() => copyToClipboard(blocks.length > 0 ? blocks[0].hash : '', 'head')}
@@ -246,7 +246,7 @@ export default function LedgerPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="rounded-xl border border-stone-200 glass-panel-strong p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="flex flex-1 items-center gap-3 w-full">
           <div className="relative flex-1">
             <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -255,7 +255,7 @@ export default function LedgerPage() {
               placeholder="Search by Event Summary, Hash, Entity ID, or Actor..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-xs font-mono text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
+              className="w-full pl-9 pr-4 py-2 glass-control border border-stone-200 rounded-lg text-xs font-mono text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
             />
           </div>
 
@@ -264,7 +264,7 @@ export default function LedgerPage() {
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-xs font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
+              className="glass-control border border-stone-200 rounded-lg px-3 py-2 text-xs font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
             >
               <option value="">All Event Types</option>
               {eventTypes.map((et) => (
@@ -304,7 +304,7 @@ export default function LedgerPage() {
             <select
               value={tamperBlockIdx ?? ''}
               onChange={(e) => setTamperBlockIdx(e.target.value === '' ? null : Number(e.target.value))}
-              className="w-full bg-white border border-stone-200 rounded-lg px-3 py-1.5 text-xs font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+              className="w-full glass-control border border-stone-200 rounded-lg px-3 py-1.5 text-xs font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
             >
               <option value="">Choose a block to test...</option>
               {blocks.map(b => (
@@ -324,7 +324,7 @@ export default function LedgerPage() {
               value={tamperedPayload}
               onChange={(e) => setTamperedPayload(e.target.value)}
               placeholder="e.g. { temperature: 35.0, cargo_weight: 9999 }"
-              className="w-full bg-white border border-stone-200 rounded-lg px-3 py-1.5 text-xs font-mono text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+              className="w-full glass-control border border-stone-200 rounded-lg px-3 py-1.5 text-xs font-mono text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
             />
           </div>
 
@@ -377,7 +377,7 @@ export default function LedgerPage() {
       {/* Connected Block Sequence */}
       <div className="space-y-4">
         {filteredBlocks.length === 0 ? (
-          <div className="py-12 text-center text-stone-500 text-sm font-mono border border-dashed border-stone-200 rounded-xl bg-white">
+          <div className="py-12 text-center text-stone-500 text-sm font-mono border border-dashed border-stone-200 rounded-xl glass-panel-strong">
             No ledger blocks found matching your query
           </div>
         ) : (
@@ -393,7 +393,7 @@ export default function LedgerPage() {
                   <div className="absolute left-6 top-full h-4 w-0.5 bg-stone-200 z-0" />
                 )}
 
-                <div className="rounded-xl border border-stone-200 bg-white hover:border-stone-300 transition-all p-5 shadow-xs relative z-10">
+                <div className="rounded-xl border border-stone-200 glass-panel-strong hover:border-stone-300 transition-all p-5 shadow-xs relative z-10">
                   {/* Top Bar: Index, Event Type, Timestamp */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-3 mb-3">
                     <div className="flex items-center gap-3">
@@ -445,7 +445,7 @@ export default function LedgerPage() {
                   </div>
 
                   {/* Cryptographic Linkage Box */}
-                  <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 space-y-2 text-xs font-mono">
+                  <div className="rounded-lg glass-inset border border-stone-200 p-3 space-y-2 text-xs font-mono">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-1">
                       <span className="text-stone-500 text-[10px] uppercase flex items-center gap-1 font-semibold">
                         <LinkIcon className="h-3 w-3 text-stone-400" />

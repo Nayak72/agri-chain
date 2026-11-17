@@ -143,7 +143,7 @@ export default function UsersPage() {
           <button
             onClick={fetchUsers}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 shadow-xs transition-colors"
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono rounded-lg border border-stone-200 glass-control text-stone-700 hover:bg-stone-50 shadow-xs transition-colors"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-stone-400' : 'text-stone-500'}`} />
             <span>Refresh Registry</span>
@@ -167,25 +167,25 @@ export default function UsersPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+        <div className="rounded-xl border border-stone-200 glass-panel p-4 shadow-xs">
           <div className="text-xs font-mono uppercase text-stone-500 mb-1 font-semibold">Total Users</div>
           <div className="text-2xl font-bold font-mono text-stone-900">{total}</div>
           <div className="text-xs text-stone-500 mt-1 font-sans">Platform-wide identity records</div>
         </div>
 
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+        <div className="rounded-xl border border-stone-200 glass-panel p-4 shadow-xs">
           <div className="text-xs font-mono uppercase text-stone-500 mb-1 font-semibold">Active Accounts</div>
           <div className="text-2xl font-bold font-mono text-emerald-700">{activeCount}</div>
           <div className="text-xs text-stone-500 mt-1 font-sans">Authorized for authentication</div>
         </div>
 
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+        <div className="rounded-xl border border-stone-200 glass-panel p-4 shadow-xs">
           <div className="text-xs font-mono uppercase text-stone-500 mb-1 font-semibold">Pending KYC Approval</div>
           <div className="text-2xl font-bold font-mono text-amber-700">{pendingApprovals}</div>
           <div className="text-xs text-stone-500 mt-1 font-sans">Awaiting administrator verification</div>
         </div>
 
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs">
+        <div className="rounded-xl border border-stone-200 glass-panel p-4 shadow-xs">
           <div className="text-xs font-mono uppercase text-stone-500 mb-1 font-semibold">Roles Defined</div>
           <div className="text-2xl font-bold font-mono text-[#244634]">6 Roles</div>
           <div className="text-xs text-stone-500 mt-1 font-sans">RBAC matrix enforced</div>
@@ -193,7 +193,7 @@ export default function UsersPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="rounded-xl border border-stone-200 glass-panel p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
         <form onSubmit={handleSearchSubmit} className="flex flex-1 items-center gap-3 w-full">
           <div className="relative flex-1">
             <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -202,7 +202,7 @@ export default function UsersPage() {
               placeholder="Search by full name or email address..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-xs font-mono text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
+              className="w-full pl-9 pr-4 py-2 glass-control border border-stone-200 rounded-lg text-xs font-mono text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
             />
           </div>
 
@@ -211,7 +211,7 @@ export default function UsersPage() {
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-xs font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
+              className="glass-control border border-stone-200 rounded-lg px-3 py-2 text-xs font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
             >
               <option value="">All Roles</option>
               <option value="admin">Admin</option>
@@ -225,7 +225,7 @@ export default function UsersPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-xs font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
+              className="glass-control border border-stone-200 rounded-lg px-3 py-2 text-xs font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
             >
               <option value="">All Statuses</option>
               <option value="true">Active Only</option>
@@ -236,7 +236,7 @@ export default function UsersPage() {
       </div>
 
       {/* Users Directory Table */}
-      <div className="rounded-xl border border-stone-200 bg-white overflow-hidden shadow-xs">
+      <div className="rounded-xl border border-stone-200 glass-panel-strong overflow-hidden shadow-xs">
         {loading ? (
           <div className="py-12 text-center text-stone-500 text-xs font-mono">
             Loading user directory...

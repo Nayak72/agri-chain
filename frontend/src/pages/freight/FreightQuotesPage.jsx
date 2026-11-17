@@ -122,7 +122,7 @@ export default function FreightQuotesPage() {
             size="sm"
             onClick={() => refetch()}
             disabled={isFetching}
-            className="gap-2 bg-white/80 border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
+            className="gap-2 glass-control border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
             <span>Sync</span>
@@ -132,7 +132,7 @@ export default function FreightQuotesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Quotation Submission Form */}
-        <Card className="lg:col-span-1 bg-white/95 border-[#E1DDD0] shadow-sm h-fit">
+        <Card className="lg:col-span-1 glass-panel-strong border-[#E1DDD0] shadow-sm h-fit">
           <CardHeader className="border-b border-[#ECE7DA] pb-5">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full bg-[#3F7C56]" />
@@ -171,7 +171,7 @@ export default function FreightQuotesPage() {
                   required
                   value={form.booking_id}
                   onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                 >
                   <option value="">Select dispatch booking...</option>
                   {bookings.map(b => (
@@ -188,7 +188,7 @@ export default function FreightQuotesPage() {
                   name="proposed_vehicle_category"
                   value={form.proposed_vehicle_category}
                   onChange={handleChange}
-                  className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                  className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                 >
                   <option value="REFRIGERATED_TRUCK">Refrigerated Truck (14ft)</option>
                   <option value="REEFER_20FT">Refrigerated Truck (20ft)</option>
@@ -207,7 +207,7 @@ export default function FreightQuotesPage() {
                     name="freight_base_charge_inr"
                     value={form.freight_base_charge_inr}
                     onChange={handleChange}
-                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                   />
                 </div>
 
@@ -221,7 +221,7 @@ export default function FreightQuotesPage() {
                     name="fuel_surcharge_inr"
                     value={form.fuel_surcharge_inr}
                     onChange={handleChange}
-                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                   />
                 </div>
 
@@ -236,7 +236,7 @@ export default function FreightQuotesPage() {
                     name="planned_distance_km"
                     value={form.planned_distance_km}
                     onChange={handleChange}
-                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                   />
                 </div>
                 <div className="space-y-1">
@@ -248,7 +248,7 @@ export default function FreightQuotesPage() {
                     name="estimated_transit_hours"
                     value={form.estimated_transit_hours}
                     onChange={handleChange}
-                    className="bg-white border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
+                    className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                   />
                 </div>
               </div>
@@ -266,8 +266,8 @@ export default function FreightQuotesPage() {
         </Card>
 
         {/* Right Column: Quotes List */}
-        <Card className="lg:col-span-2 bg-white/95 border-[#E1DDD0] overflow-hidden shadow-sm h-fit">
-          <div className="p-6 border-b border-[#ECE7DA] bg-[#F2EFE7]/40">
+        <Card className="lg:col-span-2 glass-panel-strong border-[#E1DDD0] overflow-hidden shadow-sm h-fit">
+          <div className="p-6 border-b border-[#ECE7DA] glass-inset">
             <h2 className="text-base font-serif font-bold text-[#1B2A20] flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#244634]" />
               Exchange Quotations Ledger
@@ -289,7 +289,7 @@ export default function FreightQuotesPage() {
             </div>
           ) : (
             <Table>
-              <TableHeader className="bg-[#F2EFE7]/60">
+              <TableHeader className="glass-inset">
                 <TableRow className="border-[#ECE7DA]">
                   <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E] py-3.5">Quote ID</TableHead>
                   <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Booking Ref</TableHead>
@@ -303,7 +303,7 @@ export default function FreightQuotesPage() {
                 {quotes.map((q) => {
                   const quoteKey = q.id || q._id || q.quotation_id
                   return (
-                    <TableRow key={quoteKey} className="hover:bg-[#F2EFE7]/40 transition-colors border-[#ECE7DA]">
+                    <TableRow key={quoteKey} className="hover:glass-inset transition-colors border-[#ECE7DA]">
                       <TableCell className="font-bold text-[#244634] py-4">{q.quotation_id || quoteKey}</TableCell>
                       <TableCell className="text-[#26312A] cursor-pointer hover:underline font-semibold" onClick={() => navigate(`/freight-bookings/${q.booking_id}`)}>
                         {q.booking_id}

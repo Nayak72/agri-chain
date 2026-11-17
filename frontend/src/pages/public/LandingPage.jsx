@@ -106,9 +106,9 @@ export default function LandingPage() {
   const { isAuthenticated } = useAuth()
 
   return (
-    <div className="min-h-screen bg-[#F6F4EC] text-[#26312A] font-sans selection:bg-[#244634]/20 selection:text-[#244634]">
+    <div className="glass-shell min-h-screen text-[#26312A] font-sans selection:bg-[#244634]/20 selection:text-[#244634]">
       {/* 1. Header Navigation */}
-      <nav className="fixed top-0 w-full z-50 bg-[#F6F4EC]/90 backdrop-blur-md border-b border-[#E5E3D9]">
+      <nav className="fixed top-0 w-full z-50 glass-topbar border-b border-[#E5E3D9]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link to={isAuthenticated ? "/dashboard" : "/"} className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-forest text-white flex items-center justify-center shadow-xs">
@@ -166,7 +166,7 @@ export default function LandingPage() {
 
         {/* Mobile dropdown */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-b border-border bg-surface px-4 pt-3 pb-5 space-y-3 shadow-lg">
+          <div className="md:hidden border-b border-border glass-panel-strong px-4 pt-3 pb-5 space-y-3 shadow-lg">
             <a
               href="#capabilities"
               onClick={() => setMobileMenuOpen(false)}
@@ -246,7 +246,7 @@ export default function LandingPage() {
             </Link>
             <a
               href="#capabilities"
-              className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-surface border border-border hover:bg-surface-muted text-ink-primary font-medium text-sm transition-all text-center shadow-2xs"
+              className="w-full sm:w-auto px-6 py-3.5 rounded-xl glass-control border border-border hover:bg-surface-muted text-ink-primary font-medium text-sm transition-all text-center shadow-2xs"
             >
               Platform Overview
             </a>
@@ -254,19 +254,19 @@ export default function LandingPage() {
 
           {/* Key Platform Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 pt-10 border-t border-border max-w-4xl mx-auto">
-            <div className="p-5 rounded-2xl bg-surface border border-border text-center shadow-2xs">
+            <div className="p-5 rounded-2xl glass-panel border border-border text-center shadow-2xs">
               <div className="text-2xl sm:text-3xl font-bold font-mono text-forest">6 Roles</div>
               <div className="text-xs text-ink-secondary mt-1 font-medium">Full Supply Chain RBAC</div>
             </div>
-            <div className="p-5 rounded-2xl bg-surface border border-border text-center shadow-2xs">
+            <div className="p-5 rounded-2xl glass-panel border border-border text-center shadow-2xs">
               <div className="text-2xl sm:text-3xl font-bold font-mono text-forest">100%</div>
               <div className="text-xs text-ink-secondary mt-1 font-medium">Exact Weight Reconciliation</div>
             </div>
-            <div className="p-5 rounded-2xl bg-surface border border-border text-center shadow-2xs">
+            <div className="p-5 rounded-2xl glass-panel border border-border text-center shadow-2xs">
               <div className="text-2xl sm:text-3xl font-bold font-mono text-terracotta">Telemetry</div>
               <div className="text-xs text-ink-secondary mt-1 font-medium">Simulated IoT Reefer Feeds</div>
             </div>
-            <div className="p-5 rounded-2xl bg-surface border border-border text-center shadow-2xs">
+            <div className="p-5 rounded-2xl glass-panel border border-border text-center shadow-2xs">
               <div className="text-2xl sm:text-3xl font-bold font-mono text-sage-dark">SHA-256</div>
               <div className="text-xs text-ink-secondary mt-1 font-medium">Hash-Chained Audit Ledger</div>
             </div>
@@ -293,7 +293,7 @@ export default function LandingPage() {
               return (
                 <div
                   key={i}
-                  className="p-6 rounded-2xl bg-surface border border-border shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all"
+                  className="p-6 rounded-2xl glass-panel border border-border shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all"
                 >
                   <div className="w-12 h-12 rounded-xl bg-forest/10 border border-forest/20 text-forest flex items-center justify-center mb-4">
                     <Icon className="w-6 h-6 stroke-[1.8]" />
@@ -324,7 +324,7 @@ export default function LandingPage() {
             {WORKFLOW_STEPS.map((s, idx) => (
               <div
                 key={idx}
-                className="p-6 rounded-2xl bg-surface border border-border shadow-2xs relative flex flex-col justify-between"
+                className="p-6 rounded-2xl glass-panel border border-border shadow-2xs relative flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -379,7 +379,7 @@ export default function LandingPage() {
             </div>
 
             {/* Simulated telemetry card */}
-            <div className="rounded-2xl border border-border bg-surface p-6 sm:p-8 shadow-sm">
+            <div className="rounded-2xl border border-border glass-panel p-6 sm:p-8 shadow-sm">
               <div className="flex items-center justify-between pb-4 border-b border-border">
                 <div className="flex items-center gap-2">
                   <Thermometer className="w-5 h-5 text-forest" />
@@ -391,12 +391,12 @@ export default function LandingPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-4 my-6">
-                <div className="p-4 rounded-xl bg-surface-muted/60 border border-border">
+                <div className="p-4 rounded-xl glass-inset border border-border">
                   <div className="text-[11px] font-mono text-ink-secondary uppercase">Current Temp</div>
                   <div className="text-2xl font-bold font-mono text-forest mt-1">4.2 °C</div>
                   <div className="text-[10px] text-ink-tertiary mt-0.5">Range: 2.0 °C - 6.0 °C</div>
                 </div>
-                <div className="p-4 rounded-xl bg-surface-muted/60 border border-border">
+                <div className="p-4 rounded-xl glass-inset border border-border">
                   <div className="text-[11px] font-mono text-ink-secondary uppercase">Humidity</div>
                   <div className="text-2xl font-bold font-mono text-ink-primary mt-1">88.5 %</div>
                   <div className="text-[10px] text-ink-tertiary mt-0.5">Target: 85% - 92%</div>
@@ -430,9 +430,9 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-border bg-surface p-6 sm:p-8 shadow-xs">
+          <div className="rounded-2xl border border-border glass-panel p-6 sm:p-8 shadow-xs">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="p-4 rounded-xl bg-surface-muted/60 border border-border">
+              <div className="p-4 rounded-xl glass-inset border border-border">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-mono text-forest font-bold">Block #1</span>
                   <span className="text-[10px] font-mono bg-forest/10 text-forest px-2 py-0.5 rounded font-semibold">GENESIS</span>
@@ -441,7 +441,7 @@ export default function LandingPage() {
                 <div className="text-[11px] text-ink-secondary mt-1 font-mono">PRODUCE_BATCH_CREATED</div>
               </div>
 
-              <div className="p-4 rounded-xl bg-surface-muted/60 border border-border">
+              <div className="p-4 rounded-xl glass-inset border border-border">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-mono text-forest font-bold">Block #2</span>
                   <span className="text-[10px] font-mono bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.5 rounded font-semibold">LINKED</span>
@@ -450,7 +450,7 @@ export default function LandingPage() {
                 <div className="text-[11px] text-ink-secondary mt-1 font-mono">WAREHOUSE_RECEIVED</div>
               </div>
 
-              <div className="p-4 rounded-xl bg-surface-muted/60 border border-border">
+              <div className="p-4 rounded-xl glass-inset border border-border">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-mono text-forest font-bold">Block #3</span>
                   <span className="text-[10px] font-mono bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded font-semibold">LOCKED</span>
@@ -485,7 +485,7 @@ export default function LandingPage() {
             </Link>
             <Link
               to="/login"
-              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-surface border border-border hover:bg-surface-muted text-ink-primary font-medium text-sm transition-all"
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl glass-control border border-border hover:bg-surface-muted text-ink-primary font-medium text-sm transition-all"
             >
               Sign In to Platform
             </Link>
@@ -494,7 +494,7 @@ export default function LandingPage() {
       </section>
 
       {/* 8. System Footer */}
-      <footer className="border-t border-border py-12 px-4 sm:px-6 lg:px-8 bg-surface">
+      <footer className="border-t border-border py-12 px-4 sm:px-6 lg:px-8 glass-topbar">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-forest text-white flex items-center justify-center font-bold font-mono text-sm">

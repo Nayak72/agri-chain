@@ -48,7 +48,7 @@ export default function ProduceListPage() {
               size="sm"
               onClick={() => refetch()}
               disabled={isFetching}
-              className="gap-2 bg-white/80 border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
+              className="gap-2 glass-control border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
               <span>Sync</span>
@@ -78,7 +78,7 @@ export default function ProduceListPage() {
               className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
                 selectedCategory === cat
                   ? 'bg-[#244634] text-white shadow-xs font-semibold'
-                  : 'bg-white/80 border border-[#E1DDD0] text-[#526357] hover:bg-[#F2EFE7] hover:text-[#26312A]'
+                  : 'glass-control border border-[#E1DDD0] text-[#526357] hover:bg-[#F2EFE7] hover:text-[#26312A]'
               }`}
             >
               {cat}
@@ -93,7 +93,7 @@ export default function ProduceListPage() {
             placeholder="Search produce..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-9 text-xs bg-white/90 border-[#E1DDD0] text-[#26312A] placeholder:text-[#7A887E] focus-visible:ring-[#244634]"
+            className="pl-9 h-9 text-xs glass-control border-[#E1DDD0] text-[#26312A] placeholder:text-[#7A887E] focus-visible:ring-[#244634]"
           />
         </div>
       </div>
@@ -131,7 +131,7 @@ export default function ProduceListPage() {
               <Card
                 key={itemId}
                 onClick={() => navigate(`/produce/${itemId}`)}
-                className="group cursor-pointer hover:border-[#244634]/50 hover:shadow-md transition-all duration-300 bg-white/90 border-[#E1DDD0] flex flex-col justify-between"
+                className="group cursor-pointer hover:border-[#244634]/50 hover:shadow-md transition-all duration-300 glass-panel border-[#E1DDD0] flex flex-col justify-between"
               >
                 <CardContent className="p-5 flex flex-col justify-between h-full">
                   <div>

@@ -45,7 +45,7 @@ export default function FarmsListPage() {
               size="sm"
               onClick={() => refetch()}
               disabled={isFetching}
-              className="gap-2 bg-white/80 border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
+              className="gap-2 glass-control border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
               <span>Sync</span>
@@ -74,7 +74,7 @@ export default function FarmsListPage() {
             placeholder="Search by farm name, city, or state..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-white/90 border-[#E1DDD0] text-sm text-[#26312A] placeholder:text-[#7A887E] focus-visible:ring-[#244634]"
+            className="pl-10 glass-control border-[#E1DDD0] text-sm text-[#26312A] placeholder:text-[#7A887E] focus-visible:ring-[#244634]"
           />
         </div>
         <div className="text-xs font-mono text-[#526357] flex items-center gap-1.5 self-end sm:self-center">
@@ -118,7 +118,7 @@ export default function FarmsListPage() {
               <Card
                 key={farmId}
                 onClick={() => navigate(`/farms/${farmId}`)}
-                className="group cursor-pointer hover:border-[#244634]/50 hover:shadow-md transition-all duration-300 bg-white/90 border-[#E1DDD0] overflow-hidden"
+                className="group cursor-pointer hover:border-[#244634]/50 hover:shadow-md transition-all duration-300 glass-panel-strong border-[#E1DDD0] overflow-hidden"
               >
                 <CardContent className="p-6 flex flex-col justify-between h-full">
                   <div>

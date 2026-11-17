@@ -27,8 +27,16 @@ export function DialogTrigger({ children, asChild = false, ...props }) {
   })
 }
 
-export function DialogContent({ className, children, ...props }) {
+export function DialogContent({ className, children, showCloseButton = true, ...props }) {
   const { open, setOpen } = React.useContext(DialogContext)
+  const [present, setPresent] = React.useState(open)
+  const panel = React.useRef(null)
+
+  React.useEffect(() => {
+    if (open) { setPresent(true); return }
+    const timer = setTimeout(() => setPresent(false), 180)
+    return () => clearTimeout(timer)
+  }, [open])
 
   React.useEffect(() => {
     const handleKeyDown = (e) => {
@@ -40,32 +48,58 @@ export function DialogContent({ className, children, ...props }) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [open, setOpen])
 
-  if (!open) return null
+  React.useEffect(() => {
+    if (!open || !present) return
+    const previous = document.activeElement
+    const oldOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    panel.current?.focus()
+    const trapFocus = (event) => {
+      if (event.key !== 'Tab') return
+      const controls = [...(panel.current?.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]') || [])].filter(el => el.getClientRects().length)
+      const first = controls[0], last = controls[controls.length - 1]
+      if (!first) { event.preventDefault(); return }
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === panel.current)) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', trapFocus)
+    return () => {
+      document.body.style.overflow = oldOverflow
+      document.removeEventListener('keydown', trapFocus)
+      previous?.focus()
+    }
+  }, [open, present])
+
+  if (!open && !present) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div data-closing={!open} inert={!open ? "" : undefined} className="dialog-presence fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-[#1b251e]/40 backdrop-blur-xs transition-opacity animate-fade-in-down"
+        className="fixed inset-0 glass-overlay"
         onClick={() => setOpen(false)}
       />
 
       {/* Modal Card */}
       <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
         className={cn(
-          'relative z-50 w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-2xl transition-all duration-200 animate-fade-in-up',
+          'glass-dialog relative z-50 w-full max-w-lg rounded-2xl border p-6',
           className
         )}
         {...props}
       >
-        <button
+        {showCloseButton && <button
           onClick={() => setOpen(false)}
           className="absolute right-4 top-4 rounded-lg p-1 text-ink-secondary hover:bg-surface-muted hover:text-ink-primary transition-colors cursor-pointer"
           title="Close"
         >
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
-        </button>
+        </button>}
         {children}
       </div>
     </div>,

@@ -75,7 +75,7 @@ export default function WarehouseDetailPage() {
       {/* 2/3 + 1/3 Header Deck */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Identity Card */}
-        <Card className="lg:col-span-2 bg-white/95 border-[#E1DDD0] shadow-sm relative overflow-hidden">
+        <Card className="lg:col-span-2 glass-panel-strong border-[#E1DDD0] shadow-sm relative overflow-hidden">
           <CardContent className="p-8">
             <Button
               variant="ghost"
@@ -102,7 +102,7 @@ export default function WarehouseDetailPage() {
         </Card>
 
         {/* Dynamic Capacity Control Card */}
-        <Card className="bg-white/95 border-[#E1DDD0] shadow-sm flex flex-col justify-between">
+        <Card className="glass-panel-strong border-[#E1DDD0] shadow-sm flex flex-col justify-between">
           <CardContent className="p-6 flex flex-col justify-between h-full">
             <div>
               <h3 className="text-xs font-mono text-[#526357] uppercase tracking-widest font-semibold mb-3">Capacity Status</h3>
@@ -134,7 +134,7 @@ export default function WarehouseDetailPage() {
       </div>
 
       {/* Operational Actions Deck */}
-      <div className="p-2 rounded-2xl bg-white/80 border border-[#E1DDD0] grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="p-2 rounded-2xl glass-panel border border-[#E1DDD0] grid grid-cols-2 md:grid-cols-4 gap-2">
         <Button
           variant="ghost"
           onClick={() => navigate('/produce/new')}
@@ -173,8 +173,8 @@ export default function WarehouseDetailPage() {
       </div>
 
       {/* Payloads / Stored Stock Table */}
-      <Card className="bg-white/95 border-[#E1DDD0] overflow-hidden shadow-xs">
-        <div className="p-6 border-b border-[#ECE7DA] flex justify-between items-center bg-[#F2EFE7]/40">
+      <Card className="glass-panel-strong border-[#E1DDD0] overflow-hidden shadow-xs">
+        <div className="p-6 border-b border-[#ECE7DA] flex justify-between items-center glass-inset">
           <div>
             <h2 className="text-base font-serif font-bold text-[#1B2A20] flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#244634]" />
@@ -211,7 +211,7 @@ export default function WarehouseDetailPage() {
           </div>
         ) : (
           <Table>
-            <TableHeader className="bg-[#F2EFE7]/60">
+            <TableHeader className="glass-inset">
               <TableRow className="border-[#ECE7DA]">
                 <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E] py-3.5">Batch ID</TableHead>
                 <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Commodity</TableHead>
@@ -223,7 +223,7 @@ export default function WarehouseDetailPage() {
             </TableHeader>
             <TableBody className="divide-y divide-[#ECE7DA] font-mono text-xs">
               {inventoryItems.map((item) => (
-                <TableRow key={item.id || item._id} className="hover:bg-[#F2EFE7]/40 transition-colors border-[#ECE7DA]">
+                <TableRow key={item.id || item._id} className="hover:glass-inset transition-colors border-[#ECE7DA]">
                   <TableCell className="font-bold text-[#244634] py-4">{item.batch_id}</TableCell>
                   <TableCell className="text-[#26312A] font-sans font-medium">{item.produce_type}</TableCell>
                   <TableCell className="text-[#526357]">{item.storage_location || 'Aisle A-01'}</TableCell>

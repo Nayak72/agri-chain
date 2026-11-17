@@ -92,7 +92,7 @@ export default function FreightBookingDetailPage() {
       </Button>
 
       {/* Header Deck */}
-      <Card className="bg-white/95 border-[#E1DDD0] shadow-sm">
+      <Card className="glass-panel-strong border-[#E1DDD0] shadow-sm">
         <CardContent className="p-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
@@ -132,7 +132,7 @@ export default function FreightBookingDetailPage() {
 
       {/* Routing & Cargo Details */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="bg-white/90 border-[#E1DDD0]">
+        <Card className="glass-panel border-[#E1DDD0]">
           <CardContent className="p-6">
             <h3 className="text-xs font-mono text-[#526357] uppercase tracking-widest font-semibold mb-4">
               Cargo & Fleet Criteria
@@ -166,18 +166,18 @@ export default function FreightBookingDetailPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/90 border-[#E1DDD0] flex flex-col justify-between">
+        <Card className="glass-panel border-[#E1DDD0] flex flex-col justify-between">
           <CardContent className="p-6 flex flex-col justify-between h-full">
             <div>
               <h3 className="text-xs font-mono text-[#526357] uppercase tracking-widest font-semibold mb-4">
                 Route Trajectory
               </h3>
               <div className="space-y-3 font-mono text-xs">
-                <div className="p-3.5 rounded-xl bg-[#F2EFE7]/60 border border-[#ECE7DA]">
+                <div className="p-3.5 rounded-xl glass-inset border border-[#ECE7DA]">
                   <span className="text-[10px] text-[#244634] block font-bold uppercase mb-1">Origin Pickup</span>
                   <div className="text-[#1B2A20] font-semibold font-sans">{booking.pickup_city}, {booking.pickup_state}</div>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#F2EFE7]/60 border border-[#ECE7DA]">
+                <div className="p-3.5 rounded-xl glass-inset border border-[#ECE7DA]">
                   <span className="text-[10px] text-[#3F7C56] block font-bold uppercase mb-1">Destination Hub</span>
                   <div className="text-[#1B2A20] font-semibold font-sans">{booking.destination_city}, {booking.destination_state}</div>
                 </div>
@@ -191,8 +191,8 @@ export default function FreightBookingDetailPage() {
       </div>
 
       {/* Received Transporter Quotations Table */}
-      <Card className="bg-white/95 border-[#E1DDD0] overflow-hidden">
-        <div className="p-6 border-b border-[#ECE7DA] flex justify-between items-center bg-[#F2EFE7]/40">
+      <Card className="glass-panel-strong border-[#E1DDD0] overflow-hidden">
+        <div className="p-6 border-b border-[#ECE7DA] flex justify-between items-center glass-inset">
           <div>
             <h2 className="text-base font-serif font-bold text-[#1B2A20] flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#3F7C56]" />
@@ -231,7 +231,7 @@ export default function FreightBookingDetailPage() {
           </div>
         ) : (
           <Table>
-            <TableHeader className="bg-[#F2EFE7]/60">
+            <TableHeader className="glass-inset">
               <TableRow className="border-[#ECE7DA]">
                 <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E] py-3.5">Quote ID</TableHead>
                 <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Transporter</TableHead>
@@ -247,7 +247,7 @@ export default function FreightBookingDetailPage() {
                 const quoteKey = q.id || q._id || q.quotation_id
                 const isAccepted = q.status === 'ACCEPTED'
                 return (
-                  <TableRow key={quoteKey} className="hover:bg-[#F2EFE7]/40 transition-colors border-[#ECE7DA]">
+                  <TableRow key={quoteKey} className="hover:glass-inset transition-colors border-[#ECE7DA]">
                     <TableCell className="font-bold text-[#244634] py-4">{q.quotation_id || quoteKey}</TableCell>
                     <TableCell className="text-[#26312A]">{q.transporter_id}</TableCell>
                     <TableCell className="text-[#526357]">{q.proposed_vehicle_category}</TableCell>

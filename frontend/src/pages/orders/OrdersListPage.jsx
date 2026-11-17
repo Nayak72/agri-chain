@@ -49,7 +49,7 @@ export default function OrdersListPage() {
               size="sm"
               onClick={() => refetch()}
               disabled={isFetching}
-              className="gap-2 bg-white/80 border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
+              className="gap-2 glass-control border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
               <span>Sync</span>
@@ -78,7 +78,7 @@ export default function OrdersListPage() {
             placeholder="Search order ID or commodity..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-white/90 border-[#E1DDD0] text-sm text-[#26312A] placeholder:text-[#7A887E] focus-visible:ring-[#244634]"
+            className="pl-10 glass-control border-[#E1DDD0] text-sm text-[#26312A] placeholder:text-[#7A887E] focus-visible:ring-[#244634]"
           />
         </div>
 
@@ -90,7 +90,7 @@ export default function OrdersListPage() {
               className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
                 statusFilter === st
                   ? 'bg-[#244634] text-white font-semibold shadow-xs'
-                  : 'bg-white/80 border border-[#E1DDD0] text-[#526357] hover:bg-[#F2EFE7] hover:text-[#26312A]'
+                  : 'glass-control border border-[#E1DDD0] text-[#526357] hover:bg-[#F2EFE7] hover:text-[#26312A]'
               }`}
             >
               {st}
@@ -125,9 +125,9 @@ export default function OrdersListPage() {
           }
         />
       ) : (
-        <div className="bg-white/95 border border-[#E1DDD0] rounded-2xl overflow-hidden shadow-xs">
+        <div className="glass-panel-strong border border-[#E1DDD0] rounded-2xl overflow-hidden shadow-xs">
           <Table>
-            <TableHeader className="bg-[#F2EFE7]/60">
+            <TableHeader className="glass-inset">
               <TableRow className="border-[#ECE7DA] hover:bg-transparent">
                 <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E] py-3.5">Order ID</TableHead>
                 <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Commodity</TableHead>
@@ -145,7 +145,7 @@ export default function OrdersListPage() {
                   <TableRow
                     key={orderKey}
                     onClick={() => navigate(`/purchase-orders/${orderKey}`)}
-                    className="hover:bg-[#F2EFE7]/40 cursor-pointer transition-colors border-[#ECE7DA]"
+                    className="hover:glass-inset cursor-pointer transition-colors border-[#ECE7DA]"
                   >
                     <TableCell className="font-bold text-[#244634] py-4">{order.order_id || orderKey}</TableCell>
                     <TableCell className="text-[#26312A] font-sans font-medium">{order.produce_type}</TableCell>

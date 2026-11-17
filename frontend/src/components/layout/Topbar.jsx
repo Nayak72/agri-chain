@@ -70,7 +70,7 @@ export function Topbar({ onOpenMobile }) {
   const pathParts = location.pathname.split('/').filter(Boolean)
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-border bg-surface/90 px-4 backdrop-blur-md sm:px-6 lg:px-8 select-none">
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between glass-topbar border-b px-4 sm:px-6 lg:px-8 select-none">
       {/* Left: Mobile hamburger & Breadcrumbs */}
       <div className="flex items-center gap-3 min-w-0">
         <button
@@ -120,7 +120,7 @@ export function Topbar({ onOpenMobile }) {
       <div className="flex items-center gap-3 shrink-0">
         {/* System Health Status (Strictly SYS:ONLINE or SYS:OFFLINE) */}
         {systemOnline !== null && (
-          <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-surface-muted/80 border border-border text-[11px] font-mono">
+          <div className="flex items-center gap-2 px-2.5 py-1 rounded-full glass-control border text-[11px] font-mono">
             <span
               className={`h-2 w-2 rounded-full ${
                 systemOnline

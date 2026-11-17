@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React from 'react'
+import NavIndicator from './NavIndicator'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { ROLES, ALL_ROLES, ADMIN_ONLY, normalizeRole, isRoleAllowed } from '@/constants/roles'
@@ -105,14 +106,14 @@ export function Sidebar({ collapsed, onToggleCollapse, className }) {
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 hidden lg:flex flex-col bg-[#1b3527] border-r border-[#152a1e] text-[#F6F4EC] transition-all duration-200 select-none ${
+      className={`fixed inset-y-0 left-0 z-40 hidden lg:flex flex-col glass-sidebar border-r text-[#F6F4EC] transition-all duration-200 select-none ${
         collapsed ? 'w-[72px]' : 'w-[252px]'
       } ${className || ''}`}
     >
       {/* Brand Header */}
       <div className="flex h-16 items-center px-4 border-b border-white/10 justify-between shrink-0">
         <NavLink to="/dashboard" className="flex items-center gap-3 overflow-hidden">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-300 border border-white/15 shadow-sm">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-sage-light border border-white/15 shadow-sm">
             <Leaf className="h-5 w-5 stroke-[2]" />
           </div>
           {!collapsed && (
@@ -120,7 +121,7 @@ export function Sidebar({ collapsed, onToggleCollapse, className }) {
               <span className="text-base font-bold tracking-tight text-white leading-tight truncate">
                 AgriChain
               </span>
-              <span className="text-[10px] font-mono tracking-wider text-emerald-300/80 uppercase truncate">
+              <span className="text-[10px] font-mono tracking-wider text-sage-light/80 uppercase truncate">
                 Nature Meets Precision
               </span>
             </div>
@@ -129,7 +130,7 @@ export function Sidebar({ collapsed, onToggleCollapse, className }) {
       </div>
 
       {/* Navigation Links (Scrollable) */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6 scrollbar-thin">
+      <NavIndicator route={location.pathname} collapsed={collapsed} className="flex-1 overflow-y-auto px-3 py-4 scrollbar-thin">
         {visibleSectors.map((sec) => (
           <div key={sec.sector} className="space-y-1">
             {!collapsed && (
@@ -149,15 +150,15 @@ export function Sidebar({ collapsed, onToggleCollapse, className }) {
                   key={item.path}
                   to={item.path}
                   title={collapsed ? item.label : undefined}
-                  className={`group flex items-center gap-3 rounded-xl px-2.5 py-2 text-xs font-medium transition-all ${
+                  className={`glass-nav group flex items-center gap-3 rounded-xl px-2.5 py-2 text-xs font-medium transition-all ${
                     isActive
-                      ? 'bg-white/15 text-white font-semibold shadow-xs border border-white/10'
+                      ? 'glass-nav-active text-white font-semibold'
                       : 'text-white/70 hover:bg-white/10 hover:text-white'
                   } ${collapsed ? 'justify-center px-0' : ''}`}
                 >
                   <Icon
                     className={`h-4 w-4 shrink-0 transition-transform group-hover:scale-105 ${
-                      isActive ? 'text-emerald-300' : 'text-white/60 group-hover:text-white'
+                      isActive ? 'text-sage-light' : 'text-white/60 group-hover:text-white'
                     }`}
                   />
                   {!collapsed && <span className="truncate">{item.label}</span>}
@@ -166,13 +167,13 @@ export function Sidebar({ collapsed, onToggleCollapse, className }) {
             })}
           </div>
         ))}
-      </div>
+      </NavIndicator>
 
       {/* User & Collapse Footer */}
       <div className="shrink-0 border-t border-white/10 p-3 bg-black/10">
         <div className={`flex items-center gap-2.5 ${collapsed ? 'justify-center' : 'justify-between'}`}>
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 text-xs font-mono font-bold">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sage/20 text-ivory border border-sage/30 text-xs font-mono font-bold">
               {getInitials(user?.full_name || user?.email)}
             </div>
             {!collapsed && (
@@ -180,7 +181,7 @@ export function Sidebar({ collapsed, onToggleCollapse, className }) {
                 <span className="text-xs font-semibold text-white truncate leading-tight">
                   {user?.full_name || user?.email?.split('@')[0]}
                 </span>
-                <span className="text-[10px] font-mono text-emerald-300/80 uppercase truncate">
+                <span className="text-[10px] font-mono text-sage-light/80 uppercase truncate">
                   {getRoleLabel(user?.role)}
                 </span>
               </div>

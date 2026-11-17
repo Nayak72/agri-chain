@@ -46,7 +46,7 @@ export default function FreightBookingsListPage() {
               size="sm"
               onClick={() => refetch()}
               disabled={isFetching}
-              className="gap-2 bg-white/80 border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
+              className="gap-2 glass-control border-[#E1DDD0] hover:bg-[#F2EFE7] text-[#26312A]"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
               <span>Sync</span>
@@ -75,7 +75,7 @@ export default function FreightBookingsListPage() {
             placeholder="Search booking ID, route, vehicle category..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-white/90 border-[#E1DDD0] text-sm text-[#26312A] placeholder:text-[#7A887E] focus-visible:ring-[#244634]"
+            className="pl-10 glass-control border-[#E1DDD0] text-sm text-[#26312A] placeholder:text-[#7A887E] focus-visible:ring-[#244634]"
           />
         </div>
         <span className="text-xs font-mono text-[#526357] self-end sm:self-center">
@@ -109,9 +109,9 @@ export default function FreightBookingsListPage() {
           }
         />
       ) : (
-        <div className="bg-white/95 border border-[#E1DDD0] rounded-2xl overflow-hidden shadow-xs">
+        <div className="glass-panel-strong border border-[#E1DDD0] rounded-2xl overflow-hidden shadow-xs">
           <Table>
-            <TableHeader className="bg-[#F2EFE7]/60">
+            <TableHeader className="glass-inset">
               <TableRow className="border-[#ECE7DA] hover:bg-transparent">
                 <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E] py-3.5">Booking ID</TableHead>
                 <TableHead className="text-[11px] font-mono uppercase tracking-wider text-[#7A887E]">Route</TableHead>
@@ -130,7 +130,7 @@ export default function FreightBookingsListPage() {
                   <TableRow
                     key={bookingKey}
                     onClick={() => navigate(`/freight-bookings/${bookingKey}`)}
-                    className="hover:bg-[#F2EFE7]/40 cursor-pointer transition-colors border-[#ECE7DA]"
+                    className="hover:glass-inset cursor-pointer transition-colors border-[#ECE7DA]"
                   >
                     <TableCell className="font-bold text-[#244634] py-4">{b.booking_id || bookingKey}</TableCell>
                     <TableCell className="text-[#26312A] font-sans">

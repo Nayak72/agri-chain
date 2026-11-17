@@ -80,3 +80,168 @@
   }
 }
 
+
+/* Material hierarchy: shell < card < data panel < control < modal.
+   Insets use tint rather than another expensive backdrop-filter layer. */
+:root {
+  --glass-shell: linear-gradient(115deg, rgba(255,255,255,.16), rgba(246,244,236,.25));
+  --glass-panel: rgba(255, 255, 255, .66);
+  --glass-strong: rgba(255, 255, 255, .86);
+  --glass-inset: rgba(240, 237, 226, .64);
+  --glass-control: rgba(255, 255, 255, .9);
+  --glass-border: rgba(36, 70, 52, .13);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, .85);
+  --glass-shadow: 0 8px 28px -16px rgba(27, 53, 39, .22), 0 2px 6px -4px rgba(27, 53, 39, .12);
+  --glass-blur: 18px;
+  --ambient-forest: rgba(36, 70, 52, .30);
+  --ambient-sage: rgba(145, 166, 140, .46);
+  --ambient-harvest: rgba(216, 188, 141, .24);
+  --motion-ease: cubic-bezier(.22, 1, .36, 1);
+  --motion-fast: 180ms;
+  --motion-page: 380ms;
+}
+
+#root { isolation: isolate; }
+.app-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 65% 0%, #fff 0%, transparent 64%), var(--color-ivory);
+}
+.app-ambient-light {
+  position: absolute;
+  width: 100%;
+  height: 110%;
+  filter: blur(60px);
+  animation: ambient-drift 38s ease-in-out infinite alternate;
+}
+.app-ambient-botanical {
+  top: -25%; left: -15%;
+  background: radial-gradient(ellipse at 20% 45%, var(--ambient-forest), transparent 48%), radial-gradient(ellipse at 82% 64%, var(--ambient-sage), transparent 44%);
+}
+.app-ambient-harvest {
+  bottom: -45%; right: -20%;
+  background: radial-gradient(ellipse at 48% 40%, var(--ambient-harvest), transparent 52%);
+  animation-duration: 49s;
+  animation-delay: -18s;
+}
+.glass-shell { background: var(--glass-shell); }
+.shell-content { min-width: 0; transition-timing-function: var(--motion-ease); }
+.glass-panel, .glass-panel-strong, .glass-metric, .glass-dialog {
+  background: linear-gradient(145deg, rgba(255,255,255,.17), transparent 65%), var(--glass-panel);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(115%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(115%);
+  transition: box-shadow 240ms var(--motion-ease), border-color 240ms, transform 240ms var(--motion-ease);
+}
+.glass-panel-strong { background-color: var(--glass-strong); }
+.glass-metric {
+  background: linear-gradient(125deg, rgba(255,255,255,.76), rgba(240,237,226,.52));
+}
+.glass-panel .glass-panel, .glass-panel-strong .glass-panel, .glass-panel .glass-panel-strong {
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  background: var(--glass-inset);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+}
+.glass-inset {
+  background: var(--glass-inset);
+  border-color: rgba(36,70,52,.09);
+  box-shadow: inset 0 1px 3px rgba(36,70,52,.035), 0 1px 0 rgba(255,255,255,.55);
+}
+.glass-control {
+  background: var(--glass-control);
+  border-color: rgba(36,70,52,.18);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 3px rgba(36,70,52,.035);
+  transition: background var(--motion-fast), border-color var(--motion-fast), box-shadow var(--motion-fast);
+}
+.glass-control:focus-visible {
+  border-color: var(--color-forest);
+  box-shadow: 0 0 0 3px rgba(145,166,140,.28);
+}
+select.glass-control option { background: var(--color-ivory); color: var(--color-ink-primary); }
+.glass-data { background: rgba(255,255,255,.5); }
+.glass-data thead { background: rgba(240,237,226,.9); }
+.glass-sidebar {
+  background: linear-gradient(155deg, rgba(145,166,140,.035), transparent 55%), rgba(27,53,39,.97);
+  border-color: rgba(145,166,140,.25);
+  box-shadow: inset -1px 0 0 rgba(255,255,255,.05), 8px 0 36px -20px rgba(27,53,39,.32);
+  -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+  transition-timing-function: var(--motion-ease);
+}
+.glass-topbar {
+  background: linear-gradient(110deg, rgba(255,255,255,.64), rgba(246,244,236,.48));
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-highlight), 0 3px 16px -12px rgba(36,70,52,.2);
+  -webkit-backdrop-filter: blur(20px) saturate(115%); backdrop-filter: blur(20px) saturate(115%);
+}
+.glass-nav { position: relative; transition: color 180ms, background 240ms, box-shadow 240ms; }
+.glass-nav-active {
+  background: linear-gradient(110deg, rgba(167,187,163,.32), rgba(145,166,140,.16));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 0 0 1px rgba(167,187,163,.24), 0 4px 14px rgba(0,0,0,.09);
+}
+.glass-tab-active {
+  background: linear-gradient(130deg, rgba(255,255,255,.94), rgba(167,187,163,.22));
+  box-shadow: var(--glass-highlight), 0 2px 5px rgba(36,70,52,.08);
+}
+.glass-button { transition-timing-function: var(--motion-ease); box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
+.glass-button:active:not(:disabled) { transform: translateY(1px) scale(.985); }
+.glass-overlay {
+  background: rgba(27,53,39,.38);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.glass-dialog {
+  background-color: rgba(246,244,236,.95);
+  box-shadow: var(--glass-highlight), 0 24px 80px -24px rgba(27,53,39,.4);
+}
+.route-content { view-transition-name: agri-content; }
+.route-enter { animation: glass-enter var(--motion-page) var(--motion-ease) both; }
+::view-transition-old(agri-content) { animation: glass-exit 180ms ease-in both; }
+::view-transition-new(agri-content) { animation: glass-enter var(--motion-page) var(--motion-ease) both; }
+::view-transition-group(agri-content) { animation-duration: var(--motion-page); }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+.dialog-presence .glass-overlay { animation: overlay-in 220ms ease both; }
+.dialog-presence .glass-dialog { animation: glass-enter 280ms var(--motion-ease) both; }
+.dialog-presence[data-closing="true"] { pointer-events: none; }
+.dialog-presence[data-closing="true"] .glass-overlay { animation: overlay-out 180ms ease both; }
+.dialog-presence[data-closing="true"] .glass-dialog { animation: glass-exit 180ms ease both; }
+.mobile-presence { visibility: hidden; pointer-events: none; transition: visibility 240ms; }
+.mobile-presence[data-open="true"] { visibility: visible; pointer-events: auto; }
+.mobile-presence .glass-overlay { opacity: 0; transition: opacity 240ms; }
+.mobile-presence[data-open="true"] .glass-overlay { opacity: 1; }
+.mobile-drawer { transform: translateX(-100%); transition: transform 300ms var(--motion-ease); }
+.mobile-presence[data-open="true"] .mobile-drawer { transform: translateX(0); }
+:where(a, button, [role="tab"]):focus-visible { outline: 2px solid var(--color-sage); outline-offset: 3px; }
+@media (hover: hover) {
+  .glass-panel:hover, .glass-metric:hover { border-color: rgba(145,166,140,.45); box-shadow: var(--glass-highlight), 0 12px 32px -18px rgba(27,53,39,.28); }
+  .glass-panel.cursor-pointer:hover, button.glass-metric:hover { transform: translateY(-2px); }
+}
+@keyframes ambient-drift { to { transform: translate3d(3%, -2%, 0) scale(1.06); } }
+@keyframes glass-enter { from { opacity: 0; filter: blur(6px); transform: translateY(10px) scale(.99); } to { opacity: 1; filter: none; transform: none; } }
+@keyframes glass-exit { to { opacity: 0; filter: blur(4px); transform: translateY(-4px) scale(.995); } }
+@keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes overlay-out { from { opacity: 1; } to { opacity: 0; } }
+@media (max-width: 767px) {
+  :root { --glass-blur: 10px; --glass-panel: rgba(255,255,255,.78); }
+  .app-ambient-light { filter: blur(35px); animation: none; }
+  .glass-topbar, .glass-sidebar { -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-panel, .glass-panel-strong, .glass-metric, .glass-dialog, .glass-topbar { background: #faf9f3; }
+  .glass-sidebar { background: #1b3527; }
+  .glass-control { background: #fff; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  .route-enter { filter: none; transform: none; }
+}
+.nav-indicator {
+  position: absolute; left: 0; top: 0; pointer-events: none; border-radius: .75rem;
+  background: linear-gradient(110deg, rgba(167,187,163,.32), rgba(145,166,140,.16));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 0 0 1px rgba(167,187,163,.24), 0 4px 14px rgba(0,0,0,.09);
+  transition: transform 340ms var(--motion-ease), width 300ms var(--motion-ease), height 300ms var(--motion-ease);
+}
+.has-nav-indicator .glass-nav-active { background: transparent; box-shadow: none; }

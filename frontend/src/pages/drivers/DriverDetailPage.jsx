@@ -59,7 +59,7 @@ export default function DriverDetailPage() {
       </Button>
 
       {/* Identity Card */}
-      <Card className="bg-white/95 border-[#E1DDD0] shadow-sm">
+      <Card className="glass-panel-strong border-[#E1DDD0] shadow-sm">
         <CardContent className="p-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
@@ -91,7 +91,7 @@ export default function DriverDetailPage() {
 
       {/* Details Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="bg-white/90 border-[#E1DDD0]">
+        <Card className="glass-panel border-[#E1DDD0]">
           <CardContent className="p-6">
             <h3 className="text-xs font-mono text-[#526357] uppercase tracking-widest font-semibold mb-4">
               Professional Credentials
@@ -117,7 +117,7 @@ export default function DriverDetailPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/90 border-[#E1DDD0] flex flex-col justify-between">
+        <Card className="glass-panel border-[#E1DDD0] flex flex-col justify-between">
           <CardContent className="p-6 flex flex-col justify-between h-full">
             <div>
               <h3 className="text-xs font-mono text-[#526357] uppercase tracking-widest font-semibold mb-4">

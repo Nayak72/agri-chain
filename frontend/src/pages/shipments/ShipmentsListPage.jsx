@@ -52,7 +52,7 @@ export default function ShipmentsListPage() {
             <button
               onClick={() => refetch()}
               disabled={isFetching}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 hover:border-stone-300 shadow-sm transition-all disabled:opacity-60"
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-lg border border-stone-200 glass-control text-stone-700 hover:bg-stone-50 hover:border-stone-300 shadow-sm transition-all disabled:opacity-60"
             >
               <RefreshCw className={`w-4 h-4 text-stone-500 ${isFetching ? 'animate-spin' : ''}`} />
               <span>Sync</span>
@@ -71,7 +71,7 @@ export default function ShipmentsListPage() {
       />
 
       {/* Search and Filters Bar */}
-      <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+      <div className="glass-panel p-4 rounded-xl border border-stone-200 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
         <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-3" />
           <input
@@ -79,7 +79,7 @@ export default function ShipmentsListPage() {
             placeholder="Search shipment ID, origin, destination..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-stone-50 border border-stone-200 rounded-lg px-4 py-2 pl-10 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono transition-colors"
+            className="w-full glass-control border border-stone-200 rounded-lg px-4 py-2 pl-10 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono transition-colors"
           />
         </div>
 
@@ -102,7 +102,7 @@ export default function ShipmentsListPage() {
 
       {/* Shipments Table Container */}
       {isLoading ? (
-        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-16 flex flex-col items-center justify-center space-y-3">
+        <div className="glass-panel rounded-xl border border-stone-200 shadow-sm p-16 flex flex-col items-center justify-center space-y-3">
           <div className="w-8 h-8 border-3 border-stone-200 border-t-[#244634] rounded-full animate-spin" />
           <span className="text-stone-500 font-mono text-xs tracking-wide">Scanning live shipments network...</span>
         </div>
@@ -115,7 +115,7 @@ export default function ShipmentsListPage() {
           onAction={canCreate && !search ? () => navigate('/shipments/new') : undefined}
         />
       ) : (
-        <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="glass-panel-strong border border-stone-200 rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>

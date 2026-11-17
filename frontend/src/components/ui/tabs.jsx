@@ -22,7 +22,7 @@ export function TabsList({ className, children, ...props }) {
   return (
     <div
       className={cn(
-        'inline-flex h-11 items-center justify-start rounded-xl bg-surface-muted/70 p-1 text-ink-secondary border border-border/60',
+        'inline-flex h-11 items-center justify-start rounded-xl glass-inset p-1 text-ink-secondary border border-border/60',
         className
       )}
       {...props}
@@ -45,7 +45,7 @@ export function TabsTrigger({ value, className, children, ...props }) {
       className={cn(
         'inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold tracking-wide transition-all cursor-pointer font-mono',
         isSelected
-          ? 'bg-surface text-ink-primary shadow-xs border border-border/80'
+          ? 'glass-tab-active text-forest border border-forest/15'
           : 'text-ink-secondary hover:text-ink-primary hover:bg-surface/50',
         className
       )}
