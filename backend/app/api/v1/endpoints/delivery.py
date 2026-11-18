@@ -7,6 +7,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field, ConfigDict
 from bson import ObjectId
 from app.db.mongodb import get_database
+from app.core.access import shipment_reference_scope
 from app.core.permissions import get_current_user
 from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError
 from app.core.constants import UserRole, DeliveryStatus
@@ -21,9 +22,9 @@ router = APIRouter()
 
 
 class ConfirmDeliveryRequest(BaseModel):
-    delivered_quantity_kg: float = Field(..., ge=0)
-    damaged_quantity_kg: float = Field(0.0, ge=0)
-    missing_quantity_kg: float = Field(0.0, ge=0)
+    delivered_quantity_kg: float = Field(..., ge=0, allow_inf_nan=False, multiple_of=0.001)
+    damaged_quantity_kg: float = Field(0.0, ge=0, allow_inf_nan=False, multiple_of=0.001)
+    missing_quantity_kg: float = Field(0.0, ge=0, allow_inf_nan=False, multiple_of=0.001)
     received_by: str
     model_config = ConfigDict(extra="forbid")
 
@@ -65,33 +66,8 @@ async def list_delivery_reports(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    query = {}
-    
-    if current_user["role"] == UserRole.DRIVER:
-        driver = await get_driver_for_user(db, current_user["sub"])
-        d_ids = [current_user["sub"]]
-        if driver:
-            d_ids.extend([str(driver["_id"]), driver.get("driver_id")])
-        shipments = await db.shipments.find({"$or": [{"driver_id": {"$in": d_ids}}, {"driver_user_id": current_user["sub"]}]}, {"_id": 1}).to_list(100)
-        shipment_ids = [str(s["_id"]) for s in shipments]
-        query["shipment_id"] = {"$in": shipment_ids}
-    elif current_user["role"] == UserRole.BUYER:
-        shipments = await db.shipments.find({"buyer_id": current_user["sub"]}, {"_id": 1}).to_list(100)
-        shipment_ids = [str(s["_id"]) for s in shipments]
-        query["shipment_id"] = {"$in": shipment_ids}
-    elif current_user["role"] == UserRole.TRANSPORTER:
-        transporter = await get_transporter_for_user(db, current_user["sub"])
-        if transporter:
-            shipments = await db.shipments.find({"transporter_id": str(transporter["_id"])}, {"_id": 1}).to_list(100)
-            shipment_ids = [str(s["_id"]) for s in shipments]
-            query["shipment_id"] = {"$in": shipment_ids}
-        else:
-            query["shipment_id"] = {"$in": []}
-    elif current_user["role"] == UserRole.FARMER:
-        shipments = await db.shipments.find({"farmer_id": current_user["sub"]}, {"_id": 1}).to_list(100)
-        shipment_ids = [str(s["_id"]) for s in shipments]
-        query["shipment_id"] = {"$in": shipment_ids}
-    
+    query = await shipment_reference_scope(db, current_user)
+
     if status:
         query["status"] = status.value if hasattr(status, "value") else str(status)
     
@@ -184,7 +160,9 @@ async def confirm_delivery(shipment_id: str, data: ConfirmDeliveryRequest,
     if shipment.get("status") != "OUT_FOR_DELIVERY":
         raise ValidationError("Shipment must be OUT_FOR_DELIVERY")
     loaded = shipment.get("loaded_weight_kg")
-    if loaded is None or abs(data.delivered_quantity_kg + data.damaged_quantity_kg + data.missing_quantity_kg - loaded) > 0.01:
+    from decimal import Decimal
+    parts = sum(Decimal(str(value)) for value in (data.delivered_quantity_kg, data.damaged_quantity_kg, data.missing_quantity_kg))
+    if loaded is None or parts != Decimal(str(loaded)):
         raise ValidationError("Delivered, damaged, and missing must equal loaded weight")
     status = "DELIVERED" if data.damaged_quantity_kg + data.missing_quantity_kg == 0 else "PARTIAL"
     return await _record_delivery(db, shipment, current_user, status, data.model_dump())

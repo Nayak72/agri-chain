@@ -43,7 +43,7 @@ const NAVIGATION_SECTORS = [
     items: [
       { label: 'Farms', path: '/farms', icon: Sprout, roles: [ROLES.ADMIN, ROLES.FARMER] },
       { label: 'Produce', path: '/produce', icon: Apple, roles: [ROLES.ADMIN, ROLES.FARMER, ROLES.WAREHOUSE_MANAGER, ROLES.BUYER] },
-      { label: 'Batches', path: '/batches', icon: Boxes, roles: [ROLES.ADMIN, ROLES.FARMER, ROLES.WAREHOUSE_MANAGER] },
+      { label: 'Batches', path: '/batches', icon: Boxes, roles: [ROLES.ADMIN, ROLES.FARMER, ROLES.WAREHOUSE_MANAGER, ROLES.BUYER] },
     ],
   },
   {

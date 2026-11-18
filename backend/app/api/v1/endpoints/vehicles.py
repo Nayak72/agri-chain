@@ -124,6 +124,8 @@ async def list_vehicles(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
+    if current_user["role"] not in [UserRole.ADMIN, UserRole.TRANSPORTER]:
+        raise ForbiddenError("Not authorized to view vehicles")
     query = {}
     if current_user["role"] == UserRole.TRANSPORTER:
         t_doc = await db.transporters.find_one({"user_id": current_user["sub"]})
@@ -151,6 +153,8 @@ async def get_vehicle(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
+    if current_user["role"] not in [UserRole.ADMIN, UserRole.TRANSPORTER]:
+        raise ForbiddenError("Not authorized to view vehicles")
     vehicle = await resolve_doc(db.vehicles, vehicle_id, "Vehicle", business_key="vehicle_id")
     
     if current_user["role"] == UserRole.TRANSPORTER:

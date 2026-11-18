@@ -82,8 +82,8 @@ def _user_payload(user: dict) -> dict:
     role_raw = user.get("role", "FARMER")
     try:
         role = Role(role_raw)
-    except Exception:
-        role = Role.FARMER
+    except (TypeError, ValueError) as exc:
+        raise ForbiddenError("Invalid user role") from exc
     return {
         "id": str(user["_id"]),
         "email": user.get("email", ""),

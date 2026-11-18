@@ -28,20 +28,11 @@ async def get_driver_for_user(db: AsyncIOMotorDatabase, user: any) -> dict:
     """Resolve driver record linked to the authenticated user account (user dict or user_id string)."""
     user_id = user if isinstance(user, str) else (user.get("sub") if isinstance(user, dict) else str(user))
     role = user.get("role") if isinstance(user, dict) else None
-    email = user.get("email") if isinstance(user, dict) else None
 
     if role == UserRole.ADMIN:
         return None
 
     driver = await db.drivers.find_one({"user_id": user_id})
-    if not driver and email:
-        # Also check if driver was referenced by email
-        driver = await db.drivers.find_one({"email": email})
-        if driver and not driver.get("user_id"):
-            # Auto-link by verified email match
-            await db.drivers.update_one({"_id": driver["_id"]}, {"$set": {"user_id": user_id}})
-            driver["user_id"] = user_id
-
     if not driver:
         raise ForbiddenError("No driver profile linked to this user account")
 
@@ -101,3 +92,35 @@ async def assert_can_view_shipment(db: AsyncIOMotorDatabase, user: dict, shipmen
         raise ForbiddenError("Shipment does not contain stock from your warehouse")
 
     raise ForbiddenError("Role not permitted to view this shipment")
+
+
+async def shipment_scope(db, user: dict) -> dict:
+    """Build a default-deny Mongo filter for shipments visible to a user."""
+    role, user_id = user.get("role"), user.get("sub")
+    if role == UserRole.ADMIN:
+        return {}
+    if role == UserRole.FARMER:
+        return {"farmer_id": user_id}
+    if role == UserRole.BUYER:
+        return {"buyer_id": user_id}
+    if role == UserRole.TRANSPORTER:
+        transporter = await db.transporters.find_one({"user_id": user_id})
+        return {"transporter_id": str(transporter["_id"])} if transporter else {"_id": {"$in": []}}
+    if role == UserRole.DRIVER:
+        driver = await db.drivers.find_one({"user_id": user_id})
+        return {"driver_id": str(driver["_id"])} if driver else {"_id": {"$in": []}}
+    if role == UserRole.WAREHOUSE_MANAGER:
+        warehouses = await db.warehouses.find({"manager_id": user_id}, {"_id": 1}).to_list(None)
+        inventories = await db.inventory_items.find({"warehouse_id": {"$in": [str(w["_id"]) for w in warehouses]}}, {"batch_id": 1}).to_list(None)
+        return {"batch_ids": {"$in": list({i["batch_id"] for i in inventories if i.get("batch_id")})}}
+    raise ForbiddenError("Role not permitted to view shipments")
+
+
+async def shipment_reference_scope(db, user: dict) -> dict:
+    """Filter related records by authorized canonical or public shipment ID."""
+    if user.get("role") == UserRole.ADMIN:
+        return {}
+    scope = await shipment_scope(db, user)
+    shipments = await db.shipments.find(scope, {"_id": 1, "shipment_id": 1}).to_list(None)
+    ids = [identifier for shipment in shipments for identifier in (str(shipment["_id"]), shipment.get("shipment_id")) if identifier]
+    return {"shipment_id": {"$in": ids}}

@@ -57,6 +57,7 @@ export const shipmentsApi = {
   arrive: (id) => apiClient.post(`/shipments/${id}/arrive`),
   outForDelivery: (id) => apiClient.post(`/shipments/${id}/out-for-delivery`),
   cancel: (id, reason) => apiClient.post(`/shipments/${id}/cancel`, { reason }),
+  receiveReturn: (id, data) => apiClient.post(`/shipments/${id}/return-receipt`, data),
 }
 
 export const checkpointsApi = {

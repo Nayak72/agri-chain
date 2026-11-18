@@ -58,7 +58,7 @@ const ROLE_QUICK_ACTIONS = {
   [ROLES.DRIVER]: [
     { icon: Navigation, label: 'My Active Shipments', desc: 'Assigned transport runs', path: '/shipments', accent: 'forest' },
     { icon: ThermometerSnowflake, label: 'Cold-Chain Telemetry', desc: 'Cargo temp & SLA status', path: '/cold-chain', accent: 'terracotta' },
-    { icon: ClipboardCheck, label: 'Deliveries', desc: 'Record delivery handover', path: '/deliveries', accent: 'harvest' },
+    { icon: ClipboardCheck, label: 'Deliveries', desc: 'Review delivery handover', path: '/deliveries', accent: 'harvest' },
     { icon: ShieldCheck, label: 'Ledger Audit', desc: 'Tamper-evident logs', path: '/ledger', accent: 'slate' },
   ],
   [ROLES.WAREHOUSE_MANAGER]: [
@@ -121,7 +121,7 @@ export default function DashboardPage() {
     refetchShipments()
   }
 
-  const actions = ROLE_QUICK_ACTIONS[userRole] || ROLE_QUICK_ACTIONS[ROLES.ADMIN]
+  const actions = ROLE_QUICK_ACTIONS[userRole] || []
 
   return (
     <div className="space-y-8 animate-fade-in-up">

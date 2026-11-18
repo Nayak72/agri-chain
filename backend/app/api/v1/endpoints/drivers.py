@@ -115,6 +115,8 @@ async def list_drivers(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
+    if current_user["role"] not in [UserRole.ADMIN, UserRole.TRANSPORTER, UserRole.DRIVER]:
+        raise ForbiddenError("Not authorized to view drivers")
     query = {}
     if current_user["role"] == UserRole.TRANSPORTER:
         t_doc = await db.transporters.find_one({"user_id": current_user["sub"]})
@@ -142,6 +144,8 @@ async def get_driver(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
+    if current_user["role"] not in [UserRole.ADMIN, UserRole.TRANSPORTER, UserRole.DRIVER]:
+        raise ForbiddenError("Not authorized to view drivers")
     driver = await resolve_doc(db.drivers, driver_id, "Driver", business_key="driver_id")
     
     if current_user["role"] == UserRole.TRANSPORTER:

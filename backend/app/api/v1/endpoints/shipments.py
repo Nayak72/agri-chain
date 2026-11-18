@@ -1,9 +1,11 @@
 import uuid
+from decimal import Decimal, InvalidOperation
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field, ConfigDict
+from bson import ObjectId
 
 from app.db.mongodb import get_database
 from app.core.permissions import get_current_user
@@ -15,8 +17,9 @@ from app.services.ledger_service import append_ledger_block
 from app.db.unit_of_work import run_in_txn
 from app.utils.serialization import to_response
 from app.utils.mongo import to_mongo, resolve_doc
-from app.core.access import get_transporter_for_user, get_driver_for_user, assert_can_view_shipment
+from app.core.access import get_transporter_for_user, get_driver_for_user, assert_can_view_shipment, shipment_scope
 from app.services.shipment_workflow import transition_shipment, cancel_shipment
+from app.services.inventory_service import release_stock
 
 router = APIRouter()
 
@@ -30,7 +33,7 @@ class ShipmentCreate(BaseModel):
 
 
 class ShipmentLoad(BaseModel):
-    actual_weight_kg: float = Field(..., gt=0)
+    actual_weight_kg: float = Field(..., gt=0, allow_inf_nan=False, multiple_of=0.001)
     actual_package_count: int = Field(..., gt=0)
     batch_quantities: List[dict] = Field(default_factory=list)
     model_config = ConfigDict(extra="forbid")
@@ -38,6 +41,13 @@ class ShipmentLoad(BaseModel):
 
 class ShipmentCancelRequest(BaseModel):
     reason: str = Field(...)
+    model_config = ConfigDict(extra="forbid")
+
+
+class ShipmentReturnReceipt(BaseModel):
+    returned_quantity_kg: float = Field(..., gt=0, allow_inf_nan=False, multiple_of=0.001)
+    condition: str = Field(..., min_length=1, max_length=500)
+    inspected_usable: bool
     model_config = ConfigDict(extra="forbid")
 
 
@@ -65,6 +75,10 @@ class ShipmentResponse(BaseModel):
     is_delayed: bool = False
     status_history: List[dict] = Field(default_factory=list)
     cancellation_reason: Optional[str] = None
+    return_received_at: Optional[datetime] = None
+    return_received_by: Optional[str] = None
+    returned_quantity_kg: Optional[float] = None
+    return_condition: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -122,12 +136,21 @@ async def create_shipment(
         )
     if booking.get("refrigeration_required", False) and not vehicle.get("refrigeration_available", False):
         raise ValidationError("Booking requires refrigerated vehicle, but selected vehicle does not support refrigeration")
+    if booking.get("refrigeration_required", False):
+        required_min, required_max = booking.get("temperature_min"), booking.get("temperature_max")
+        vehicle_min, vehicle_max = vehicle.get("temperature_min"), vehicle.get("temperature_max")
+        if required_min is None or required_max is None or vehicle_min is None or vehicle_max is None:
+            raise ValidationError("Refrigerated bookings and vehicles must specify temperature capabilities")
+        if vehicle_min > required_min or vehicle_max < required_max:
+            raise ValidationError("Vehicle temperature capability does not cover the booking's required range")
 
     driver = await resolve_doc(db.drivers, shipment_data.driver_id, "Driver", business_key="driver_id")
     if driver.get("transporter_id") != t_id and current_user["role"] != UserRole.ADMIN:
         raise ForbiddenError("Driver does not belong to this transporter")
 
     po = await resolve_doc(db.purchase_orders, booking["purchase_order_id"], "Purchase Order", business_key="order_id")
+    if Decimal(str(po.get("accepted_quantity_kg", 0))) != Decimal(str(booking.get("cargo_quantity_kg", 0))):
+        raise ConflictError("Booking cargo no longer matches the order reservation; create a new booking")
 
     pickup_st = booking.get("pickup_state", "MH")
     dest_st = booking.get("destination_state", "MH")
@@ -164,7 +187,7 @@ async def create_shipment(
     async def _transaction(session):
         # Serialize shipment creation with cancellation of the same order.
         order_claim = await db.purchase_orders.update_one(
-            {"_id": po["_id"], "status": "ACCEPTED"},
+            {"_id": po["_id"], "status": "ACCEPTED", "accepted_quantity_kg": po["accepted_quantity_kg"]},
             {"$set": {"updated_at": now}}, session=session,
         )
         if order_claim.matched_count == 0:
@@ -236,35 +259,14 @@ async def list_shipments(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    query = {}
-    if current_user["role"] == UserRole.FARMER:
-        query["farmer_id"] = current_user["sub"]
-    elif current_user["role"] == UserRole.BUYER:
-        query["buyer_id"] = current_user["sub"]
-    elif current_user["role"] == UserRole.TRANSPORTER:
-        transporter = await get_transporter_for_user(db, current_user["sub"])
-        if transporter:
-            query["transporter_id"] = str(transporter["_id"])
-        else:
-            return []
-    elif current_user["role"] == UserRole.DRIVER:
-        driver = await get_driver_for_user(db, current_user["sub"])
-        if driver:
-            query["$or"] = [
-                {"driver_id": str(driver["_id"])},
-                {"driver_id": driver.get("driver_id")},
-                {"driver_user_id": current_user["sub"]},
-                {"driver_id": current_user["sub"]}
-            ]
-        else:
-            query["$or"] = [{"driver_id": current_user["sub"]}, {"driver_user_id": current_user["sub"]}]
+    query = await shipment_scope(db, current_user)
 
     if status:
         query["status"] = status.value if hasattr(status, "value") else str(status)
     if transporter_id and current_user["role"] == UserRole.ADMIN:
         query["transporter_id"] = transporter_id
     if driver_id:
-        query["driver_id"] = driver_id
+        query.setdefault("$and", []).append({"driver_id": driver_id})
     if vehicle_id:
         query["vehicle_id"] = vehicle_id
 
@@ -305,18 +307,67 @@ async def load_shipment(
     if load_data.actual_weight_kg > shipment["cargo_quantity_kg"]:
         raise ValidationError("Loaded weight cannot exceed planned cargo")
     if load_data.batch_quantities:
-        if abs(sum(float(item.get("quantity_kg", 0)) for item in load_data.batch_quantities) - load_data.actual_weight_kg) > 0.01:
+        from decimal import Decimal, InvalidOperation
+        try:
+            ids = [item["batch_id"] for item in load_data.batch_quantities]
+            quantities = [Decimal(str(item["quantity_kg"])) for item in load_data.batch_quantities]
+            if len(ids) != len(set(ids)) or set(ids) != set(shipment.get("batch_ids", [])):
+                raise ValidationError("Batch quantities must identify each shipment batch exactly once")
+            if any(not qty.is_finite() or qty < 0 or qty * 1000 != (qty * 1000).to_integral_value() for qty in quantities):
+                raise ValidationError("Batch quantities must be non-negative and in whole grams")
+        except (KeyError, TypeError, InvalidOperation, ValueError) as exc:
+            raise ValidationError("Invalid batch quantities") from exc
+        if sum(quantities) != Decimal(str(load_data.actual_weight_kg)):
             raise ValidationError("Batch quantities must equal loaded weight")
     now = datetime.now(timezone.utc)
     async def _transaction(session):
+        # The current model permits one accepted order and one batch per shipment.
+        # Release an unshipped part of that order at loading, atomically with the
+        # status transition. Never infer an allocation for older incomplete data.
+        if Decimal(str(load_data.actual_weight_kg)) < Decimal(str(shipment["cargo_quantity_kg"])):
+            order = await resolve_doc(db.purchase_orders, shipment.get("purchase_order_id"), "Purchase Order", session=session)
+            reserved = Decimal(str(order.get("accepted_quantity_kg", 0)))
+            loaded = Decimal(str(load_data.actual_weight_kg))
+            if order.get("status") != "ACCEPTED" or reserved != Decimal(str(shipment["cargo_quantity_kg"])):
+                raise ConflictError("Order reservation no longer matches the shipment")
+            inventory_id = order.get("inventory_id")
+            if not inventory_id or not ObjectId.is_valid(inventory_id):
+                raise ConflictError("Short loading requires a valid inventory allocation")
+            inventory = await db.inventory_items.find_one({"_id": ObjectId(inventory_id)}, session=session)
+            if not inventory or inventory.get("batch_id") != order.get("batch_id"):
+                raise ConflictError("Order inventory allocation changed")
+            shortfall = float(reserved - loaded)
+            claim = await db.purchase_orders.update_one(
+                {"_id": order["_id"], "status": "ACCEPTED", "accepted_quantity_kg": order["accepted_quantity_kg"]},
+                {"$set": {"accepted_quantity_kg": float(loaded), "short_loaded_quantity_kg": shortfall, "updated_at": now}}, session=session)
+            if not claim.matched_count:
+                raise ConflictError("Order reservation changed")
+            await release_stock(db, inventory_id, shortfall, session)
+            await db.inventory_movements.insert_one({
+                "type": "SHORT_LOAD_RELEASE", "inventory_id": inventory_id, "batch_id": order.get("batch_id"),
+                "warehouse_id": inventory.get("warehouse_id"), "quantity_kg": shortfall,
+                "previous_available_kg": inventory["available_kg"],
+                "new_available_kg": float(Decimal(str(inventory["available_kg"])) + Decimal(str(shortfall))),
+                "actor_id": current_user["sub"], "actor_role": current_user["role"],
+                "reference_type": "SHIPMENT", "reference_id": str(shipment["_id"]), "created_at": now,
+            }, session=session)
         for item in load_data.batch_quantities:
             b_id = item.get("batch_id")
             qty = item.get("quantity_kg", 0)
-            await db.shipment_items.update_one(
+            item_update = await db.shipment_items.update_one(
                 {"shipment_id": str(shipment["_id"]), "batch_id": b_id},
                 {"$set": {"quantity_kg": qty, "updated_at": now}},
                 session=session
             )
+            if not item_update.matched_count:
+                raise ConflictError("Shipment batch allocation changed")
+
+        if not load_data.batch_quantities and len(shipment.get("batch_ids", [])) == 1:
+            item_update = await db.shipment_items.update_one(
+                {"shipment_id": str(shipment["_id"]), "batch_id": shipment["batch_ids"][0]},
+                {"$set": {"quantity_kg": load_data.actual_weight_kg, "updated_at": now}}, session=session)
+            if not item_update.matched_count:
+                raise ConflictError("Shipment batch allocation changed")
 
         updated = await transition_shipment(
             db, str(shipment["_id"]), ShipmentStatus.LOADED.value,
@@ -354,6 +405,26 @@ async def dispatch_shipment(
             extra_updates={"actual_dispatch_time": now, "expected_arrival_time": now + timedelta(hours=hours)},
             event_summary=f"Shipment {shipment.get('shipment_id')} dispatched"
         )
+        # Reservation already reduced availability. Dispatch changes custody,
+        # not the available balance; record the actual weight exactly once in
+        # the same transaction as the conditional shipment transition.
+        order_id = shipment.get("purchase_order_id")
+        if order_id:
+            order = await resolve_doc(db.purchase_orders, order_id, "Purchase Order", session=session)
+            inv_id = order.get("inventory_id")
+            if inv_id and ObjectId.is_valid(inv_id):
+                inventory = await db.inventory_items.find_one({"_id": ObjectId(inv_id)}, session=session)
+                if not inventory or inventory.get("batch_id") != order.get("batch_id"):
+                    raise ConflictError("Order inventory allocation changed")
+                if updated.get("loaded_weight_kg") is None:
+                    raise ConflictError("Shipment has no verified loaded weight")
+                await db.inventory_movements.insert_one({
+                    "type": "DISPATCH", "inventory_id": inv_id, "batch_id": order.get("batch_id"),
+                    "warehouse_id": inventory.get("warehouse_id"), "quantity_kg": updated["loaded_weight_kg"],
+                    "previous_available_kg": inventory["available_kg"], "new_available_kg": inventory["available_kg"],
+                    "actor_id": current_user["sub"], "actor_role": current_user["role"],
+                    "reference_type": "SHIPMENT", "reference_id": str(shipment["_id"]), "created_at": now,
+                }, session=session)
         return updated
     updated = await run_in_txn(_transaction)
 
@@ -455,6 +526,58 @@ async def cancel_shipment_endpoint(
         return updated
     updated = await run_in_txn(_transaction)
     return to_response(ShipmentResponse, _shipment_response(updated))
+
+
+@router.post("/{shipment_id}/return-receipt", response_model=ShipmentResponse)
+async def receive_shipment_return(shipment_id: str, data: ShipmentReturnReceipt,
+                                  current_user: dict = Depends(get_current_user),
+                                  db: AsyncIOMotorDatabase = Depends(get_database)):
+    if current_user["role"] not in (UserRole.ADMIN, UserRole.WAREHOUSE_MANAGER):
+        raise ForbiddenError("Only the assigned warehouse manager or admin can receive returned stock")
+    shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
+    if not data.inspected_usable or not data.condition.strip():
+        raise ValidationError("Confirm the returned goods are usable and describe their condition")
+    if shipment.get("status") != "CANCELLED" or not shipment.get("actual_dispatch_time"):
+        raise ValidationError("A return receipt requires a cancelled shipment that was dispatched")
+    if shipment.get("loaded_weight_kg") is None or Decimal(str(data.returned_quantity_kg)) != Decimal(str(shipment["loaded_weight_kg"])):
+        raise ValidationError("The full loaded quantity must be returned; partial or damaged returns require a separate workflow")
+    now = datetime.now(timezone.utc)
+
+    async def transaction(session):
+        order = await resolve_doc(db.purchase_orders, shipment.get("purchase_order_id"), "Purchase Order", session=session)
+        inv_id = order.get("inventory_id")
+        if not inv_id or not ObjectId.is_valid(inv_id):
+            raise ConflictError("Return requires a valid inventory allocation")
+        inventory = await db.inventory_items.find_one({"_id": ObjectId(inv_id)}, session=session)
+        if not inventory or inventory.get("batch_id") != order.get("batch_id"):
+            raise ConflictError("Order inventory allocation changed")
+        if current_user["role"] == UserRole.WAREHOUSE_MANAGER:
+            warehouse = await resolve_doc(db.warehouses, inventory.get("warehouse_id"), "Warehouse", session=session)
+            if warehouse.get("manager_id") != current_user["sub"]:
+                raise ForbiddenError("Return belongs to another warehouse")
+        order_claim = await db.purchase_orders.update_one({"_id": order["_id"], "status": "ACCEPTED"},
+            {"$set": {"updated_at": now}}, session=session)
+        if not order_claim.matched_count:
+            raise ConflictError("Order is no longer reserved")
+        claim = await db.shipments.update_one({"_id": shipment["_id"], "status": "CANCELLED", "return_received_at": None},
+            {"$set": {"return_received_at": now, "return_received_by": current_user["sub"],
+                      "returned_quantity_kg": data.returned_quantity_kg, "return_condition": data.condition.strip(), "updated_at": now}}, session=session)
+        if not claim.matched_count:
+            raise ConflictError("Return was already recorded or shipment changed")
+        # Returned stock stays reserved until the buyer cancels the order.
+        await db.inventory_movements.insert_one({"type": "RETURN_RECEIPT_RESERVED", "inventory_id": inv_id,
+            "batch_id": order.get("batch_id"), "warehouse_id": inventory.get("warehouse_id"),
+            "quantity_kg": data.returned_quantity_kg, "previous_available_kg": inventory["available_kg"],
+            "new_available_kg": inventory["available_kg"], "actor_id": current_user["sub"],
+            "actor_role": current_user["role"], "reference_type": "SHIPMENT", "reference_id": str(shipment["_id"]),
+            "reason": data.condition.strip(), "created_at": now}, session=session)
+        await append_ledger_block(db, event_type=LedgerEventType.SHIPMENT_RETURN_RECEIVED,
+            entity_type="SHIPMENT", entity_id=str(shipment["_id"]), actor_id=current_user["sub"],
+            actor_role=current_user["role"], event_summary="Full usable shipment return received",
+            payload={"quantity_kg": data.returned_quantity_kg, "condition": data.condition.strip()}, session=session)
+        return await db.shipments.find_one({"_id": shipment["_id"]}, session=session)
+
+    return to_response(ShipmentResponse, _shipment_response(await run_in_txn(transaction)))
 
 
 @router.get("/{shipment_id}/timeline")

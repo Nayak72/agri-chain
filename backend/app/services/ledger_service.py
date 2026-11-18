@@ -265,13 +265,17 @@ async def verify_ledger_integrity(db: AsyncIOMotorDatabase) -> Dict[str, Any]:
 async def get_entity_history(
     db: AsyncIOMotorDatabase,
     entity_type: str,
-    entity_id: str
+    entity_id: str,
+    actor_id: str = None,
 ) -> list:
-    cursor = db.ledger_blocks.find({
+    query = {
         "chain_id": CHAIN_ID,
         "entity_type": entity_type,
         "entity_id": entity_id
-    }).sort("index", 1)
+    }
+    if actor_id is not None:
+        query["actor_id"] = actor_id
+    cursor = db.ledger_blocks.find(query).sort("index", 1)
     blocks = []
     async for block in cursor:
         blocks.append(block)

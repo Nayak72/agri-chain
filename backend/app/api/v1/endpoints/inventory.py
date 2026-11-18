@@ -23,10 +23,10 @@ router = APIRouter()
 class WarehouseReceiptCreate(BaseModel):
     warehouse_id: str
     batch_id: str
-    received_weight_kg: float = Field(..., gt=0)
-    accepted_weight_kg: float = Field(..., ge=0)
-    damaged_weight_kg: float = Field(0.0, ge=0)
-    rejected_weight_kg: float = Field(0.0, ge=0)
+    received_weight_kg: float = Field(..., gt=0, allow_inf_nan=False, multiple_of=0.001)
+    accepted_weight_kg: float = Field(..., ge=0, allow_inf_nan=False, multiple_of=0.001)
+    damaged_weight_kg: float = Field(0.0, ge=0, allow_inf_nan=False, multiple_of=0.001)
+    rejected_weight_kg: float = Field(0.0, ge=0, allow_inf_nan=False, multiple_of=0.001)
     inspection_result: InspectionResult = InspectionResult.PASSED
     packaging_condition: str = "GOOD"
     storage_location: str = Field(...)
@@ -74,9 +74,12 @@ async def create_warehouse_receipt(
     if receipt_data.received_weight_kg > batch["initial_quantity_kg"]:
         raise ValidationError("Received weight cannot exceed the batch's initial quantity")
     
-    total_parts = receipt_data.accepted_weight_kg + receipt_data.damaged_weight_kg + receipt_data.rejected_weight_kg
-    if abs(receipt_data.received_weight_kg - total_parts) > 0.01:
+    from decimal import Decimal
+    total_parts = sum(Decimal(str(value)) for value in (receipt_data.accepted_weight_kg, receipt_data.damaged_weight_kg, receipt_data.rejected_weight_kg))
+    if Decimal(str(receipt_data.received_weight_kg)) != total_parts:
         raise ValidationError("Received weight must exactly equal sum of accepted, damaged, and rejected weights")
+    if receipt_data.inspection_result == InspectionResult.FAILED and receipt_data.accepted_weight_kg > 0:
+        raise ValidationError("Failed inspections cannot create accepted inventory")
     
     receipt_id = f"WR-{warehouse_id[:8]}-{uuid.uuid4().hex[:8].upper()}"
     now = datetime.now(timezone.utc)
@@ -135,7 +138,15 @@ async def create_warehouse_receipt(
             "updated_at": now,
         }
         
-        await db.inventory_items.insert_one(to_mongo(inventory_doc), session=session)
+        inserted_inventory = await db.inventory_items.insert_one(to_mongo(inventory_doc), session=session)
+        await db.inventory_movements.insert_one({
+            "type": "RECEIPT", "inventory_id": str(inserted_inventory.inserted_id),
+            "batch_id": str(batch["_id"]), "warehouse_id": warehouse_id,
+            "quantity_kg": receipt_data.accepted_weight_kg,
+            "previous_available_kg": 0.0, "new_available_kg": receipt_data.accepted_weight_kg,
+            "actor_id": current_user["sub"], "actor_role": current_user["role"],
+            "reference_type": "WAREHOUSE_RECEIPT", "reference_id": str(result.inserted_id), "created_at": now,
+        }, session=session)
         
         await append_ledger_block(
             db,
@@ -168,11 +179,13 @@ async def list_warehouse_receipts(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
+    if current_user["role"] not in (UserRole.ADMIN, UserRole.WAREHOUSE_MANAGER):
+        raise ForbiddenError("Not authorized to view warehouse records")
     query = {}
     if current_user["role"] == UserRole.WAREHOUSE_MANAGER:
-        warehouses = await db.warehouses.find({"manager_id": current_user["sub"]}).to_list(100)
+        warehouses = await db.warehouses.find({"manager_id": current_user["sub"]}).to_list(None)
         wh_ids = [str(w["_id"]) for w in warehouses]
-        query["warehouse_id"] = {"$in": wh_ids}
+        query["warehouse_id"] = {"$in": [warehouse_id] if warehouse_id in wh_ids else []} if warehouse_id else {"$in": wh_ids}
     elif warehouse_id:
         query["warehouse_id"] = warehouse_id
     
@@ -211,13 +224,15 @@ async def list_inventory(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
+    if current_user["role"] not in (UserRole.ADMIN, UserRole.WAREHOUSE_MANAGER):
+        raise ForbiddenError("Not authorized to view warehouse records")
     query = {}
     if current_user["role"] == UserRole.WAREHOUSE_MANAGER:
-        warehouses = await db.warehouses.find({"manager_id": current_user["sub"]}).to_list(100)
+        warehouses = await db.warehouses.find({"manager_id": current_user["sub"]}).to_list(None)
         wh_ids = [str(w["_id"]) for w in warehouses]
-        query["warehouse_id"] = {"$in": wh_ids}
+        query["warehouse_id"] = {"$in": [warehouse_id] if warehouse_id in wh_ids else []} if warehouse_id else {"$in": wh_ids}
     
-    if warehouse_id:
+    elif warehouse_id:
         query["warehouse_id"] = warehouse_id
     if batch_id:
         query["batch_id"] = batch_id

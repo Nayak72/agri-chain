@@ -153,7 +153,10 @@ async def get_current_user(
             raise AccountPendingApprovalError()
 
     if db is not None:
-        payload["role"] = user.get("role", payload.get("role"))
+        try:
+            payload["role"] = Role(str(user.get("role", "")).upper()).value
+        except ValueError as exc:
+            raise ForbiddenError("Invalid user role") from exc
     return payload
 
 

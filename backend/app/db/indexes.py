@@ -78,6 +78,8 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     await _create_index_safe(db.inventory_items, "estimated_shelf_life_end")
     
     # Inventory movements
+    await _create_index_safe(db.inventory_movements, [("inventory_id", 1), ("created_at", 1)])
+    await _create_index_safe(db.inventory_movements, [("reference_type", 1), ("reference_id", 1)])
     
     # Purchase orders
     await _create_index_safe(db.purchase_orders, "order_id", unique=True)
@@ -155,6 +157,9 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     await _create_index_safe(db.route_checkpoints, [("shipment_id", 1), ("recorded_at", 1)])
     
     # Sensor readings
+    await _create_index_safe(db.simulation_sessions, "simulation_id", unique=True)
+    await _create_index_safe(db.simulation_sessions, [("shipment_id", 1), ("state", 1)])
+    await _create_index_safe(db.sensor_readings, [("simulation_id", 1), ("sequence", 1)])
     await _create_index_safe(db.sensor_readings, "reading_id", unique=True)
     await _create_index_safe(db.sensor_readings, "shipment_id")
     await _create_index_safe(db.sensor_readings, "timestamp")

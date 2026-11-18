@@ -1,12 +1,16 @@
 import apiClient from './client'
 
 export const sensorsApi = {
-  nextReading: (shipmentId, scenario = 'NORMAL') =>
-    apiClient.post(`/sensors/shipments/${shipmentId}/simulation/next-reading`, { scenario }),
+  nextReading: (shipmentId, scenario = 'NORMAL', sessionId = null) =>
+    apiClient.post(`/sensors/shipments/${shipmentId}/simulation/next-reading`, { scenario, session_id: sessionId }),
+  sessions: (shipmentId) => apiClient.get(`/sensors/shipments/${shipmentId}/simulation/sessions`),
+  startSession: (shipmentId, data) => apiClient.post(`/sensors/shipments/${shipmentId}/simulation/sessions`, data),
+  controlSession: (shipmentId, sessionId, action) => apiClient.post(`/sensors/shipments/${shipmentId}/simulation/sessions/${sessionId}/${action}`),
   readings: (shipmentId, params) =>
     apiClient.get(`/sensors/shipments/${shipmentId}/sensor-readings`, { params }),
   alerts: (shipmentId, params) =>
     apiClient.get(`/sensors/shipments/${shipmentId}/sensor-alerts`, { params }),
+  acknowledgeAlert: (alertId) => apiClient.post(`/sensors/sensor-alerts/${alertId}/acknowledge`),
   resolveAlert: (alertId, data = {}) =>
     apiClient.post(`/sensors/sensor-alerts/${alertId}/resolve`, data),
 }

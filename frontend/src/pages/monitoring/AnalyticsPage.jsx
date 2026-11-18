@@ -90,7 +90,8 @@ export default function AnalyticsPage() {
   const qualityCargoData = qualityData ? [
     { name: 'Accepted Cargo', kg: qualityData.accepted_quantity_kg || 0 },
     { name: 'Damaged Cargo', kg: qualityData.damaged_quantity_kg || 0 },
-    { name: 'Rejected / Missing', kg: qualityData.rejected_quantity_kg || 0 },
+    { name: 'Missing Cargo', kg: qualityData.missing_quantity_kg || 0 },
+    { name: 'Rejected Cargo', kg: qualityData.rejected_quantity_kg || 0 },
   ] : []
 
   const transporterCostChartData = freightData?.transporter_wise_cost?.map((item, idx) => ({

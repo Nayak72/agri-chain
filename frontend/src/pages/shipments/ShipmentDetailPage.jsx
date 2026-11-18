@@ -50,6 +50,8 @@ export default function ShipmentDetailPage() {
   const [showLoadModal, setShowLoadModal] = useState(false)
   const [actualWeight, setActualWeight] = useState('')
   const [actualPackageCount, setActualPackageCount] = useState('100')
+  const [returnCondition, setReturnCondition] = useState('')
+  const [returnInspected, setReturnInspected] = useState(false)
 
   // Checkpoint Modal
   const [showCheckpointModal, setShowCheckpointModal] = useState(false)
@@ -136,6 +138,20 @@ export default function ShipmentDetailPage() {
     onError: (err) => {
       setActionError(getApiError(err, 'Failed to cancel shipment.').message)
     },
+  })
+
+  const returnMutation = useMutation({
+    mutationFn: () => shipmentsApi.receiveReturn(id, {
+      returned_quantity_kg: shipment.loaded_weight_kg,
+      condition: returnCondition.trim(),
+      inspected_usable: returnInspected,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shipment', id] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      setActionError('')
+    },
+    onError: err => setActionError(getApiError(err, 'Failed to record return.').message),
   })
 
   // Load mutation
@@ -333,6 +349,24 @@ export default function ShipmentDetailPage() {
           <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{actionError}</span>
         </div>
+      )}
+
+      {shipment.status === 'CANCELLED' && shipment.actual_dispatch_time && (
+        <section className="glass-panel-strong rounded-2xl border p-5 space-y-3">
+          <h2 className="font-semibold text-stone-900">Warehouse return</h2>
+          {shipment.return_received_at ? (
+            <p className="text-sm text-stone-600">{formatWeight(shipment.returned_quantity_kg)} received on {formatDateTime(shipment.return_received_at)}. Stock remains reserved until the buyer cancels the order.</p>
+          ) : [ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER].includes(userRole) ? (
+            <form className="space-y-3" onSubmit={event => { event.preventDefault(); returnMutation.mutate() }}>
+              <p className="text-sm text-stone-600">Record the full {formatWeight(shipment.loaded_weight_kg)} after physical inspection. Partial or damaged returns require a separate workflow.</p>
+              <label className="block text-sm">Condition description
+                <input className="glass-control border rounded-xl p-2 w-full" value={returnCondition} onChange={event => setReturnCondition(event.target.value)} maxLength={500} required />
+              </label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={returnInspected} onChange={event => setReturnInspected(event.target.checked)} /> I inspected all returned goods and confirm they are usable.</label>
+              <button className="glass-button rounded-xl bg-forest px-4 py-2 text-white disabled:opacity-50" disabled={!returnInspected || !returnCondition.trim() || returnMutation.isPending}>{returnMutation.isPending ? 'Recording…' : 'Record full return'}</button>
+            </form>
+          ) : <p className="text-sm text-stone-600">Awaiting warehouse inspection before the buyer can cancel the order.</p>}
+        </section>
       )}
 
       {/* Main Grid: Timeline + Checkpoints (Left 2 cols) & Assets / Telemetry (Right 1 col) */}

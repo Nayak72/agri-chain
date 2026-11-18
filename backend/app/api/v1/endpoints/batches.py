@@ -20,6 +20,26 @@ from app.schemas.validators import validate_shelf_life
 router = APIRouter()
 
 
+async def _assert_batch_access(db, user, batch):
+    role = user.get("role")
+    if role == UserRole.ADMIN:
+        return
+    if role == UserRole.FARMER and batch.get("farmer_id") == user.get("sub"):
+        return
+    if role == UserRole.BUYER:
+        if batch.get("status") == BatchStatus.AT_WAREHOUSE.value:
+            return
+        if await db.purchase_orders.find_one({"batch_id": str(batch["_id"]), "buyer_id": user.get("sub")}):
+            return
+    if role == UserRole.WAREHOUSE_MANAGER:
+        if batch.get("status") in ("CREATED", "HARVESTED"):
+            return
+        warehouses = await db.warehouses.find({"manager_id": user.get("sub")}, {"_id": 1}).to_list(None)
+        if await db.inventory_items.find_one({"batch_id": str(batch["_id"]), "warehouse_id": {"$in": [str(w["_id"]) for w in warehouses]}}):
+            return
+    raise ForbiddenError("Not authorized to view this batch")
+
+
 async def _with_stock(db, batch):
     result = dict(batch)
     rows = await db.inventory_items.find({"batch_id": str(batch["_id"])}).to_list(100)
@@ -154,6 +174,13 @@ async def list_batches(
         conditions.append({"status": {"$in": [
             BatchStatus.AT_WAREHOUSE.value
         ]}})
+    elif current_user["role"] == UserRole.WAREHOUSE_MANAGER:
+        warehouses = await db.warehouses.find({"manager_id": current_user["sub"]}, {"_id": 1}).to_list(None)
+        stock = await db.inventory_items.find({"warehouse_id": {"$in": [str(w["_id"]) for w in warehouses]}}, {"batch_id": 1}).to_list(None)
+        ids = [ObjectId(item["batch_id"]) for item in stock if ObjectId.is_valid(item.get("batch_id", ""))]
+        conditions.append({"$or": [{"status": {"$in": ["CREATED", "HARVESTED"]}}, {"_id": {"$in": ids}}]})
+    elif current_user["role"] != UserRole.ADMIN:
+        raise ForbiddenError("Not authorized to view batches")
     
     if produce_type:
         p_val = produce_type.value if hasattr(produce_type, "value") else str(produce_type)
@@ -179,8 +206,7 @@ async def get_batch(
 ):
     batch = await resolve_doc(db.produce_batches, batch_id, "Batch", business_key="batch_id")
     
-    if current_user["role"] == UserRole.FARMER and batch["farmer_id"] != current_user["sub"]:
-        raise ForbiddenError("Not authorized to view this batch")
+    await _assert_batch_access(db, current_user, batch)
     
     return to_response(BatchResponse, await _with_stock(db, batch))
 
@@ -224,8 +250,7 @@ async def get_batch_history(
 ):
     batch = await resolve_doc(db.produce_batches, batch_id, "Batch", business_key="batch_id")
     
-    if current_user["role"] == UserRole.FARMER and batch["farmer_id"] != current_user["sub"]:
-        raise ForbiddenError("Not authorized to view this batch")
+    await _assert_batch_access(db, current_user, batch)
     
     from app.services.ledger_service import get_entity_history
     return await get_entity_history(db, "PRODUCE_BATCH", str(batch["_id"]))

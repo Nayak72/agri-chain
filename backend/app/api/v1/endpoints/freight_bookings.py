@@ -191,12 +191,16 @@ async def list_freight_bookings(
     elif current_user["role"] == UserRole.TRANSPORTER:
         transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
         t_id = str(transporter["_id"]) if transporter else None
+        if not t_id:
+            return []
         if status == FreightBookingStatus.CONFIRMED:
             my_quotes = await db.freight_quotations.find({"transporter_id": t_id, "status": "ACCEPTED"}).to_list(None) if t_id else []
             my_quote_ids = [str(q["_id"]) for q in my_quotes]
             query["status"] = FreightBookingStatus.CONFIRMED.value
             query["accepted_quotation_id"] = {"$in": my_quote_ids}
         elif status:
+            if status not in (FreightBookingStatus.REQUESTED, FreightBookingStatus.QUOTATION_PENDING, FreightBookingStatus.QUOTED):
+                raise ForbiddenError("Not authorized to view these bookings")
             query["status"] = status.value if hasattr(status, "value") else status
         else:
             query["status"] = {"$in": [
@@ -204,7 +208,9 @@ async def list_freight_bookings(
                 FreightBookingStatus.QUOTATION_PENDING.value,
                 FreightBookingStatus.QUOTED.value
             ]}
-    
+    elif current_user["role"] != UserRole.ADMIN:
+        raise ForbiddenError("Not authorized to view freight bookings")
+
     if status and current_user["role"] != UserRole.TRANSPORTER:
         query["status"] = status.value if hasattr(status, "value") else status
     if purchase_order_id:
@@ -225,6 +231,16 @@ async def get_freight_booking(
     if current_user["role"] == UserRole.BUYER and booking.get("buyer_id") != current_user["sub"]:
         raise ForbiddenError("Not authorized to view this booking")
     elif current_user["role"] == UserRole.FARMER and booking.get("seller_id") != current_user["sub"]:
+        raise ForbiddenError("Not authorized to view this booking")
+    elif current_user["role"] == UserRole.TRANSPORTER:
+        transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
+        if not transporter:
+            raise ForbiddenError("Not authorized to view this booking")
+        if booking.get("status") not in ("REQUESTED", "QUOTATION_PENDING", "QUOTED"):
+            quote = await db.freight_quotations.find_one({"_id": ObjectId(booking["accepted_quotation_id"]), "transporter_id": str(transporter["_id"]), "status": "ACCEPTED"}) if ObjectId.is_valid(booking.get("accepted_quotation_id", "")) else None
+            if not quote:
+                raise ForbiddenError("Not authorized to view this booking")
+    elif current_user["role"] not in (UserRole.ADMIN, UserRole.BUYER, UserRole.FARMER):
         raise ForbiddenError("Not authorized to view this booking")
     
     return to_response(FreightBookingResponse, booking)

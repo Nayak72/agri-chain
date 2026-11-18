@@ -33,7 +33,7 @@ export default function ProduceListPage() {
     return matchesSearch && matchesCat
   })
 
-  const canCreate = user?.role === 'admin' || user?.role === 'farmer'
+  const canCreate = String(user?.role || '').toUpperCase() === 'ADMIN'
 
   return (
     <div className="space-y-6 animate-fade-in-up">

@@ -51,6 +51,10 @@ async def get_ledger_blocks(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     query = {"chain_id": CHAIN_ID}
+    if current_user["role"] != UserRole.ADMIN:
+        if actor_id and str(actor_id) != str(current_user["sub"]):
+            raise ForbiddenError("Not authorized to view another user's ledger entries")
+        query["actor_id"] = str(current_user["sub"])
     if event_type:
         query["event_type"] = event_type
     if entity_type:
@@ -83,7 +87,8 @@ async def get_entity_audit_history(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    history = await get_entity_history(db, entity_type, entity_id)
+    history = await get_entity_history(db, entity_type, entity_id,
+        actor_id=None if current_user["role"] == UserRole.ADMIN else str(current_user["sub"]))
     return {
         "entity_type": entity_type,
         "entity_id": entity_id,

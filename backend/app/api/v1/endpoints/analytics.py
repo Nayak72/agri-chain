@@ -5,6 +5,7 @@ from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 from app.db.mongodb import get_database
+from app.core.access import shipment_scope, shipment_reference_scope
 from app.core.permissions import get_current_user, Role
 from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError
 from app.core.constants import (
@@ -61,34 +62,16 @@ async def get_dashboard_metrics(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    query = {}
-    if current_user["role"] == UserRole.FARMER:
-        query["farmer_id"] = current_user["sub"]
-    elif current_user["role"] == UserRole.BUYER:
-        query["buyer_id"] = current_user["sub"]
-    elif current_user["role"] == UserRole.TRANSPORTER:
-        transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
-        if transporter:
-            query["transporter_id"] = str(transporter["_id"])
-        else:
-            query["transporter_id"] = "none"
-    elif current_user["role"] == UserRole.DRIVER:
-        driver = await db.drivers.find_one({"user_id": current_user["sub"]})
-        d_ids = [current_user["sub"]]
-        if driver:
-            d_ids.extend([str(driver["_id"]), driver.get("driver_id")])
-        query["$or"] = [{"driver_id": {"$in": d_ids}}, {"driver_user_id": current_user["sub"]}]
-    elif current_user["role"] == UserRole.WAREHOUSE_MANAGER:
-        warehouses = await db.warehouses.find({"manager_id": current_user["sub"]}).to_list(100)
-        wh_ids = [str(w["_id"]) for w in warehouses]
-        receipts = await db.warehouse_receipts.find({"warehouse_id": {"$in": wh_ids}}).to_list(500)
-        b_ids = [r["batch_id"] for r in receipts]
-        query["batch_ids"] = {"$in": b_ids}
-    
+    query = await shipment_scope(db, current_user)
+
     total = await db.shipments.count_documents(query)
-    active = await db.shipments.count_documents({**query, "status": {"$in": [ShipmentStatus.IN_TRANSIT, ShipmentStatus.OUT_FOR_DELIVERY]}})
-    completed = await db.shipments.count_documents({**query, "status": ShipmentStatus.DELIVERED})
-    delayed = await db.shipments.count_documents({**query, "$expr": {"$gt": ["$actual_arrival_time", "$expected_arrival_time"]}})
+    active_states = [ShipmentStatus.DRIVER_ASSIGNED, ShipmentStatus.LOADED, ShipmentStatus.DISPATCHED,
+                     ShipmentStatus.IN_TRANSIT, ShipmentStatus.ARRIVED_AT_DESTINATION, ShipmentStatus.OUT_FOR_DELIVERY]
+    completed_states = [ShipmentStatus.DELIVERED, ShipmentStatus.PARTIALLY_DELIVERED, ShipmentStatus.DELIVERY_REJECTED]
+    active = await db.shipments.count_documents({**query, "status": {"$in": active_states}})
+    completed = await db.shipments.count_documents({**query, "status": {"$in": completed_states}})
+    delayed = await db.shipments.count_documents({**query, "status": {"$in": active_states},
+        "actual_arrival_time": None, "expected_arrival_time": {"$type": "date", "$lt": datetime.now(timezone.utc)}})
     cancelled = await db.shipments.count_documents({**query, "status": ShipmentStatus.CANCELLED})
     
     pipeline = [
@@ -96,13 +79,17 @@ async def get_dashboard_metrics(
         {"$group": {"_id": None, "avg_transit": {"$avg": "$actual_transit_hours"}}}
     ]
     transit_result = await db.shipments.aggregate(pipeline).to_list(1)
-    avg_transit = transit_result[0]["avg_transit"] if transit_result else 0
+    avg_transit = (transit_result[0].get("avg_transit") or 0) if transit_result else 0
     
     pipeline = [
-        {"$match": {**query, "status": ShipmentStatus.DELIVERED}},
+        {"$match": {**query, "status": ShipmentStatus.DELIVERED,
+                    "actual_arrival_time": {"$type": "date"}, "expected_arrival_time": {"$type": "date"}}},
         {"$group": {
             "_id": None,
-            "on_time": {"$sum": {"$cond": ["$is_on_time", 1, 0]}},
+            "on_time": {"$sum": {"$cond": [{"$and": [
+                {"$ne": [{"$ifNull": ["$actual_arrival_time", None]}, None]},
+                {"$ne": [{"$ifNull": ["$expected_arrival_time", None]}, None]},
+                {"$lte": ["$actual_arrival_time", "$expected_arrival_time"]}]}, 1, 0]}},
             "total": {"$sum": 1}
         }}
     ]
@@ -129,30 +116,8 @@ async def get_shipment_analytics(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    query = {}
-    if current_user["role"] == UserRole.FARMER:
-        query["farmer_id"] = current_user["sub"]
-    elif current_user["role"] == UserRole.BUYER:
-        query["buyer_id"] = current_user["sub"]
-    elif current_user["role"] == UserRole.TRANSPORTER:
-        transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
-        if transporter:
-            query["transporter_id"] = str(transporter["_id"])
-        else:
-            query["transporter_id"] = "none"
-    elif current_user["role"] == UserRole.DRIVER:
-        driver = await db.drivers.find_one({"user_id": current_user["sub"]})
-        d_ids = [current_user["sub"]]
-        if driver:
-            d_ids.extend([str(driver["_id"]), driver.get("driver_id")])
-        query["$or"] = [{"driver_id": {"$in": d_ids}}, {"driver_user_id": current_user["sub"]}]
-    elif current_user["role"] == UserRole.WAREHOUSE_MANAGER:
-        warehouses = await db.warehouses.find({"manager_id": current_user["sub"]}).to_list(100)
-        wh_ids = [str(w["_id"]) for w in warehouses]
-        receipts = await db.warehouse_receipts.find({"warehouse_id": {"$in": wh_ids}}).to_list(500)
-        b_ids = [r["batch_id"] for r in receipts]
-        query["batch_ids"] = {"$in": b_ids}
-    
+    query = await shipment_scope(db, current_user)
+
     if start_date or end_date:
         date_query = {}
         if start_date:
@@ -190,12 +155,21 @@ async def get_freight_analytics(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    query = {}
-    if current_user["role"] == UserRole.TRANSPORTER:
+    role = current_user["role"]
+    if role == UserRole.ADMIN:
+        query = {}
+    elif role == UserRole.TRANSPORTER:
         transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
-        if transporter:
-            query["transporter_id"] = str(transporter["_id"])
-    
+        query = {"transporter_id": str(transporter["_id"])} if transporter else {"_id": {"$in": []}}
+    elif role in (UserRole.BUYER, UserRole.FARMER):
+        field = "buyer_id" if role == UserRole.BUYER else "seller_id"
+        bookings = await db.freight_bookings.find({field: current_user["sub"]}, {"_id": 1}).to_list(None)
+        query = {"booking_id": {"$in": [str(booking["_id"]) for booking in bookings]}}
+    else:
+        raise ForbiddenError("Not authorized to view freight analytics")
+    shipment_query = await shipment_scope(db, current_user)
+    related_query = await shipment_reference_scope(db, current_user)
+
     # All quotations
     pipeline = [
         {"$match": query},
@@ -227,6 +201,7 @@ async def get_freight_analytics(
     
     # Route-wise costs from shipments
     route_pipeline = [
+        {"$match": shipment_query},
         {"$group": {
             "_id": {"origin": "$pickup_city", "dest": "$destination_city"},
             "count": {"$sum": 1},
@@ -247,6 +222,7 @@ async def get_freight_analytics(
     
     # Delivered weight for cost per kg
     weight_res = await db.delivery_reports.aggregate([
+        {"$match": related_query},
         {"$group": {"_id": None, "total": {"$sum": "$delivered_quantity_kg"}}}
     ]).to_list(1)
     total_kg = weight_res[0]["total"] if weight_res else 0
@@ -267,22 +243,22 @@ async def get_fleet_analytics(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
+    if current_user["role"] not in [UserRole.ADMIN, UserRole.TRANSPORTER]:
+        raise ForbiddenError("Not authorized to view fleet analytics")
     query = {}
     if current_user["role"] == UserRole.TRANSPORTER:
         transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
         if transporter:
             query["transporter_id"] = str(transporter["_id"])
+        else:
+            query["transporter_id"] = {"$in": []}
     
     total_vehicles = await db.vehicles.count_documents(query)
     available = await db.vehicles.count_documents({**query, "status": VehicleStatus.AVAILABLE})
     assigned = await db.vehicles.count_documents({**query, "status": VehicleStatus.ASSIGNED})
     maintenance = await db.vehicles.count_documents({**query, "status": VehicleStatus.MAINTENANCE})
     
-    driver_query = {}
-    if current_user["role"] == UserRole.TRANSPORTER:
-        transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
-        if transporter:
-            driver_query["transporter_id"] = str(transporter["_id"])
+    driver_query = dict(query)
     
     total_drivers = await db.drivers.count_documents(driver_query)
     available_drivers = await db.drivers.count_documents({**driver_query, "status": DriverStatus.AVAILABLE})
@@ -307,25 +283,26 @@ async def get_quality_analytics(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    query = {}
-    if current_user["role"] == UserRole.FARMER:
-        query["farmer_id"] = current_user["sub"]
-    
+    query = await shipment_scope(db, current_user)
+    related_query = await shipment_reference_scope(db, current_user)
+
     # Calculate actual dispatched weight from shipments
     shipment_weight_pipeline = [
         {"$match": {**query, "status": {"$in": [ShipmentStatus.DELIVERED, ShipmentStatus.PARTIALLY_DELIVERED]}}},
-        {"$group": {"_id": None, "total_weight": {"$sum": "$cargo_quantity_kg"}}}
+        {"$group": {"_id": None, "total_weight": {"$sum": {"$ifNull": ["$loaded_weight_kg", 0]}}}}
     ]
     weight_res = await db.shipments.aggregate(shipment_weight_pipeline).to_list(1)
     total_dispatched_kg = float(weight_res[0]["total_weight"]) if weight_res and weight_res[0].get("total_weight") else 0.0
     
     # Calculate delivery breakdown
     delivery_pipeline = [
+        {"$match": related_query},
         {"$group": {
             "_id": None,
             "delivered": {"$sum": "$delivered_quantity_kg"},
             "damaged": {"$sum": "$damaged_quantity_kg"},
-            "missing": {"$sum": "$missing_quantity_kg"},
+            "missing": {"$sum": {"$cond": [{"$eq": ["$status", "REJECTED"]}, 0, "$missing_quantity_kg"]}},
+            "rejected": {"$sum": {"$cond": [{"$eq": ["$status", "REJECTED"]}, "$missing_quantity_kg", 0]}},
         }}
     ]
     delivery_result = await db.delivery_reports.aggregate(delivery_pipeline).to_list(1)
@@ -333,33 +310,42 @@ async def get_quality_analytics(
     if delivery_result:
         delivered_qty = float(delivery_result[0]["delivered"])
         damaged_qty = float(delivery_result[0]["damaged"])
-        rejected_qty = float(delivery_result[0]["missing"])
+        missing_qty = float(delivery_result[0]["missing"])
+        rejected_qty = float(delivery_result[0].get("rejected", 0))
         if total_dispatched_kg == 0.0:
-            total_dispatched_kg = delivered_qty + damaged_qty + rejected_qty
+            total_dispatched_kg = delivered_qty + damaged_qty + missing_qty + rejected_qty
         accepted_qty = delivered_qty
     else:
         damaged_qty = 0.0
+        missing_qty = 0.0
         rejected_qty = 0.0
-        accepted_qty = total_dispatched_kg
+        accepted_qty = 0.0
     
     damage_rate = (damaged_qty / total_dispatched_kg * 100) if total_dispatched_kg > 0 else 0.0
     rejection_rate = (rejected_qty / total_dispatched_kg * 100) if total_dispatched_kg > 0 else 0.0
     
-    total_alerts = await db.sensor_alerts.count_documents({"status": AlertStatus.ACTIVE})
-    total_readings = await db.sensor_readings.count_documents({})
-    normal_readings = await db.sensor_readings.count_documents({"status": SensorStatus.NORMAL})
+    total_alerts = await db.sensor_alerts.count_documents({**related_query, "status": AlertStatus.ACTIVE})
+    total_readings = await db.sensor_readings.count_documents(related_query)
+    normal_readings = await db.sensor_readings.count_documents({**related_query, "status": SensorStatus.NORMAL})
     compliance = (normal_readings / total_readings * 100) if total_readings > 0 else None
     
+    duration_result = await db.sensor_alerts.aggregate([
+        {"$match": {**related_query, "alert_type": "TEMPERATURE", "created_at": {"$type": "date"}}},
+        {"$group": {"_id": None, "milliseconds": {"$sum": {"$max": [0, {"$subtract": [
+            {"$ifNull": ["$resolved_at", datetime.now(timezone.utc)]}, "$created_at"]}]}}}}
+    ]).to_list(1)
+    duration_hours = (duration_result[0].get("milliseconds", 0) / 3_600_000) if duration_result else 0.0
     return {
         "total_dispatched_quantity_kg": round(total_dispatched_kg, 2),
         "accepted_quantity_kg": round(accepted_qty, 2),
         "damaged_quantity_kg": round(damaged_qty, 2),
         "rejected_quantity_kg": round(rejected_qty, 2),
+        "missing_quantity_kg": round(missing_qty, 2),
         "damage_rate_percentage": round(damage_rate, 2),
         "rejection_rate_percentage": round(rejection_rate, 2),
         "cold_chain_compliance_percentage": round(compliance, 2) if compliance is not None else None,
         "temperature_excursion_count": total_alerts,
-        "total_excursion_duration_hours": 0.0,
+        "total_excursion_duration_hours": round(duration_hours, 2),
     }
 
 
@@ -368,9 +354,10 @@ async def get_cold_chain_analytics(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    total_readings = await db.sensor_readings.count_documents({})
-    normal_readings = await db.sensor_readings.count_documents({"status": SensorStatus.NORMAL})
-    critical_readings = await db.sensor_readings.count_documents({"status": SensorStatus.CRITICAL})
+    related_query = await shipment_reference_scope(db, current_user)
+    total_readings = await db.sensor_readings.count_documents(related_query)
+    normal_readings = await db.sensor_readings.count_documents({**related_query, "status": SensorStatus.NORMAL})
+    critical_readings = await db.sensor_readings.count_documents({**related_query, "status": SensorStatus.CRITICAL})
     
     compliance = (normal_readings / total_readings * 100) if total_readings > 0 else None
     
@@ -379,6 +366,6 @@ async def get_cold_chain_analytics(
         "normal_readings": normal_readings,
         "critical_readings": critical_readings,
         "compliance_percentage": round(compliance, 2) if compliance is not None else None,
-        "active_alerts": await db.sensor_alerts.count_documents({"status": AlertStatus.ACTIVE}),
-        "resolved_alerts": await db.sensor_alerts.count_documents({"status": AlertStatus.RESOLVED}),
+        "active_alerts": await db.sensor_alerts.count_documents({**related_query, "status": AlertStatus.ACTIVE}),
+        "resolved_alerts": await db.sensor_alerts.count_documents({**related_query, "status": AlertStatus.RESOLVED}),
     }

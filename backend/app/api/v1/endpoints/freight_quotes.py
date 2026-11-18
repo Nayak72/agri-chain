@@ -158,9 +158,11 @@ async def list_freight_quotations(
         else:
             # Scoped by user's bookings
             match_field = "buyer_id" if current_user["role"] == UserRole.BUYER else "seller_id"
-            my_bookings = await db.freight_bookings.find({match_field: current_user["sub"]}).to_list(100)
+            my_bookings = await db.freight_bookings.find({match_field: current_user["sub"]}).to_list(None)
             b_ids = [str(b["_id"]) for b in my_bookings]
             query["booking_id"] = {"$in": b_ids}
+    elif current_user["role"] != UserRole.ADMIN:
+        raise ForbiddenError("Not authorized to view freight quotations")
     
     if booking_id and current_user["role"] == UserRole.ADMIN:
         b = await resolve_doc(db.freight_bookings, booking_id, "Freight Booking", business_key="booking_id")
@@ -187,10 +189,11 @@ async def get_freight_quotation(
             raise ForbiddenError("Not authorized to view this quotation")
     elif current_user["role"] in [UserRole.BUYER, UserRole.FARMER]:
         booking = await db.freight_bookings.find_one({"_id": ObjectId(quotation["booking_id"]) if ObjectId.is_valid(quotation["booking_id"]) else quotation["booking_id"]})
-        if booking:
-            field = "buyer_id" if current_user["role"] == UserRole.BUYER else "seller_id"
-            if booking.get(field) != current_user["sub"]:
-                raise ForbiddenError("Not authorized to view this quotation")
+        field = "buyer_id" if current_user["role"] == UserRole.BUYER else "seller_id"
+        if not booking or booking.get(field) != current_user["sub"]:
+            raise ForbiddenError("Not authorized to view this quotation")
+    elif current_user["role"] != UserRole.ADMIN:
+        raise ForbiddenError("Not authorized to view this quotation")
     
     return to_response(FreightQuotationResponse, quotation)
 

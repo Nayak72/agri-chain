@@ -71,6 +71,8 @@ async def create_warehouse(
     validate_temperature_range(warehouse_data.temperature_range_min, warehouse_data.temperature_range_max)
 
     manager_id = warehouse_data.manager_id or current_user["sub"]
+    if current_user["role"] == UserRole.WAREHOUSE_MANAGER and manager_id != current_user["sub"]:
+        raise ForbiddenError("Warehouse managers cannot assign another manager")
     if not ObjectId.is_valid(manager_id):
         raise ValidationError("Invalid manager ID")
     
@@ -111,6 +113,8 @@ async def list_warehouses(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
+    if current_user["role"] not in (UserRole.ADMIN, UserRole.WAREHOUSE_MANAGER):
+        raise ForbiddenError("Not authorized to view warehouses")
     query = {}
     if current_user["role"] == UserRole.WAREHOUSE_MANAGER:
         query["manager_id"] = current_user["sub"]
@@ -132,6 +136,8 @@ async def get_warehouse(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
+    if current_user["role"] not in (UserRole.ADMIN, UserRole.WAREHOUSE_MANAGER):
+        raise ForbiddenError("Not authorized to view warehouses")
     warehouse = await resolve_doc(db.warehouses, warehouse_id, "Warehouse", business_key="name")
     
     if current_user["role"] == UserRole.WAREHOUSE_MANAGER and warehouse.get("manager_id") != current_user["sub"]:

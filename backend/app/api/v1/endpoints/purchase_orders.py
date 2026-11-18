@@ -25,7 +25,7 @@ class PurchaseOrderCreate(BaseModel):
     seller_id: Optional[str] = None
     produce_type: ProduceType
     batch_id: str
-    requested_quantity_kg: float = Field(..., gt=0, allow_inf_nan=False)
+    requested_quantity_kg: float = Field(..., gt=0, allow_inf_nan=False, multiple_of=0.001)
     unit_price_paise: int = Field(..., gt=0)
     preferred_delivery_date: date
     buyer_id: Optional[str] = None
@@ -154,6 +154,8 @@ async def list_purchase_orders(
         warehouses = await get_warehouses_for_user(db, current_user)
         inv_batches = await db.inventory_items.distinct("batch_id", {"warehouse_id": {"$in": warehouses}})
         conditions.append({"batch_id": {"$in": inv_batches}})
+    elif current_user["role"] != UserRole.ADMIN:
+        raise ForbiddenError("Not authorized to view purchase orders")
     
     if status:
         s_val = status.value if hasattr(status, "value") else str(status)
@@ -177,6 +179,12 @@ async def get_purchase_order(
     if role == UserRole.BUYER and order["buyer_id"] != uid:
         raise ForbiddenError("Not authorized to view this purchase order")
     if role == UserRole.FARMER and order["seller_id"] != uid:
+        raise ForbiddenError("Not authorized to view this purchase order")
+    if role == UserRole.WAREHOUSE_MANAGER:
+        warehouses = await get_warehouses_for_user(db, current_user)
+        if not await db.inventory_items.find_one({"batch_id": order.get("batch_id"), "warehouse_id": {"$in": warehouses}}):
+            raise ForbiddenError("Not authorized to view this purchase order")
+    elif role not in (UserRole.ADMIN, UserRole.BUYER, UserRole.FARMER):
         raise ForbiddenError("Not authorized to view this purchase order")
     
     return to_response(PurchaseOrderResponse, order)
@@ -219,6 +227,13 @@ async def accept_purchase_order(
         if not inv:
             raise ValidationError("Batch has no accepted warehouse stock")
         await reserve_stock(db, str(inv["_id"]), qty, session)
+        await db.inventory_movements.insert_one({
+            "type": "RESERVATION", "inventory_id": str(inv["_id"]), "batch_id": batch_id,
+            "warehouse_id": inv.get("warehouse_id"), "quantity_kg": qty,
+            "previous_available_kg": inv["available_kg"], "new_available_kg": inv["available_kg"] - qty,
+            "actor_id": current_user["sub"], "actor_role": current_user["role"],
+            "reference_type": "PURCHASE_ORDER", "reference_id": str(order["_id"]), "created_at": now,
+        }, session=session)
         await db.purchase_orders.update_one(
             {"_id": order["_id"]}, {"$set": {"inventory_id": str(inv["_id"])}}, session=session,
         )
@@ -299,7 +314,7 @@ async def cancel_purchase_order(
         raise ValidationError(f"Order cannot be cancelled from status {order['status']}")
     
     now = datetime.now(timezone.utc)
-    qty = order["requested_quantity_kg"]
+    qty = order.get("accepted_quantity_kg") or order["requested_quantity_kg"]
     batch_id = order.get("batch_id")
 
     async def _transaction(session):
@@ -308,6 +323,16 @@ async def cancel_purchase_order(
         )
         if shipment:
             raise ConflictError("Cancel the shipment before cancelling this order")
+        # A cancelled trip may already have left the warehouse. Without an
+        # explicit return receipt, releasing its reservation would fabricate stock.
+        departed = await db.shipments.find_one({
+            "purchase_order_id": str(order["_id"]), "status": "CANCELLED",
+            "return_received_at": None,
+            "$or": [{"actual_dispatch_time": {"$ne": None}},
+                    {"status_history.status": {"$in": ["DISPATCHED", "IN_TRANSIT"]}}],
+        }, session=session)
+        if departed:
+            raise ConflictError("Cannot release dispatched stock without a recorded return receipt")
         claim = await db.purchase_orders.update_one(
             {"_id": order["_id"], "status": order["status"]},
             {"$set": {"status": PurchaseOrderStatus.CANCELLED.value, "updated_at": now}}, session=session,
@@ -318,7 +343,17 @@ async def cancel_purchase_order(
             inventory_id = order.get("inventory_id")
             if not inventory_id:
                 raise ConflictError("Accepted order has no inventory allocation")
+            inventory = await db.inventory_items.find_one({"_id": ObjectId(inventory_id)}, session=session)
+            if not inventory:
+                raise ConflictError("Allocated inventory no longer exists")
             await release_stock(db, inventory_id, qty, session)
+            await db.inventory_movements.insert_one({
+                "type": "RELEASE", "inventory_id": inventory_id, "batch_id": order.get("batch_id"),
+                "warehouse_id": inventory.get("warehouse_id"), "quantity_kg": qty,
+                "previous_available_kg": inventory["available_kg"], "new_available_kg": inventory["available_kg"] + qty,
+                "actor_id": current_user["sub"], "actor_role": current_user["role"],
+                "reference_type": "PURCHASE_ORDER", "reference_id": str(order["_id"]), "created_at": now,
+            }, session=session)
 
         await append_ledger_block(
             db,

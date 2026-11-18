@@ -127,7 +127,7 @@ export default function App() {
                 </ProtectedRoute>
               } />
               <Route path="/produce/new" element={
-                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER]}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
                   <ProduceCreatePage />
                 </ProtectedRoute>
               } />
@@ -138,7 +138,7 @@ export default function App() {
               } />
 
               <Route path="/batches" element={
-                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER, ROLES.WAREHOUSE_MANAGER]}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER, ROLES.WAREHOUSE_MANAGER, ROLES.BUYER]}>
                   <BatchesListPage />
                 </ProtectedRoute>
               } />
@@ -148,7 +148,7 @@ export default function App() {
                 </ProtectedRoute>
               } />
               <Route path="/batches/:id" element={
-                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER, ROLES.WAREHOUSE_MANAGER]}>
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FARMER, ROLES.WAREHOUSE_MANAGER, ROLES.BUYER]}>
                   <BatchDetailPage />
                 </ProtectedRoute>
               } />

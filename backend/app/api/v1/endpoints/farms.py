@@ -104,8 +104,8 @@ async def list_farms(
     query = {}
     if current_user["role"] == UserRole.FARMER:
         query["farmer_id"] = current_user["sub"]
-    elif current_user["role"] in [UserRole.WAREHOUSE_MANAGER, UserRole.BUYER, UserRole.TRANSPORTER, UserRole.DRIVER]:
-        query["is_active"] = True
+    elif current_user["role"] != UserRole.ADMIN:
+        raise ForbiddenError("Not authorized to list farms")
     
     if is_active is not None:
         query["is_active"] = is_active
@@ -122,7 +122,17 @@ async def get_farm(
 ):
     farm = await resolve_doc(db.farms, farm_id, "Farm")
     
-    if current_user["role"] == UserRole.FARMER and farm["farmer_id"] != current_user["sub"]:
+    role = current_user["role"]
+    if role == UserRole.FARMER and farm["farmer_id"] != current_user["sub"]:
+        raise ForbiddenError("Not authorized to view this farm")
+    if role == UserRole.BUYER:
+        orders = await db.purchase_orders.find({"buyer_id": current_user["sub"]}, {"batch_id": 1}).to_list(None)
+        order_batch_ids = [ObjectId(o["batch_id"]) for o in orders if ObjectId.is_valid(o.get("batch_id", ""))]
+        relevant = await db.produce_batches.find_one({"farm_id": str(farm["_id"]), "$or": [
+            {"status": "AT_WAREHOUSE"}, {"_id": {"$in": order_batch_ids}}]})
+        if not relevant:
+            raise ForbiddenError("Not authorized to view this farm")
+    elif role not in (UserRole.ADMIN, UserRole.FARMER):
         raise ForbiddenError("Not authorized to view this farm")
     
     return to_response(FarmResponse, farm)

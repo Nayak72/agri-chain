@@ -255,7 +255,8 @@ async def test_six_role_lifecycle_and_ledger(db):
     await freight_quotes.accept_freight_quotation(quote.id, {"role": "BUYER", "sub": buyer}, db)
     vehicle_id = (await db.vehicles.insert_one({
         "vehicle_id": "VEH-LIFECYCLE", "transporter_id": str(transporter_id),
-        "max_payload_kg": 1000, "refrigeration_available": True, "status": "AVAILABLE",
+        "max_payload_kg": 1000, "refrigeration_available": True,
+        "temperature_min": 5, "temperature_max": 15, "status": "AVAILABLE",
     })).inserted_id
     driver_id = (await db.drivers.insert_one({
         "driver_id": "DRV-LIFECYCLE", "user_id": driver_user,
@@ -280,3 +281,86 @@ async def test_six_role_lifecycle_and_ledger(db):
     assert (await db.shipments.find_one({"_id": ObjectId(shipment.id)}))["status"] == "DELIVERED"
     assert (await verify_ledger_integrity(db))["valid"]
     assert await reconcile(db) == []
+
+
+async def test_simulation_sessions_have_independent_sequences_and_controls(db):
+    shipment_id = (await db.shipments.insert_one({
+        'shipment_id': 'SESSION-SHIPMENT', 'status': 'IN_TRANSIT', 'batch_ids': [],
+        'farmer_id': 'farmer', 'buyer_id': 'buyer',
+    })).inserted_id
+    admin = {'role': 'ADMIN', 'sub': 'admin'}
+    normal = await sensors.start_simulation(str(shipment_id), sensors.SimulationStart(scenario='NORMAL', seed='same'), admin, db)
+    with pytest.raises(ConflictError):
+        await sensors.start_simulation(str(shipment_id), sensors.SimulationStart(scenario='NORMAL'), admin, db)
+    for _ in range(9):
+        await sensors.next_reading_endpoint(str(shipment_id), sensors.ReadingRequest(session_id=normal['simulation_id']), admin, db)
+    await sensors.control_simulation(str(shipment_id), normal['simulation_id'], 'pause', admin, db)
+    with pytest.raises(ConflictError):
+        await sensors.next_reading_endpoint(str(shipment_id), sensors.ReadingRequest(session_id=normal['simulation_id']), admin, db)
+    await sensors.control_simulation(str(shipment_id), normal['simulation_id'], 'resume', admin, db)
+    await sensors.control_simulation(str(shipment_id), normal['simulation_id'], 'stop', admin, db)
+    excursion = await sensors.start_simulation(str(shipment_id), sensors.SimulationStart(scenario='TEMP_EXCURSION', seed='same'), admin, db)
+    readings = [await sensors.next_reading_endpoint(str(shipment_id), sensors.ReadingRequest(session_id=excursion['simulation_id']), admin, db) for _ in range(4)]
+    assert [item['sequence'] for item in readings] == [0, 1, 2, 3]
+    assert readings[-1]['temperature'] > readings[-1]['configured_temp_max']
+    session = await db.simulation_sessions.find_one({'simulation_id': excursion['simulation_id']})
+    assert session['sequence'] == 4 and session['simulated_elapsed_seconds'] == 240
+
+
+async def test_alert_acknowledgement_is_authorized_audited_and_idempotent(db):
+    shipment_id = (await db.shipments.insert_one({'shipment_id': 'ACK-SHIP', 'status': 'IN_TRANSIT',
+                                                   'farmer_id': 'farmer', 'buyer_id': 'buyer'})).inserted_id
+    alert_id = (await db.sensor_alerts.insert_one({'alert_id': 'ACK-ALERT', 'shipment_id': str(shipment_id),
+                                                    'status': 'ACTIVE', 'alert_type': 'TEMPERATURE'})).inserted_id
+    with pytest.raises(ForbiddenError):
+        await sensors.acknowledge_alert(str(alert_id), {'role': 'BUYER', 'sub': 'buyer'}, db)
+    await sensors.acknowledge_alert(str(alert_id), {'role': 'ADMIN', 'sub': 'admin'}, db)
+    alert = await db.sensor_alerts.find_one({'_id': alert_id})
+    assert alert['acknowledged_by'] == 'admin' and alert['status'] == 'ACTIVE'
+    assert await db.ledger_blocks.count_documents({'event_type': 'SENSOR_ALERT_ACKNOWLEDGED'}) == 1
+    with pytest.raises(ConflictError):
+        await sensors.acknowledge_alert(str(alert_id), {'role': 'ADMIN', 'sub': 'admin'}, db)
+
+
+async def test_quality_analytics_separates_missing_rejected_and_alert_duration(db):
+    from datetime import datetime, timezone, timedelta
+    from app.api.v1.endpoints.analytics import get_quality_analytics
+    sid = str((await db.shipments.insert_one({'shipment_id': 'QUALITY-SHIP', 'status': 'DELIVERY_REJECTED',
+        'buyer_id': 'buyer', 'loaded_weight_kg': 8})).inserted_id)
+    await db.delivery_reports.insert_one({'shipment_id': sid, 'status': 'REJECTED',
+        'delivered_quantity_kg': 0, 'damaged_quantity_kg': 0, 'missing_quantity_kg': 8})
+    now = datetime.now(timezone.utc)
+    await db.sensor_alerts.insert_one({'shipment_id': sid, 'alert_type': 'TEMPERATURE', 'status': 'RESOLVED',
+        'created_at': now - timedelta(hours=2), 'resolved_at': now})
+    metrics = await get_quality_analytics({'role': 'BUYER', 'sub': 'buyer'}, db)
+    assert metrics['rejected_quantity_kg'] == 8
+    assert metrics['missing_quantity_kg'] == 0
+    assert metrics['total_excursion_duration_hours'] == 2
+
+
+async def test_receipt_and_order_movements_are_transactional(db):
+    farmer, manager, buyer, wh, batch = await stock_fixture(db)
+    await receive(db, manager, wh, batch)
+    order = await purchase_orders.create_purchase_order(
+        purchase_orders.PurchaseOrderCreate(produce_type='TOMATO', batch_id=str(batch),
+            requested_quantity_kg=20, unit_price_paise=100,
+            preferred_delivery_date=date.today() + timedelta(days=1)), {'role': 'BUYER', 'sub': buyer}, db)
+    await purchase_orders.accept_purchase_order(order.id, {'role': 'FARMER', 'sub': farmer}, db)
+    movements = await db.inventory_movements.find({'batch_id': str(batch)}).sort('created_at', 1).to_list(None)
+    assert [movement['type'] for movement in movements] == ['RECEIPT', 'RESERVATION']
+    assert movements[1]['previous_available_kg'] == 100
+    assert movements[1]['new_available_kg'] == 80
+    assert movements[1]['reference_id'] == order.id
+
+
+async def test_legacy_movement_backfill_is_idempotent_and_does_not_invent_history(db):
+    from scripts.backfill_inventory_movements import backfill
+    inv = (await db.inventory_items.insert_one({'batch_id': 'legacy', 'warehouse_id': 'wh',
+                                                'accepted_kg': 50, 'available_kg': 30})).inserted_id
+    assert (await backfill(db))['eligible'] == 1
+    assert await db.inventory_movements.count_documents({}) == 0
+    assert (await backfill(db, apply=True))['created'] == 1
+    assert (await backfill(db, apply=True))['existing'] == 1
+    movement = await db.inventory_movements.find_one({'inventory_id': str(inv)})
+    assert movement['type'] == 'OPENING_BALANCE' and movement['new_available_kg'] == 30
+    assert await db.inventory_movements.count_documents({}) == 1

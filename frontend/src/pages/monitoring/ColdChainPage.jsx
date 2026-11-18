@@ -34,6 +34,10 @@ import { useAuth } from '../../context/AuthContext'
 const SCENARIOS = [
   { value: 'NORMAL', label: 'Normal' },
   { value: 'TEMP_EXCURSION', label: 'Temperature excursion' },
+  { value: 'HUMIDITY_EXCURSION', label: 'Humidity excursion' },
+  { value: 'DOOR_OPEN_EVENT', label: 'Door-open disturbance' },
+  { value: 'REFRIGERATION_FAILURE', label: 'Refrigeration failure' },
+  { value: 'RECOVERY_AFTER_EXCURSION', label: 'Recovery after excursion' },
 ]
 
 export default function ColdChainPage() {
@@ -52,6 +56,7 @@ export default function ColdChainPage() {
 
   // Simulation controls state
   const [scenario, setScenario] = useState('NORMAL')
+  const [simulation, setSimulation] = useState(null)
 
   // Resolve alert modal
   const [activeAlertModal, setActiveAlertModal] = useState(null)
@@ -80,14 +85,16 @@ export default function ColdChainPage() {
     if (!silent) setLoading(true)
     setError(null)
     try {
-      const [readingsRes, alertsRes] = await Promise.all([
+      const [readingsRes, alertsRes, sessionsRes] = await Promise.all([
         sensorsApi.readings(selectedShipmentId, { page_size: 60 }),
         sensorsApi.alerts(selectedShipmentId, { page_size: 20 }),
+        sensorsApi.sessions(selectedShipmentId),
       ])
       const rawReadings = readingsRes.data || []
       const chronological = [...rawReadings].reverse()
       setReadings(chronological)
       setAlerts(alertsRes.data || [])
+      setSimulation((sessionsRes.data || []).find(item => ['RUNNING', 'PAUSED'].includes(item.state)) || null)
     } catch (err) {
       if (!silent) {
         setError(err.response?.data?.detail || 'Failed to fetch sensor telemetry')
@@ -108,12 +115,39 @@ export default function ColdChainPage() {
     if (!selectedShipmentId) return
     setActionLoading(true)
     try {
-      await sensorsApi.nextReading(selectedShipmentId, scenario)
+      await sensorsApi.nextReading(selectedShipmentId, scenario, simulation?.simulation_id || null)
       setSuccessMsg('Manual reading generated')
       setTimeout(() => setSuccessMsg(null), 2000)
       fetchTelemetry(true)
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to trigger single reading')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleSimulation = async (action) => {
+    setActionLoading(true)
+    setError(null)
+    try {
+      if (action === 'start') await sensorsApi.startSession(selectedShipmentId, { scenario })
+      else await sensorsApi.controlSession(selectedShipmentId, simulation.simulation_id, action)
+      await fetchTelemetry(true)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Simulation control failed')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleAcknowledge = async (alertId) => {
+    setActionLoading(true)
+    setError(null)
+    try {
+      await sensorsApi.acknowledgeAlert(alertId)
+      await fetchTelemetry(true)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to acknowledge alert')
     } finally {
       setActionLoading(false)
     }
@@ -259,6 +293,7 @@ export default function ColdChainPage() {
             <select
               value={scenario}
               onChange={(e) => setScenario(e.target.value)}
+              disabled={!!simulation}
               className="w-full glass-control border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634] font-mono"
             >
               {SCENARIOS.map((sc) => (
@@ -272,9 +307,14 @@ export default function ColdChainPage() {
 
           {/* Action Buttons */}
           <div className="md:col-span-6 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-mono text-stone-600">{simulation ? `${simulation.scenario} · ${simulation.state} · ${simulation.sequence} readings · ${simulation.simulated_elapsed_seconds}s simulated` : 'No active simulation session'}</span>
+            {!simulation ? <button type="button" onClick={() => handleSimulation('start')} disabled={actionLoading || !selectedShipmentId || selectedShipment?.status !== 'IN_TRANSIT'} className="glass-control rounded-lg border px-3 py-2 text-xs disabled:opacity-50">Start simulation</button> : <>
+              <button type="button" onClick={() => handleSimulation(simulation.state === 'RUNNING' ? 'pause' : 'resume')} disabled={actionLoading} className="glass-control rounded-lg border px-3 py-2 text-xs disabled:opacity-50">{simulation.state === 'RUNNING' ? 'Pause' : 'Resume'}</button>
+              <button type="button" onClick={() => handleSimulation('stop')} disabled={actionLoading} className="glass-control rounded-lg border px-3 py-2 text-xs disabled:opacity-50">Stop</button>
+            </>}
             <button
               onClick={handleNextReading}
-              disabled={actionLoading || !selectedShipmentId || selectedShipment?.status !== 'IN_TRANSIT'}
+              disabled={actionLoading || !selectedShipmentId || selectedShipment?.status !== 'IN_TRANSIT' || simulation?.state === 'PAUSED'}
               title="Generate single reading"
               className="px-3 py-2 rounded-lg bg-stone-100 hover:bg-stone-200 disabled:opacity-50 text-stone-700 border border-stone-200 text-xs font-mono font-semibold uppercase flex items-center gap-1.5 transition-colors"
             >
@@ -552,8 +592,13 @@ export default function ColdChainPage() {
                         >
                           {alert.status}
                         </span>
+                        {alert.acknowledged_at && <span className="ml-1 text-stone-600">Acknowledged</span>}
                       </td>
                       <td className="py-3 px-3 text-right space-x-2">
+
+                        {canManageReadings && alert.status === 'ACTIVE' && !alert.acknowledged_at && (
+                          <button type="button" disabled={actionLoading} onClick={() => handleAcknowledge(alertId)} className="glass-control rounded-lg border px-2 py-1 text-xs disabled:opacity-50">Acknowledge</button>
+                        )}
 
                         {canManageReadings && alert.status !== 'RESOLVED' && (
                           <button
