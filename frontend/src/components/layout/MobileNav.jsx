@@ -101,6 +101,11 @@ export function MobileNav({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return
+    // Resizing an open mobile drawer must not leave desktop scrolling locked.
+    const desktop = window.matchMedia?.('(min-width: 1024px)')
+    const closeOnDesktop = () => { if (desktop?.matches) onClose() }
+    closeOnDesktop()
+    desktop?.addEventListener?.('change', closeOnDesktop)
     const previous = document.activeElement
     const oldOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -117,6 +122,7 @@ export function MobileNav({ open, onClose }) {
     }
     document.addEventListener('keydown', onKey)
     return () => {
+      desktop?.removeEventListener?.('change', closeOnDesktop)
       cancelAnimationFrame(focusFrame)
       document.body.style.overflow = oldOverflow
       document.removeEventListener('keydown', onKey)

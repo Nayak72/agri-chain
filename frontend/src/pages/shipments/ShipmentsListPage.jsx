@@ -117,7 +117,7 @@ export default function ShipmentsListPage() {
       ) : (
         <div className="glass-panel-strong border border-stone-200 rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="glass-data w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-stone-200 text-[11px] uppercase tracking-wider text-stone-500 bg-stone-50/75">
                   <th className="px-6 py-3.5 font-semibold">Shipment ID</th>

@@ -21,8 +21,13 @@ export default function RouteTransition() {
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return
-      transition.current = document.startViewTransition(() => flushSync(() => setPage(next)))
-      transition.current.ready.catch(() => {}) // A hidden tab may skip snapshots.
+      try {
+        transition.current = document.startViewTransition(() => flushSync(() => setPage(next)))
+        transition.current.ready.catch(() => {}) // A hidden tab may skip snapshots.
+      } catch {
+        // Snapshot failure must never prevent navigation.
+        setPage(next)
+      }
     })
     return () => { cancelled = true }
   }, [location.key, page.key, outlet])

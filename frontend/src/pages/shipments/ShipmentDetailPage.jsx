@@ -1,3 +1,4 @@
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -487,9 +488,8 @@ export default function ShipmentDetailPage() {
       </div>
 
       {/* Cargo Loading Modal */}
-      {showLoadModal && (
-        <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="glass-dialog border border-stone-200 rounded-2xl p-6 max-w-md w-full shadow-xl animate-fade-in-up">
+      <Dialog open={showLoadModal} onOpenChange={setShowLoadModal}>
+          <DialogContent showCloseButton={false} aria-label="Verify Cargo Loading" className="glass-dialog border border-stone-200 rounded-2xl p-6 max-w-md w-full shadow-xl">
             <h3 className="text-lg font-bold text-stone-900 mb-1">Verify Cargo Loading</h3>
             <p className="text-xs text-stone-500 mb-4 font-sans">
               Enter verified gross scale weight and package count at loading bay origin.
@@ -537,14 +537,12 @@ export default function ShipmentDetailPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+      </Dialog>
 
       {/* Corridor Checkpoint Modal */}
-      {showCheckpointModal && (
-        <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="glass-dialog border border-stone-200 rounded-2xl p-6 max-w-md w-full shadow-xl animate-fade-in-up">
+      <Dialog open={showCheckpointModal} onOpenChange={setShowCheckpointModal}>
+          <DialogContent showCloseButton={false} aria-label="Log Route Checkpoint" className="glass-dialog border border-stone-200 rounded-2xl p-6 max-w-md w-full shadow-xl">
             <h3 className="text-lg font-bold text-stone-900 mb-1">Log Route Checkpoint</h3>
             <p className="text-xs text-stone-500 mb-4 font-sans">
               Record physical milestone transit along corridor route.
@@ -594,9 +592,8 @@ export default function ShipmentDetailPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+      </Dialog>
     </div>
   )
 }

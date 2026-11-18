@@ -196,6 +196,7 @@ select.glass-control option { background: var(--color-ivory); color: var(--color
   background-color: rgba(246,244,236,.95);
   box-shadow: var(--glass-highlight), 0 24px 80px -24px rgba(27,53,39,.4);
 }
+.glass-dialog:focus-visible { outline: 2px solid var(--color-sage); outline-offset: 2px; }
 .route-content { view-transition-name: agri-content; }
 .route-enter { animation: glass-enter var(--motion-page) var(--motion-ease) both; }
 ::view-transition-old(agri-content) { animation: glass-exit 180ms ease-in both; }
@@ -245,3 +246,12 @@ select.glass-control option { background: var(--color-ivory); color: var(--color
   transition: transform 340ms var(--motion-ease), width 300ms var(--motion-ease), height 300ms var(--motion-ease);
 }
 .has-nav-indicator .glass-nav-active { background: transparent; box-shadow: none; }
+
+/* Route-level motion owns page entry; avoid a second legacy page animation. */
+.route-enter > .animate-fade-in-up { animation: none; }
+[role="tabpanel"]:focus-visible { outline: 2px solid var(--color-sage); outline-offset: 4px; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-panel .glass-panel, .glass-panel-strong .glass-panel, .glass-panel .glass-panel-strong {
+    background: var(--color-surface-muted);
+  }
+}

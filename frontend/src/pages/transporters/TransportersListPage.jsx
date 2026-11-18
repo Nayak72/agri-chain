@@ -1,3 +1,4 @@
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, RefreshCw, Search, Truck, Check, AlertCircle, CheckCircle2, X } from 'lucide-react'
@@ -241,9 +242,8 @@ export default function TransportersListPage() {
       )}
 
       {/* Onboard Modal */}
-      {showRegisterModal && (
-        <div className="fixed inset-0 z-50 glass-overlay flex items-center justify-center p-4">
-          <Card className="glass-dialog border-[#E1DDD0] max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={showRegisterModal} onOpenChange={setShowRegisterModal}>
+          <DialogContent showCloseButton={false} aria-label="Onboard Logistics Carrier" className="p-0 glass-dialog border-[#E1DDD0] max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 pb-3 border-b border-[#ECE7DA]">
               <div>
                 <h3 className="text-lg font-serif font-bold text-[#1B2A20]">Onboard Logistics Carrier</h3>
@@ -388,9 +388,8 @@ export default function TransportersListPage() {
                 </div>
               </form>
             </div>
-          </Card>
-        </div>
-      )}
+          </DialogContent>
+      </Dialog>
     </div>
   )
 }

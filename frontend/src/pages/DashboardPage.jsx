@@ -277,7 +277,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="glass-data w-full text-sm">
                     <thead>
                       <tr className="border-b border-border/70 bg-surface-muted/40">
                         <th className="px-5 py-3 text-left text-xs font-mono font-semibold text-ink-secondary uppercase tracking-wider">

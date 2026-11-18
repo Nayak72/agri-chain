@@ -1,3 +1,4 @@
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -308,9 +309,8 @@ export default function UserDetailPage() {
       </div>
 
       {/* Edit Profile Modal */}
-      {showEditModal && (
-        <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="glass-panel border border-stone-200 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl animate-fade-in-up">
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+          <DialogContent showCloseButton={false} aria-label="Edit User Profile" className="glass-dialog border border-stone-200 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 className="text-base font-bold text-stone-900">Edit User Profile</h3>
 
             <div className="space-y-3">
@@ -367,9 +367,8 @@ export default function UserDetailPage() {
                 {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+      </Dialog>
     </div>
   )
 }

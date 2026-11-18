@@ -1,3 +1,4 @@
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import React, { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import {
@@ -501,7 +502,7 @@ export default function ColdChainPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-mono">
+            <table className="glass-data w-full text-left text-xs font-mono">
               <thead>
                 <tr className="border-b border-stone-200 text-stone-500 uppercase bg-stone-50/75">
                   <th className="py-2.5 px-3 font-semibold">Time</th>
@@ -579,14 +580,13 @@ export default function ColdChainPage() {
       </div>
 
       {/* Acknowledge / Resolve Modal */}
-      {activeAlertModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl border border-stone-200 glass-panel-strong p-6 shadow-xl animate-fade-in-up">
+      <Dialog open={!!activeAlertModal} onOpenChange={value => { if (!value) setActiveAlertModal(null) }}>
+          <DialogContent showCloseButton={false} aria-label="Resolve Sensor Excursion" className="w-full max-w-md rounded-2xl border border-stone-200 glass-dialog p-6 shadow-xl">
             <h3 className="text-lg font-bold text-stone-900 mb-1">
               Resolve Sensor Excursion
             </h3>
             <p className="text-xs text-stone-500 mb-4 font-sans">
-              {activeAlertModal.alert.message || 'SLA threshold breach detected.'}
+              {activeAlertModal?.alert.message || 'SLA threshold breach detected.'}
             </p>
 
             <form onSubmit={handleAlertActionSubmit} className="space-y-4">
@@ -621,9 +621,8 @@ export default function ColdChainPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+      </Dialog>
     </div>
   )
 }

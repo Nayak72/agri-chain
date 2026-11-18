@@ -247,7 +247,7 @@ export default function UsersPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-mono">
+            <table className="glass-data w-full text-left text-xs font-mono">
               <thead>
                 <tr className="border-b border-stone-200 text-stone-500 uppercase bg-stone-50/75">
                   <th className="py-3 px-4 font-semibold">User</th>

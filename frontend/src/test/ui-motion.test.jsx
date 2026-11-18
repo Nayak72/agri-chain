@@ -6,6 +6,7 @@ import RouteTransition from '../components/layout/RouteTransition'
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '../components/ui/dialog'
 import { MobileNav } from '../components/layout/MobileNav'
 import AuthContext from '../context/AuthContext'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); delete document.startViewTransition })
 
@@ -20,6 +21,59 @@ function NavigationFixture() {
 }
 
 describe('presentation lifecycle', () => {
+  it('still navigates if native snapshot creation throws', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    document.startViewTransition = vi.fn(() => { throw new Error('Snapshot unavailable') })
+    render(<NavigationFixture />)
+    fireEvent.click(screen.getByText('Next page'))
+    expect(await screen.findByRole('heading', { name: 'Second page' })).toBeInTheDocument()
+  })
+
+  it('unlocks scrolling when an open drawer is resized to desktop', () => {
+    let resize
+    const media = { matches: false, addEventListener: (_, handler) => { resize = handler }, removeEventListener: vi.fn() }
+    vi.stubGlobal('matchMedia', () => media)
+    function Fixture() {
+      const [open, setOpen] = useState(false)
+      return <MemoryRouter><AuthContext.Provider value={{ user: { role: 'FARMER' } }}>
+        <button onClick={() => setOpen(true)}>Open drawer</button>
+        <MobileNav open={open} onClose={() => setOpen(false)} />
+      </AuthContext.Provider></MemoryRouter>
+    }
+    render(<Fixture />)
+    fireEvent.click(screen.getByText('Open drawer'))
+    expect(document.body.style.overflow).toBe('hidden')
+    media.matches = true
+    // Dispatch through a DOM event so React's test utility flushes the update.
+    window.addEventListener('resize', resize)
+    fireEvent(window, new Event('resize'))
+    window.removeEventListener('resize', resize)
+    expect(document.body.style.overflow).toBe('')
+    expect(document.querySelector('.mobile-presence')).toHaveAttribute('inert')
+  })
+
+  it('supports keyboard tabs, skips disabled options and labels the panel', () => {
+    render(<Tabs defaultValue="stock"><TabsList>
+      <TabsTrigger value="stock">Stock</TabsTrigger>
+      <TabsTrigger value="disabled" disabled>Unavailable</TabsTrigger>
+      <TabsTrigger value="receipts">Receipts</TabsTrigger>
+    </TabsList><TabsContent value="stock">Stock content</TabsContent>
+      <TabsContent value="receipts">Receipt content</TabsContent></Tabs>)
+    const stock = screen.getByRole('tab', { name: 'Stock' })
+    const receipts = screen.getByRole('tab', { name: 'Receipts' })
+    stock.focus()
+    fireEvent.keyDown(stock, { key: 'ArrowRight' })
+    expect(receipts).toHaveFocus()
+    expect(receipts).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tabpanel', { name: 'Receipts' })).toHaveTextContent('Receipt content')
+    fireEvent.keyDown(receipts, { key: 'ArrowRight' })
+    expect(stock).toHaveFocus()
+    fireEvent.keyDown(stock, { key: 'End' })
+    expect(receipts).toHaveFocus()
+    fireEvent.keyDown(receipts, { key: 'Home' })
+    expect(stock).toHaveFocus()
+  })
+
   it('navigates when native view transitions are unavailable', async () => {
     render(<NavigationFixture />)
     fireEvent.click(screen.getByText('Next page'))
