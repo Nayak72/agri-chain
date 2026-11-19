@@ -20,6 +20,13 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = Field(None)
     phone: Optional[str] = Field(None)
     is_active: Optional[bool] = None
+    role: Optional[UserRole] = None
+    reason: str = Field(..., min_length=1, max_length=500)
+    model_config = ConfigDict(extra="forbid")
+
+
+class UserStatusChange(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=500)
     model_config = ConfigDict(extra="forbid")
 
 
@@ -28,6 +35,8 @@ class UserListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+    active_count: int
+    pending_approval_count: int
 
 
 @router.get("", response_model=UserListResponse)
@@ -53,6 +62,8 @@ async def list_users(
         ]
     
     total = await db.users.count_documents(query)
+    active_count = await db.users.count_documents({"$and": [query, {"is_active": {"$ne": False}}]})
+    pending_approval_count = await db.users.count_documents({"$and": [query, {"is_approved": False}]})
     users = await db.users.find(query).sort("created_at", -1).skip((page - 1) * page_size).limit(page_size).to_list(page_size)
     
     return UserListResponse(
@@ -70,6 +81,8 @@ async def list_users(
         total=total,
         page=page,
         page_size=page_size,
+        active_count=active_count,
+        pending_approval_count=pending_approval_count,
     )
 
 
@@ -109,30 +122,47 @@ async def update_user(
     if not ObjectId.is_valid(user_id):
         raise ValidationError("Invalid user ID")
     
-    target = await db.users.find_one({"_id": ObjectId(user_id)})
-    if not target:
-        raise NotFoundError("User", user_id)
-    
     update_data = user_data.model_dump(exclude_unset=True)
+    reason = update_data.pop("reason", "").strip()
+    if not reason:
+        raise ValidationError("A reason is required for administrative changes")
     if not update_data:
         raise ValidationError("No valid fields to update")
-    
-    if update_data.get("is_active") is False:
-        if user_id == current_user["sub"]:
-            raise ValidationError("Cannot deactivate your own account")
-        if target.get("role") == UserRole.ADMIN:
-            active_admins = await db.users.count_documents({"role": UserRole.ADMIN, "is_active": True})
-            if active_admins <= 1:
-                raise ValidationError("Cannot deactivate the last active administrator")
-
-    update_data["updated_at"] = datetime.now(timezone.utc)
-    
-    await db.users.update_one(
-        {"_id": ObjectId(user_id)},
-        {"$set": update_data}
-    )
-    
+    if any(value is None for value in update_data.values()):
+        raise ValidationError("Updated fields cannot be null")
+    now = datetime.now(timezone.utc)
+    async def transaction(session):
+        target = await db.users.find_one({"_id": ObjectId(user_id)}, session=session)
+        if not target:
+            raise NotFoundError("User", user_id)
+        target_role = str(target.get('role', '')).strip().upper()
+        role_changed = 'role' in update_data and update_data['role'] != target_role
+        if role_changed and (user_id == current_user['sub'] or target_role == UserRole.ADMIN or update_data['role'] == UserRole.ADMIN):
+            raise ForbiddenError("Administrator roles cannot be assigned or changed through this operation")
+        if update_data.get('is_active') is False and (user_id == current_user['sub'] or target_role == UserRole.ADMIN):
+            raise ForbiddenError("Administrator accounts cannot be deactivated through this operation")
+        before = {key: target.get(key) for key in update_data}
+        after = {key: (value.value if hasattr(value, 'value') else value) for key, value in update_data.items()}
+        result = await db.users.update_one({'_id': target['_id']}, {'$set': {**after, 'updated_at': now}}, session=session)
+        if result.matched_count != 1:
+            raise NotFoundError('User', user_id)
+        audit = {'user_id': user_id, 'actor_id': current_user['sub'], 'actor_role': current_user['role'],
+                 'reason': reason, 'previous': before, 'updated': after, 'created_at': now}
+        await db.admin_audit_events.insert_one(audit.copy(), session=session)
+        await append_ledger_block(db, event_type=LedgerEventType.USER_PROFILE_UPDATED, entity_type='USER', entity_id=user_id,
+            actor_id=current_user['sub'], actor_role=current_user['role'], event_summary='Administrator updated user profile',
+            payload={'user_id': user_id, 'reason': reason, 'previous': before, 'updated': after}, session=session)
+    await run_in_txn(transaction)
     return {"message": "User updated successfully"}
+
+
+@router.get('/{user_id}/audit-history')
+async def user_audit_history(user_id: str, current_user: dict = Depends(get_current_admin_user),
+                             db: AsyncIOMotorDatabase = Depends(get_database)):
+    if not ObjectId.is_valid(user_id):
+        raise ValidationError('Invalid user ID')
+    events = await db.admin_audit_events.find({'user_id': user_id}, {'_id': 0}).sort('created_at', -1).limit(100).to_list(100)
+    return events
 
 
 @router.post("/{user_id}/approve")
@@ -167,44 +197,20 @@ async def approve_user(
 @router.post("/{user_id}/suspend")
 async def suspend_user(
     user_id: str,
+    change: UserStatusChange,
     current_user: dict = Depends(get_current_admin_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(user_id):
-        raise ValidationError("Invalid user ID")
-    
-    if user_id == current_user["sub"]:
-        raise ValidationError("Cannot suspend yourself")
-    
-    target = await db.users.find_one({"_id": ObjectId(user_id)})
-    if not target:
-        raise NotFoundError("User", user_id)
-    if target.get("role") == UserRole.ADMIN:
-        raise ForbiddenError("Cannot suspend another administrator")
-    
-    now = datetime.now(timezone.utc)
-    await db.users.update_one(
-        {"_id": ObjectId(user_id)},
-        {"$set": {"is_active": False, "updated_at": now}}
-    )
+    await update_user(user_id, UserUpdate(is_active=False, reason=change.reason), current_user, db)
     return {"message": "User suspended successfully"}
 
 
 @router.post("/{user_id}/activate")
 async def activate_user(
     user_id: str,
+    change: UserStatusChange,
     current_user: dict = Depends(get_current_admin_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if not ObjectId.is_valid(user_id):
-        raise ValidationError("Invalid user ID")
-    
-    now = datetime.now(timezone.utc)
-    result = await db.users.update_one(
-        {"_id": ObjectId(user_id)},
-        {"$set": {"is_active": True, "updated_at": now}}
-    )
-    if result.matched_count == 0:
-        raise NotFoundError("User", user_id)
-    
+    await update_user(user_id, UserUpdate(is_active=True, reason=change.reason), current_user, db)
     return {"message": "User activated successfully"}

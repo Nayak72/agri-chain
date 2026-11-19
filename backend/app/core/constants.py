@@ -156,6 +156,7 @@ class SensorScenario(str, Enum):
 
 class SensorStatus(str, Enum):
     NORMAL = "NORMAL"
+    WARNING = "WARNING"
     CRITICAL = "CRITICAL"
 
 
@@ -179,6 +180,7 @@ class DeliveryStatus(str, Enum):
 
 class LedgerEventType(str, Enum):
     USER_APPROVED = "USER_APPROVED"
+    USER_PROFILE_UPDATED = "USER_PROFILE_UPDATED"
     PRODUCE_BATCH_CREATED = "PRODUCE_BATCH_CREATED"
     WAREHOUSE_RECEIVED = "WAREHOUSE_RECEIVED"
     PURCHASE_ORDER_CREATED = "PURCHASE_ORDER_CREATED"

@@ -105,6 +105,40 @@ ROLE_PERMISSIONS: dict[Role, Set[str]] = {
     },
 }
 
+# Action-level policies for the operations migrated to centralized checks.
+_ACTION_PERMISSIONS = {
+    Role.ADMIN: {"inventory:receive", "returns:receive", "sensors:simulate", "alerts:acknowledge", "alerts:resolve"},
+    Role.WAREHOUSE_MANAGER: {"inventory:receive", "returns:receive"},
+    Role.TRANSPORTER: {"sensors:simulate", "alerts:acknowledge", "alerts:resolve"},
+    Role.DRIVER: {"sensors:simulate", "alerts:acknowledge", "alerts:resolve"},
+}
+for _role, _actions in _ACTION_PERMISSIONS.items():
+    ROLE_PERMISSIONS[_role].update(_actions)
+
+# Workspace capabilities describe navigation only. Endpoint authorization and
+# ownership checks remain independently authoritative on the server.
+_WORKSPACE_PERMISSIONS = {
+    Role.ADMIN: {"farms", "farm-create", "farm-detail", "produce", "produce-create", "batches", "batch-create", "warehouses", "warehouse-create", "inventory", "orders", "bookings", "booking-create", "quotes", "transporters", "fleet", "drivers", "deliveries", "analytics", "users", "settings"},
+    Role.FARMER: {"farms", "farm-create", "farm-detail", "produce", "batches", "batch-create", "orders", "bookings", "booking-create", "quotes", "deliveries", "analytics"},
+    Role.WAREHOUSE_MANAGER: {"produce", "batches", "warehouses", "warehouse-create", "inventory", "deliveries", "analytics"},
+    Role.BUYER: {"farm-detail", "produce", "batches", "orders", "order-create", "bookings", "booking-create", "quotes", "deliveries", "analytics"},
+    Role.TRANSPORTER: {"bookings", "quotes", "transporters", "fleet", "drivers", "shipment-create", "deliveries", "analytics"},
+    Role.DRIVER: {"deliveries"},
+}
+for _role, _pages in _WORKSPACE_PERMISSIONS.items():
+    ROLE_PERMISSIONS[_role].update({f"page:{page}" for page in _pages | {"dashboard", "shipments", "cold-chain", "ledger"}})
+
+
+def enforce_permission(user: dict, permission: str) -> None:
+    """Deny unknown roles or missing action capabilities before resource checks."""
+    try:
+        raw_role = user.get("role", "")
+        role = Role(str(getattr(raw_role, "value", raw_role)).strip().upper())
+    except ValueError as exc:
+        raise ForbiddenError("Invalid user role") from exc
+    if not has_permission(role, permission):
+        raise ForbiddenError(f"Permission denied: {permission}")
+
 
 def has_permission(role: Role, permission: str) -> bool:
     return permission in ROLE_PERMISSIONS.get(role, set())
@@ -154,7 +188,7 @@ async def get_current_user(
 
     if db is not None:
         try:
-            payload["role"] = Role(str(user.get("role", "")).upper()).value
+            payload["role"] = Role(str(user.get("role", "")).strip().upper()).value
         except ValueError as exc:
             raise ForbiddenError("Invalid user role") from exc
     return payload

@@ -6,13 +6,15 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field, ConfigDict
 
 from app.db.mongodb import get_database
-from app.core.permissions import get_current_user
+from app.core.permissions import get_current_user, enforce_permission
 from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError, ConflictError
 from app.core.constants import (
     InventoryStatus, WarehouseReceiptStatus, InspectionResult,
     UserRole, ProduceType, LedgerEventType
 )
 from app.services.ledger_service import append_ledger_block
+from app.services.warehouse_capacity import check_capacity
+from app.services.inventory_service import kilograms_to_grams
 from app.db.unit_of_work import run_in_txn
 from app.utils.serialization import to_response
 from app.utils.mongo import to_mongo, resolve_doc
@@ -30,6 +32,7 @@ class WarehouseReceiptCreate(BaseModel):
     inspection_result: InspectionResult = InspectionResult.PASSED
     packaging_condition: str = "GOOD"
     storage_location: str = Field(...)
+    cold_storage: bool = False
     model_config = ConfigDict(extra="forbid")
 
 
@@ -46,6 +49,7 @@ class WarehouseReceiptResponse(BaseModel):
     inspection_result: InspectionResult
     packaging_condition: Optional[str] = "GOOD"
     storage_location: Optional[str] = None
+    cold_storage: bool = False
     status: WarehouseReceiptStatus
     receiving_date: Optional[datetime] = None
     created_at: Optional[datetime] = None
@@ -59,8 +63,7 @@ async def create_warehouse_receipt(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    if current_user["role"] not in [UserRole.WAREHOUSE_MANAGER, UserRole.ADMIN]:
-        raise ForbiddenError("Only warehouse managers or admins can create receipts")
+    enforce_permission(current_user, "inventory:receive")
     
     warehouse = await resolve_doc(db.warehouses, warehouse_id, "Warehouse")
     if receipt_data.warehouse_id != warehouse_id:
@@ -80,6 +83,8 @@ async def create_warehouse_receipt(
         raise ValidationError("Received weight must exactly equal sum of accepted, damaged, and rejected weights")
     if receipt_data.inspection_result == InspectionResult.FAILED and receipt_data.accepted_weight_kg > 0:
         raise ValidationError("Failed inspections cannot create accepted inventory")
+    if batch.get("requires_cold_storage") and not receipt_data.cold_storage:
+        raise ValidationError("This batch requires cold storage")
     
     receipt_id = f"WR-{warehouse_id[:8]}-{uuid.uuid4().hex[:8].upper()}"
     now = datetime.now(timezone.utc)
@@ -96,6 +101,7 @@ async def create_warehouse_receipt(
         "inspection_result": receipt_data.inspection_result.value if hasattr(receipt_data.inspection_result, "value") else receipt_data.inspection_result,
         "packaging_condition": receipt_data.packaging_condition,
         "storage_location": receipt_data.storage_location,
+        "cold_storage": receipt_data.cold_storage,
         "status": WarehouseReceiptStatus.RECEIVED.value if hasattr(WarehouseReceiptStatus.RECEIVED, "value") else WarehouseReceiptStatus.RECEIVED,
         "receiving_date": now,
         "created_at": now,
@@ -103,6 +109,8 @@ async def create_warehouse_receipt(
     }
     
     async def _transaction(session):
+        if receipt_data.accepted_weight_kg:
+            await check_capacity(db, warehouse_id, receipt_data.accepted_weight_kg, receipt_data.cold_storage, session)
         result = await db.warehouse_receipts.insert_one(to_mongo(receipt_doc), session=session)
         receipt_doc["_id"] = result.inserted_id
         
@@ -131,8 +139,12 @@ async def create_warehouse_receipt(
             "produce_type": batch["produce_type"],
             "accepted_kg": receipt_data.accepted_weight_kg,
             "available_kg": receipt_data.accepted_weight_kg,
+            "accepted_g": kilograms_to_grams(receipt_data.accepted_weight_kg),
+            "available_g": kilograms_to_grams(receipt_data.accepted_weight_kg),
+            "balance_unit": "g",
             "status": InventoryStatus.AVAILABLE.value if hasattr(InventoryStatus.AVAILABLE, "value") else InventoryStatus.AVAILABLE,
             "storage_location": receipt_data.storage_location,
+            "cold_storage": receipt_data.cold_storage,
                 "estimated_shelf_life_end": batch.get("estimated_shelf_life_end"),
             "created_at": now,
             "updated_at": now,
@@ -208,6 +220,7 @@ class InventoryItemResponse(BaseModel):
     available_kg: float
     status: InventoryStatus
     storage_location: Optional[str] = None
+    cold_storage: Optional[bool] = None
     estimated_shelf_life_end: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

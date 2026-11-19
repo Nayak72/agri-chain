@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
-import { ROLES, ALL_ROLES, ADMIN_ONLY, normalizeRole, isRoleAllowed } from '@/constants/roles'
+import { pageCapabilityForPath } from '@/constants/pageCapabilities'
+import { ROLES, ALL_ROLES, ADMIN_ONLY } from '@/constants/roles'
 import { getRoleLabel } from '@/utils'
 import {
   LayoutDashboard,
@@ -90,9 +91,8 @@ const NAVIGATION_SECTORS = [
 ]
 
 export function MobileNav({ open, onClose }) {
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const location = useLocation()
-  const userRole = normalizeRole(user?.role)
 
   // Close drawer on route change
   useEffect(() => {
@@ -132,7 +132,7 @@ export function MobileNav({ open, onClose }) {
 
   const visibleSectors = NAVIGATION_SECTORS.map((sec) => ({
     ...sec,
-    items: sec.items.filter((item) => isRoleAllowed(userRole, item.roles)),
+    items: sec.items.filter((item) => can(pageCapabilityForPath(item.path))),
   })).filter((sec) => sec.items.length > 0)
 
   return (

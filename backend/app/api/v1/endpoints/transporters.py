@@ -138,12 +138,11 @@ async def list_transporters(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
+    if current_user["role"] not in (UserRole.ADMIN, UserRole.TRANSPORTER):
+        raise ForbiddenError("Not authorized to view transporter profiles")
     query = {}
     if current_user["role"] == UserRole.TRANSPORTER:
         query["user_id"] = current_user["sub"]
-    elif current_user["role"] != UserRole.ADMIN:
-        query["approval_status"] = "APPROVED"
-        query["is_active"] = True
     
     if approval_status and current_user["role"] == UserRole.ADMIN:
         query["approval_status"] = approval_status
@@ -160,6 +159,8 @@ async def get_transporter(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
+    if current_user["role"] not in (UserRole.ADMIN, UserRole.TRANSPORTER):
+        raise ForbiddenError("Not authorized to view transporter profiles")
     transporter = await resolve_doc(db.transporters, transporter_id, "Transporter", business_key="transporter_id")
     
     if current_user["role"] == UserRole.TRANSPORTER and transporter.get("user_id") != current_user["sub"]:

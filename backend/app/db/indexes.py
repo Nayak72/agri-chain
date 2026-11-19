@@ -159,6 +159,7 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     # Sensor readings
     await _create_index_safe(db.simulation_sessions, "simulation_id", unique=True)
     await _create_index_safe(db.simulation_sessions, [("shipment_id", 1), ("state", 1)])
+    await _create_index_safe(db.simulation_sessions, [("state", 1), ("auto_play", 1), ("auto_next_at", 1)])
     await _create_index_safe(db.sensor_readings, [("simulation_id", 1), ("sequence", 1)])
     await _create_index_safe(db.sensor_readings, "reading_id", unique=True)
     await _create_index_safe(db.sensor_readings, "shipment_id")

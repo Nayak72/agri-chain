@@ -1,9 +1,10 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { normalizeRole } from '../constants/roles'
+import { pageCapabilityForPath } from '../constants/pageCapabilities'
 
 export default function ProtectedRoute({ children, allowedRoles }) {
-  const { user, loading, isAuthenticated } = useAuth()
+  const { user, loading, isAuthenticated, can } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -33,8 +34,13 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     return <Navigate to="/forbidden" replace />
   }
 
-  // Role check using canonical uppercase normalization
-  if (allowedRoles && allowedRoles.length > 0) {
+  // Recognized pages use the backend-issued workspace capability. The legacy
+  // role guard remains only for routes that have no workspace policy yet.
+  const capability = pageCapabilityForPath(location.pathname)
+  if (capability && !can(capability)) {
+    return <Navigate to="/forbidden" replace />
+  }
+  if (!capability && allowedRoles && allowedRoles.length > 0) {
     const userRole = normalizeRole(user.role)
     const normalizedAllowed = allowedRoles.map(r => normalizeRole(r))
     if (!normalizedAllowed.includes(userRole)) {

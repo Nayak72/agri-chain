@@ -93,11 +93,12 @@ async def get_delivery_report_by_id(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     report = await resolve_doc(db.delivery_reports, report_id, "Delivery Report", business_key="report_id")
-    if ObjectId.is_valid(report.get("shipment_id", "")):
-        sh = await db.shipments.find_one({"_id": ObjectId(report["shipment_id"])})
-        if sh:
-            await assert_can_view_shipment(db, current_user, sh)
-            report["shipment_public_id"] = sh.get("shipment_id")
+    shipment_id = report.get("shipment_id")
+    if not shipment_id:
+        raise NotFoundError("Shipment for delivery report", report_id)
+    shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
+    await assert_can_view_shipment(db, current_user, shipment)
+    report["shipment_public_id"] = shipment.get("shipment_id")
     return to_response(DeliveryReportResponse, report)
 
 

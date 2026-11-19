@@ -3,10 +3,10 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { analyticsApi } from '../api/analytics.api'
 import { shipmentsApi } from '../api/commerce.api'
-import { ledgerApi } from '../api/monitoring.api'
 import { useAuth } from '../context/AuthContext'
 import { formatDateTime, formatStatus, getRoleLabel } from '../utils'
 import { ROLES, normalizeRole } from '../constants/roles'
+import { pageCapabilityForPath } from '../constants/pageCapabilities'
 import { PageHeader } from '@/components/common/PageHeader'
 import { StatCard } from '@/components/common/StatCard'
 import { StatusBadge } from '@/components/common/StatusBadge'
@@ -23,7 +23,7 @@ import {
   Timer,
   Award,
   XCircle,
-  Hash,
+  Layers,
   Sprout,
   Boxes,
   Truck,
@@ -64,7 +64,7 @@ const ROLE_QUICK_ACTIONS = {
   [ROLES.WAREHOUSE_MANAGER]: [
     { icon: Warehouse, label: 'Warehouse Terminals', desc: 'Review facility occupancy', path: '/warehouses', accent: 'forest' },
     { icon: PackageSearch, label: 'Inventory & Receiving', desc: 'Intake batches & FEFO rotation', path: '/inventory', accent: 'terracotta' },
-    { icon: ThermometerSnowflake, label: 'Cold-Chain Telemetry', desc: 'Storage environmental sensors', path: '/cold-chain', accent: 'harvest' },
+    { icon: ThermometerSnowflake, label: 'Cold-Chain Telemetry', desc: 'View shipment simulation', path: '/cold-chain', accent: 'harvest' },
     { icon: ShieldCheck, label: 'Ledger Audit', desc: 'Verify incoming batches', path: '/ledger', accent: 'slate' },
   ],
   [ROLES.BUYER]: [
@@ -83,31 +83,30 @@ const ROLE_QUICK_ACTIONS = {
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const userRole = normalizeRole(user?.role)
 
   // 1. Dashboard metrics from existing endpoint
-  const { data: analytics, isLoading: analyticsLoading, refetch: refetchAnalytics } = useQuery({
-    queryKey: ['analytics', 'dashboard'],
+  const { data: analytics, isLoading: analyticsLoading, isError: analyticsError, refetch: refetchAnalytics } = useQuery({
+    queryKey: ['analytics', 'dashboard', user?.id],
     queryFn: () => analyticsApi.dashboard().then(r => r.data),
     staleTime: 60_000,
     retry: 2,
   })
 
   // 2. Recent shipments from existing endpoint
-  const { data: shipmentsData, isLoading: shipmentsLoading, refetch: refetchShipments } = useQuery({
-    queryKey: ['shipments', 'recent'],
+  const { data: shipmentsData, isLoading: shipmentsLoading, isError: shipmentsError, refetch: refetchShipments } = useQuery({
+    queryKey: ['shipments', 'recent', user?.id],
     queryFn: () => shipmentsApi.list({ page: 1, page_size: 8 }).then(r => r.data),
     staleTime: 30_000,
     retry: 2,
   })
 
-  // 3. Ledger statistics from existing endpoint
-  const { data: ledgerStats } = useQuery({
-    queryKey: ['ledger', 'statistics'],
-    queryFn: () => ledgerApi.statistics().then(r => r.data),
-    staleTime: 120_000,
-    retry: 2,
+  const { data: workspace, isLoading: workspaceLoading, isError: workspaceError, refetch: refetchWorkspace } = useQuery({
+    queryKey: ['analytics', 'workspace', user?.id, userRole],
+    queryFn: () => analyticsApi.workspace().then(r => r.data),
+    staleTime: 30_000,
+    retry: 1,
   })
 
   const isLoading = analyticsLoading || shipmentsLoading
@@ -119,26 +118,27 @@ export default function DashboardPage() {
   const handleRefresh = () => {
     refetchAnalytics()
     refetchShipments()
+    refetchWorkspace()
   }
 
-  const actions = ROLE_QUICK_ACTIONS[userRole] || []
+  const actions = (ROLE_QUICK_ACTIONS[userRole] || []).filter(action => can(pageCapabilityForPath(action.path)))
 
   return (
     <div className="space-y-8 animate-fade-in-up">
       {/* Page Header */}
       <PageHeader
-        badge="Live Telemetry"
-        title="Supply Chain Overview"
+        badge="Operational workspace"
+        title={`${getRoleLabel(userRole)} Overview`}
         serif={false}
         description={
           user ? (
             <span>
-              Real-time agricultural logistics monitoring across active operations. Signed in as{' '}
+              Your permitted supply-chain operations. Signed in as{' '}
               <strong className="text-ink-primary font-medium">{user.full_name || user.email}</strong>{' '}
               <span className="font-mono text-xs text-forest">({getRoleLabel(user.role)})</span>
             </span>
           ) : (
-            'Real-time agricultural logistics monitoring across active operations.'
+            'Your permitted supply-chain operations.'
           )
         }
         actions={
@@ -169,34 +169,35 @@ export default function DashboardPage() {
         }
       />
 
-      {/* KPI Cards: strictly matching backend DashboardMetrics & ledgerApi.statistics schema */}
+      {analyticsError && <p role="alert" className="text-sm text-red-700">Unable to load shipment metrics. Try Sync again.</p>}
+      {/* KPI Cards: shipment metrics are scoped by the server. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           icon={Package}
           label="Total Shipments"
-          value={isLoading ? '—' : stats.total_shipments ?? 0}
+          value={isLoading || analyticsError ? '—' : stats.total_shipments ?? 0}
           accent="forest"
           onClick={() => navigate('/shipments')}
         />
         <StatCard
           icon={Clock}
           label="Active Shipments"
-          value={isLoading ? '—' : stats.active_shipments ?? 0}
+          value={isLoading || analyticsError ? '—' : stats.active_shipments ?? 0}
           accent="forest"
           onClick={() => navigate('/shipments')}
         />
         <StatCard
           icon={CheckCircle2}
           label="Completed"
-          value={isLoading ? '—' : (stats.completed_shipments ?? stats.delivered_shipments ?? 0)}
-          sublabel="Delivered cargo"
+          value={isLoading || analyticsError ? '—' : (stats.completed_shipments ?? stats.delivered_shipments ?? 0)}
+          sublabel="Final delivery outcomes"
           accent="sage"
           onClick={() => navigate('/deliveries')}
         />
         <StatCard
           icon={AlertTriangle}
           label="Delayed"
-          value={isLoading ? '—' : stats.delayed_shipments ?? 0}
+          value={isLoading || analyticsError ? '—' : stats.delayed_shipments ?? 0}
           alert={Boolean(stats.delayed_shipments && stats.delayed_shipments > 0)}
           accent="red"
           onClick={() => navigate('/shipments')}
@@ -207,33 +208,37 @@ export default function DashboardPage() {
         <StatCard
           icon={Timer}
           label="Avg Transit Hours"
-          value={isLoading ? '—' : `${stats.average_transit_hours ?? 0}h`}
+          value={isLoading || analyticsError || stats.average_transit_hours == null ? '—' : `${stats.average_transit_hours}h`}
           sublabel="Transit duration"
           accent="slate"
         />
         <StatCard
           icon={Award}
           label="On-Time Delivery"
-          value={isLoading ? '—' : `${stats.on_time_delivery_percentage ?? 0}%`}
+          value={isLoading || analyticsError || stats.on_time_delivery_percentage == null ? '—' : `${stats.on_time_delivery_percentage}%`}
           sublabel="Fulfillment SLA"
           accent="sage"
         />
         <StatCard
           icon={XCircle}
           label="Cancelled"
-          value={isLoading ? '—' : stats.cancelled_shipments ?? 0}
+          value={isLoading || analyticsError ? '—' : stats.cancelled_shipments ?? 0}
           accent="terracotta"
           onClick={() => navigate('/shipments')}
         />
-        <StatCard
-          icon={Hash}
-          label="Ledger Blocks"
-          value={isLoading ? '—' : ledgerStats?.total_blocks ?? 0}
-          sublabel="Audit chain sealed"
-          accent="slate"
-          onClick={() => navigate('/ledger')}
-        />
+        <StatCard icon={ShieldCheck} label="Audit Ledger" value="View" sublabel="Accessible audit events" accent="slate" onClick={() => navigate('/ledger')} />
       </div>
+
+      <section aria-label="Role-specific operations">
+        <h2 className="text-base font-semibold text-ink-primary mb-3">Your operations</h2>
+        {workspaceError ? <p role="alert" className="text-sm text-red-700">Unable to load your operational metrics. Try Sync again.</p> : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {(workspace?.metrics || []).map(metric => <StatCard key={metric.key} icon={Layers} label={metric.label}
+              value={workspaceLoading ? '—' : `${metric.value}${metric.unit ? ` ${metric.unit}` : ''}`} accent="forest" />)}
+            {workspaceLoading && <p className="text-sm text-ink-secondary">Loading operational metrics…</p>}
+          </div>
+        )}
+      </section>
 
       {/* Main Content Grid: Recent Shipments & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -260,20 +265,22 @@ export default function DashboardPage() {
                   <div className="w-8 h-8 border-3 border-forest/20 border-t-forest rounded-full animate-spin" />
                   <span className="text-xs font-mono text-ink-secondary">Loading shipment register...</span>
                 </div>
+              ) : shipmentsError ? (
+                <p role="alert" className="p-6 text-sm text-red-700">Unable to load shipments. Try Sync again.</p>
               ) : shipments.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-center p-6">
                   <div className="w-12 h-12 rounded-xl bg-surface-muted flex items-center justify-center text-ink-tertiary mb-3">
                     <Package className="h-6 w-6 stroke-[1.5]" />
                   </div>
                   <p className="text-ink-secondary text-sm font-medium">No shipments recorded yet</p>
-                  <Button
+                  {can(pageCapabilityForPath('/shipments/new')) && <Button
                     variant="outline"
                     size="sm"
                     onClick={() => navigate('/shipments/new')}
                     className="mt-3"
                   >
                     Create first shipment
-                  </Button>
+                  </Button>}
                 </div>
               ) : (
                 <div className="overflow-x-auto">

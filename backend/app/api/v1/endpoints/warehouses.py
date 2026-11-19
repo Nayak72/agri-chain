@@ -12,6 +12,8 @@ from app.core.constants import UserRole
 from app.utils.serialization import to_response
 from app.utils.mongo import to_mongo, resolve_doc
 from app.schemas.validators import validate_temperature_range
+from app.db.unit_of_work import run_in_txn
+from app.services.warehouse_capacity import lock_warehouse, occupancy
 
 router = APIRouter()
 
@@ -21,8 +23,8 @@ class WarehouseCreate(BaseModel):
     manager_id: Optional[str] = None
     city: str = Field(...)
     state: str = Field(...)
-    capacity_kg: float = Field(..., gt=0)
-    cold_storage_capacity_kg: float = Field(0.0, ge=0)
+    capacity_kg: float = Field(..., gt=0, allow_inf_nan=False, multiple_of=0.001)
+    cold_storage_capacity_kg: float = Field(0.0, ge=0, allow_inf_nan=False, multiple_of=0.001)
     temperature_range_min: Optional[float] = None
     temperature_range_max: Optional[float] = None
     has_refrigeration: bool = False
@@ -34,8 +36,8 @@ class WarehouseUpdate(BaseModel):
     manager_id: Optional[str] = None
     city: Optional[str] = Field(None)
     state: Optional[str] = Field(None)
-    capacity_kg: Optional[float] = Field(None, gt=0)
-    cold_storage_capacity_kg: Optional[float] = Field(None, ge=0)
+    capacity_kg: Optional[float] = Field(None, gt=0, allow_inf_nan=False, multiple_of=0.001)
+    cold_storage_capacity_kg: Optional[float] = Field(None, ge=0, allow_inf_nan=False, multiple_of=0.001)
     temperature_range_min: Optional[float] = None
     temperature_range_max: Optional[float] = None
     has_refrigeration: Optional[bool] = None
@@ -69,6 +71,10 @@ async def create_warehouse(
         raise ForbiddenError("Only warehouse managers or admins can create warehouses")
     
     validate_temperature_range(warehouse_data.temperature_range_min, warehouse_data.temperature_range_max)
+    if warehouse_data.cold_storage_capacity_kg > warehouse_data.capacity_kg:
+        raise ValidationError("Cold-storage capacity cannot exceed total warehouse capacity")
+    if warehouse_data.cold_storage_capacity_kg and not warehouse_data.has_refrigeration:
+        raise ValidationError("Cold-storage capacity requires refrigeration")
 
     manager_id = warehouse_data.manager_id or current_user["sub"]
     if current_user["role"] == UserRole.WAREHOUSE_MANAGER and manager_id != current_user["sub"]:
@@ -188,10 +194,19 @@ async def update_warehouse(
     now = datetime.now(timezone.utc)
     update_data["updated_at"] = now
     
-    await db.warehouses.update_one(
-        {"_id": warehouse["_id"]},
-        {"$set": to_mongo(update_data)}
-    )
-    
-    updated = await db.warehouses.find_one({"_id": warehouse["_id"]})
+    async def transaction(session):
+        current = await lock_warehouse(db, str(warehouse["_id"]), session)
+        total, cold = await occupancy(db, str(warehouse["_id"]), current, session)
+        capacity = update_data.get("capacity_kg", current.get("capacity_kg"))
+        cold_capacity = update_data.get("cold_storage_capacity_kg", current.get("cold_storage_capacity_kg", 0))
+        refrigerated = update_data.get("has_refrigeration", current.get("has_refrigeration", False))
+        if capacity is None or cold_capacity is None or cold_capacity > capacity:
+            raise ValidationError("Cold-storage capacity cannot exceed total warehouse capacity")
+        if total > capacity + 1e-9 or cold > cold_capacity + 1e-9:
+            raise ConflictError("Capacity cannot be reduced below occupied stock")
+        if cold > 0 and not refrigerated:
+            raise ConflictError("Cannot disable refrigeration while cold stock is stored")
+        await db.warehouses.update_one({"_id": current["_id"]}, {"$set": to_mongo(update_data)}, session=session)
+        return await db.warehouses.find_one({"_id": current["_id"]}, session=session)
+    updated = await run_in_txn(transaction)
     return to_response(WarehouseResponse, updated)

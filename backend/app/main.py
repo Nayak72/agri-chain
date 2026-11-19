@@ -16,6 +16,8 @@ from app.db.indexes import create_indexes, seed_initial_data
 from app.api.v1.router import api_router
 import logging
 import os
+import asyncio
+from contextlib import suppress
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,11 +46,18 @@ async def lifespan(app: FastAPI):
     await create_indexes(db)
     await seed_initial_data(db)
     
+    from app.services.simulation_worker import run_simulation_worker
+    worker = asyncio.create_task(run_simulation_worker(db)) if app.state.supports_transactions else None
     logger.info("AgriChain backend started successfully")
-    yield
-    
-    logger.info("Shutting down AgriChain backend...")
-    await close_mongo_connection()
+    try:
+        yield
+    finally:
+        logger.info("Shutting down AgriChain backend...")
+        if worker:
+            worker.cancel()
+            with suppress(asyncio.CancelledError):
+                await worker
+        await close_mongo_connection()
     logger.info("AgriChain backend shut down complete")
 
 

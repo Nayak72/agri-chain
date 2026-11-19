@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback } from 'react'
 import { authApi } from '../api/auth.api'
 import { tokenStore } from '../api/client'
 import { ROLES, normalizeRole } from '../constants/roles'
+import { useQueryClient } from '@tanstack/react-query'
 
 const AuthContext = createContext(null)
 
@@ -18,6 +19,7 @@ const DEV_ACCOUNTS = import.meta.env.DEV
   : []
 
 export function AuthProvider({ children }) {
+  const queryClient = useQueryClient()
   const [user, setUser] = useState(null)
   const loading = false
   const [error, setError] = useState(null)
@@ -27,9 +29,11 @@ export function AuthProvider({ children }) {
       const res = await authApi.login(email, password)
       tokenStore.set(res.data.access_token)
       const meRes = await authApi.me()
+      queryClient.clear()
       setUser(meRes.data)
       return { success: true, user: meRes.data }
     } catch (err) {
+      tokenStore.clear()
       const message =
         err.response?.data?.detail ||
         err.response?.data?.message ||
@@ -37,7 +41,7 @@ export function AuthProvider({ children }) {
       setError(message)
       return { success: false, error: message }
     }
-  }, [])
+  }, [queryClient])
 
   const register = useCallback(async (registrationData) => {
     setError(null)
@@ -47,12 +51,14 @@ export function AuthProvider({ children }) {
       if (res.data.access_token) {
         tokenStore.set(res.data.access_token)
         const meRes = await authApi.me()
+        queryClient.clear()
         setUser(meRes.data)
           return { success: true, status: 'APPROVED', user: meRes.data }
       }
       // If pending approval (TRANSPORTER / WAREHOUSE_MANAGER / DRIVER)
       return { success: true, status: res.data.status || 'PENDING_APPROVAL', user: res.data.user }
     } catch (err) {
+      tokenStore.clear()
       const message =
         err.response?.data?.detail ||
         err.response?.data?.message ||
@@ -60,12 +66,13 @@ export function AuthProvider({ children }) {
       setError(message)
       return { success: false, error: message }
     }
-  }, [])
+  }, [queryClient])
 
   const logout = useCallback(() => {
     tokenStore.clear()
+    queryClient.clear()
     setUser(null)
-  }, [])
+  }, [queryClient])
 
   const hasRole = useCallback(
     (...roles) => {
@@ -78,6 +85,7 @@ export function AuthProvider({ children }) {
   )
 
   const isAdmin = normalizeRole(user?.role) === ROLES.ADMIN
+  const can = useCallback((permission) => Array.isArray(user?.permissions) && user.permissions.includes(permission), [user])
 
   return (
     <AuthContext.Provider
@@ -89,6 +97,7 @@ export function AuthProvider({ children }) {
         register,
         logout,
         hasRole,
+        can,
         isAdmin,
         devAccounts: DEV_ACCOUNTS,
         isAuthenticated: !!user,

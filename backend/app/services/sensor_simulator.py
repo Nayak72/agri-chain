@@ -2,6 +2,39 @@ import random
 from app.core.constants import PRODUCE_HANDLING_PROFILES
 
 
+def classify_reading(reading: dict, previous: dict | None) -> str:
+    """Classify excursion severity with a small in-range hysteresis margin.
+
+    Critical means at least 2°C/10 percentage points outside the profile, or
+    two consecutive out-of-range samples. A previous warning/critical reading
+    stays warning until both measurements are at least 0.2°C/1% inside range.
+    Alerts remain open until an operator resolves them.
+    """
+    temp, humidity = reading["temperature"], reading["humidity"]
+    low, high = reading["configured_temp_min"], reading["configured_temp_max"]
+    hlow, hhigh = reading["configured_humidity_min"], reading["configured_humidity_max"]
+    temp_excess = max(low - temp, temp - high, 0)
+    humidity_excess = max(hlow - humidity, humidity - hhigh, 0)
+    out = temp_excess > 0 or humidity_excess > 0
+    required = ("temperature", "humidity", "configured_temp_min", "configured_temp_max",
+                "configured_humidity_min", "configured_humidity_max")
+    if previous and not all(isinstance(previous.get(key), (int, float)) for key in required):
+        previous = None
+    previous_out = bool(previous and (
+        previous["temperature"] < previous["configured_temp_min"] or
+        previous["temperature"] > previous["configured_temp_max"] or
+        previous["humidity"] < previous["configured_humidity_min"] or
+        previous["humidity"] > previous["configured_humidity_max"]))
+    if out and (temp_excess >= 2 or humidity_excess >= 10 or previous_out):
+        return "CRITICAL"
+    if out:
+        return "WARNING"
+    if previous and previous.get("status") in ("WARNING", "CRITICAL"):
+        if temp < low + 0.2 or temp > high - 0.2 or humidity < hlow + 1 or humidity > hhigh - 1:
+            return "WARNING"
+    return "NORMAL"
+
+
 def generate_stateless_reading(shipment_id: str, produce_type: str, scenario: str, step: int) -> dict:
     """Generate reproducible simulated values for a persisted sequence position."""
     if scenario not in ("NORMAL", "TEMP_EXCURSION", "HUMIDITY_EXCURSION", "DOOR_OPEN_EVENT",

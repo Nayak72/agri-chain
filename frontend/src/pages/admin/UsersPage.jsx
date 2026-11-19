@@ -36,6 +36,9 @@ export default function UsersPage() {
   const { user: currentUser } = useAuth()
   const [users, setUsers] = useState([])
   const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [activeCount, setActiveCount] = useState(0)
+  const [pendingApprovals, setPendingApprovals] = useState(0)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -52,6 +55,7 @@ export default function UsersPage() {
     try {
       const params = {
         page_size: 50,
+        page,
       }
       if (search) params.search = search
       if (roleFilter) params.role = roleFilter
@@ -60,6 +64,8 @@ export default function UsersPage() {
       const res = await usersApi.list(params)
       setUsers(res.data.users || [])
       setTotal(res.data.total || 0)
+      setActiveCount(res.data.active_count || 0)
+      setPendingApprovals(res.data.pending_approval_count || 0)
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to fetch user directory')
     } finally {
@@ -69,11 +75,12 @@ export default function UsersPage() {
 
   useEffect(() => {
     fetchUsers()
-  }, [roleFilter, statusFilter])
+  }, [roleFilter, statusFilter, page])
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
-    fetchUsers()
+    if (page === 1) fetchUsers()
+    else setPage(1)
   }
 
   const handleApprove = async (userId) => {
@@ -91,10 +98,11 @@ export default function UsersPage() {
   }
 
   const handleSuspend = async (userId) => {
-    if (!window.confirm('Are you sure you want to suspend this user? They will lose platform access.')) return
+    const reason = window.prompt('Reason for suspending this account:')?.trim()
+    if (!reason) return
     setActionLoading(true)
     try {
-      await usersApi.suspend(userId)
+      await usersApi.suspend(userId, reason)
       setSuccessMsg('User suspended')
       setTimeout(() => setSuccessMsg(null), 3000)
       fetchUsers()
@@ -106,9 +114,11 @@ export default function UsersPage() {
   }
 
   const handleActivate = async (userId) => {
+    const reason = window.prompt('Reason for reactivating this account:')?.trim()
+    if (!reason) return
     setActionLoading(true)
     try {
-      await usersApi.activate(userId)
+      await usersApi.activate(userId, reason)
       setSuccessMsg('User account activated')
       setTimeout(() => setSuccessMsg(null), 3000)
       fetchUsers()
@@ -118,10 +128,6 @@ export default function UsersPage() {
       setActionLoading(false)
     }
   }
-
-  // KPI calculations
-  const pendingApprovals = users.filter(u => u.is_approved === false).length
-  const activeCount = users.filter(u => u.is_active).length
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -170,7 +176,7 @@ export default function UsersPage() {
         <div className="rounded-xl border border-stone-200 glass-panel p-4 shadow-xs">
           <div className="text-xs font-mono uppercase text-stone-500 mb-1 font-semibold">Total Users</div>
           <div className="text-2xl font-bold font-mono text-stone-900">{total}</div>
-          <div className="text-xs text-stone-500 mt-1 font-sans">Platform-wide identity records</div>
+          <div className="text-xs text-stone-500 mt-1 font-sans">Matching directory filters</div>
         </div>
 
         <div className="rounded-xl border border-stone-200 glass-panel p-4 shadow-xs">
@@ -210,21 +216,21 @@ export default function UsersPage() {
             <Filter className="h-4 w-4 text-stone-400" />
             <select
               value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
+              onChange={(e) => { setPage(1); setRoleFilter(e.target.value) }}
               className="glass-control border border-stone-200 rounded-lg px-3 py-2 text-xs font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
             >
               <option value="">All Roles</option>
-              <option value="admin">Admin</option>
-              <option value="farmer">Farmer</option>
-              <option value="warehouse_manager">Warehouse Manager</option>
-              <option value="transporter">Transporter</option>
-              <option value="driver">Driver</option>
-              <option value="buyer">Buyer</option>
+              <option value="ADMIN">Admin</option>
+              <option value="FARMER">Farmer</option>
+              <option value="WAREHOUSE_MANAGER">Warehouse Manager</option>
+              <option value="TRANSPORTER">Transporter</option>
+              <option value="DRIVER">Driver</option>
+              <option value="BUYER">Buyer</option>
             </select>
 
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => { setPage(1); setStatusFilter(e.target.value) }}
               className="glass-control border border-stone-200 rounded-lg px-3 py-2 text-xs font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
             >
               <option value="">All Statuses</option>
@@ -262,7 +268,7 @@ export default function UsersPage() {
               <tbody className="divide-y divide-stone-100 text-stone-700">
                 {users.map((u) => {
                   const isCurrent = currentUser?.sub === u.id
-                  const roleStyle = ROLE_BADGE_STYLES[u.role] || 'bg-stone-100 text-stone-700 border-stone-200'
+                  const roleStyle = ROLE_BADGE_STYLES[u.role?.toLowerCase()] || 'bg-stone-100 text-stone-700 border-stone-200'
 
                   return (
                     <tr
@@ -343,7 +349,7 @@ export default function UsersPage() {
                           </button>
                         )}
 
-                        {!isCurrent && (
+                        {!isCurrent && u.role !== 'ADMIN' && (
                           u.is_active ? (
                             <button
                               onClick={() => handleSuspend(u.id)}
@@ -370,6 +376,11 @@ export default function UsersPage() {
             </table>
           </div>
         )}
+      </div>
+      <div className="flex items-center justify-end gap-3 text-xs text-stone-600">
+        <button type="button" disabled={loading || page <= 1} onClick={() => setPage(page - 1)} className="glass-control rounded-lg px-3 py-2 disabled:opacity-40">Previous</button>
+        <span>Page {page} of {Math.max(1, Math.ceil(total / 50))}</span>
+        <button type="button" disabled={loading || page * 50 >= total} onClick={() => setPage(page + 1)} className="glass-control rounded-lg px-3 py-2 disabled:opacity-40">Next</button>
       </div>
     </div>
   )

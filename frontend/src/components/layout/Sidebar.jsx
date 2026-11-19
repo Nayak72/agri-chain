@@ -1,8 +1,9 @@
 import React from 'react'
 import NavIndicator from './NavIndicator'
+import { pageCapabilityForPath } from '@/constants/pageCapabilities'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
-import { ROLES, ALL_ROLES, ADMIN_ONLY, normalizeRole, isRoleAllowed } from '@/constants/roles'
+import { ROLES, ALL_ROLES, ADMIN_ONLY } from '@/constants/roles'
 import { getInitials, getRoleLabel } from '@/utils'
 import {
   LayoutDashboard,
@@ -94,14 +95,13 @@ const NAVIGATION_SECTORS = [
 ]
 
 export function Sidebar({ collapsed, onToggleCollapse, className }) {
-  const { user, logout } = useAuth()
+  const { user, can } = useAuth()
   const location = useLocation()
-  const userRole = normalizeRole(user?.role)
 
   // Filter sectors and items based strictly on user role
   const visibleSectors = NAVIGATION_SECTORS.map((sec) => ({
     ...sec,
-    items: sec.items.filter((item) => isRoleAllowed(userRole, item.roles)),
+    items: sec.items.filter((item) => can(pageCapabilityForPath(item.path))),
   })).filter((sec) => sec.items.length > 0)
 
   return (

@@ -41,7 +41,7 @@ const SCENARIOS = [
 ]
 
 export default function ColdChainPage() {
-  const { hasRole } = useAuth()
+  const { can } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const initialShipmentId = searchParams.get('shipmentId') || ''
 
@@ -56,6 +56,7 @@ export default function ColdChainPage() {
 
   // Simulation controls state
   const [scenario, setScenario] = useState('NORMAL')
+  const [playbackSpeed, setPlaybackSpeed] = useState(1)
   const [simulation, setSimulation] = useState(null)
 
   // Resolve alert modal
@@ -111,6 +112,12 @@ export default function ColdChainPage() {
     }
   }, [selectedShipmentId])
 
+  useEffect(() => {
+    if (!selectedShipmentId || !simulation?.auto_play || simulation.state !== 'RUNNING') return
+    const timer = setInterval(() => fetchTelemetry(true), 5000)
+    return () => clearInterval(timer)
+  }, [selectedShipmentId, simulation?.auto_play, simulation?.state])
+
   const handleNextReading = async () => {
     if (!selectedShipmentId) return
     setActionLoading(true)
@@ -130,7 +137,7 @@ export default function ColdChainPage() {
     setActionLoading(true)
     setError(null)
     try {
-      if (action === 'start') await sensorsApi.startSession(selectedShipmentId, { scenario })
+      if (action === 'start') await sensorsApi.startSession(selectedShipmentId, { scenario, playback_speed: playbackSpeed })
       else await sensorsApi.controlSession(selectedShipmentId, simulation.simulation_id, action)
       await fetchTelemetry(true)
     } catch (err) {
@@ -175,7 +182,7 @@ export default function ColdChainPage() {
   }
 
   const selectedShipment = shipments.find(s => (s.id || s._id) === selectedShipmentId)
-  const canManageReadings = hasRole('ADMIN', 'DRIVER', 'TRANSPORTER')
+  const canManageReadings = can('sensors:simulate')
   const latestReading = readings.length > 0 ? readings[readings.length - 1] : null
 
   // Format data for chart
@@ -253,6 +260,8 @@ export default function ColdChainPage() {
             </select>
           </div>
 
+
+
           {selectedShipment && (
             <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-stone-600">
               <span className="flex items-center gap-1.5 font-sans">
@@ -305,12 +314,20 @@ export default function ColdChainPage() {
           </div>
 
 
+          <label className="md:col-span-2 block text-xs font-mono uppercase text-stone-600">Playback speed
+            <select value={playbackSpeed} disabled={!!simulation} onChange={e => setPlaybackSpeed(Number(e.target.value))} className="w-full glass-control border rounded-lg px-3 py-2 text-sm">
+              <option value={1}>1×</option><option value={5}>5×</option><option value={10}>10×</option><option value={60}>60×</option>
+            </select>
+          </label>
+
           {/* Action Buttons */}
           <div className="md:col-span-6 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-mono text-stone-600">{simulation ? `${simulation.scenario} · ${simulation.state} · ${simulation.sequence} readings · ${simulation.simulated_elapsed_seconds}s simulated` : 'No active simulation session'}</span>
+            <span className="text-xs font-mono text-stone-600">{simulation ? `${simulation.scenario} · ${simulation.state} · ${simulation.sequence} readings · ${simulation.simulated_elapsed_seconds}s simulated · ${simulation.auto_play ? `Auto ${simulation.playback_speed || 1}×` : 'Manual'}` : 'No active simulation session'}</span>
+            {simulation?.auto_error && <span role="alert" className="text-xs text-rose-700">{simulation.auto_error}</span>}
             {!simulation ? <button type="button" onClick={() => handleSimulation('start')} disabled={actionLoading || !selectedShipmentId || selectedShipment?.status !== 'IN_TRANSIT'} className="glass-control rounded-lg border px-3 py-2 text-xs disabled:opacity-50">Start simulation</button> : <>
               <button type="button" onClick={() => handleSimulation(simulation.state === 'RUNNING' ? 'pause' : 'resume')} disabled={actionLoading} className="glass-control rounded-lg border px-3 py-2 text-xs disabled:opacity-50">{simulation.state === 'RUNNING' ? 'Pause' : 'Resume'}</button>
               <button type="button" onClick={() => handleSimulation('stop')} disabled={actionLoading} className="glass-control rounded-lg border px-3 py-2 text-xs disabled:opacity-50">Stop</button>
+              <button type="button" onClick={() => handleSimulation(simulation.auto_play ? 'auto-stop' : 'auto-start')} disabled={actionLoading || (!simulation.auto_play && simulation.state !== 'RUNNING')} className="glass-control rounded-lg border px-3 py-2 text-xs disabled:opacity-50">{simulation.auto_play ? 'Stop auto-play' : 'Start auto-play'}</button>
             </>}
             <button
               onClick={handleNextReading}

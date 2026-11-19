@@ -81,7 +81,7 @@ class UserResponse(BaseModel):
 def _user_payload(user: dict) -> dict:
     role_raw = user.get("role", "FARMER")
     try:
-        role = Role(role_raw)
+        role = Role(str(getattr(role_raw, "value", role_raw)).strip().upper())
     except (TypeError, ValueError) as exc:
         raise ForbiddenError("Invalid user role") from exc
     return {

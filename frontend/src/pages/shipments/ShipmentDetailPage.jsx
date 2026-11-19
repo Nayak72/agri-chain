@@ -43,7 +43,7 @@ export default function ShipmentDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const userRole = normalizeRole(user?.role)
 
   const [actionError, setActionError] = useState('')
@@ -356,7 +356,7 @@ export default function ShipmentDetailPage() {
           <h2 className="font-semibold text-stone-900">Warehouse return</h2>
           {shipment.return_received_at ? (
             <p className="text-sm text-stone-600">{formatWeight(shipment.returned_quantity_kg)} received on {formatDateTime(shipment.return_received_at)}. Stock remains reserved until the buyer cancels the order.</p>
-          ) : [ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER].includes(userRole) ? (
+          ) : can('returns:receive') ? (
             <form className="space-y-3" onSubmit={event => { event.preventDefault(); returnMutation.mutate() }}>
               <p className="text-sm text-stone-600">Record the full {formatWeight(shipment.loaded_weight_kg)} after physical inspection. Partial or damaged returns require a separate workflow.</p>
               <label className="block text-sm">Condition description

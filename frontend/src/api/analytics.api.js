@@ -1,6 +1,7 @@
 import apiClient from './client'
 
 export const analyticsApi = {
+  workspace: () => apiClient.get('/analytics/workspace'),
   dashboard: () =>
     apiClient.get('/analytics/dashboard'),
 

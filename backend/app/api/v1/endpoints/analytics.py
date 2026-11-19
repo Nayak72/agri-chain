@@ -22,8 +22,8 @@ class DashboardMetrics(BaseModel):
     completed_shipments: int
     delayed_shipments: int
     cancelled_shipments: int
-    average_transit_hours: float
-    on_time_delivery_percentage: float
+    average_transit_hours: Optional[float]
+    on_time_delivery_percentage: Optional[float]
 
 
 class FleetMetrics(BaseModel):
@@ -57,6 +57,70 @@ class QualityMetrics(BaseModel):
     total_excursion_duration_hours: float
 
 
+class WorkspaceMetric(BaseModel):
+    key: str
+    label: str
+    value: float
+    unit: Optional[str] = None
+
+
+class WorkspaceMetrics(BaseModel):
+    role: UserRole
+    metrics: List[WorkspaceMetric]
+
+
+@router.get('/workspace', response_model=WorkspaceMetrics)
+async def get_workspace_metrics(current_user: dict = Depends(get_current_user),
+                                db: AsyncIOMotorDatabase = Depends(get_database)):
+    """Current role's operational counts; no page-size-limited client totals."""
+    role, uid = current_user['role'], current_user['sub']
+    metrics = []
+    def add(key, label, value, unit=None):
+        metrics.append(WorkspaceMetric(key=key, label=label, value=value, unit=unit))
+    if role == UserRole.ADMIN:
+        add('farms', 'Registered farms', await db.farms.count_documents({}))
+        add('batches', 'Harvest batches', await db.produce_batches.count_documents({}))
+        add('pending_users', 'Accounts awaiting approval', await db.users.count_documents({'is_approved': False}))
+        add('alerts', 'Active shipment alerts', await db.sensor_alerts.count_documents({'status': 'ACTIVE'}))
+    elif role == UserRole.FARMER:
+        add('farms', 'My farms', await db.farms.count_documents({'farmer_id': uid}))
+        add('batches', 'My batches', await db.produce_batches.count_documents({'farmer_id': uid}))
+        add('pending_orders', 'Orders awaiting my decision', await db.purchase_orders.count_documents({'seller_id': uid, 'status': 'PLACED'}))
+        add('accepted_orders', 'Accepted orders', await db.purchase_orders.count_documents({'seller_id': uid, 'status': 'ACCEPTED'}))
+    elif role == UserRole.BUYER:
+        add('orders', 'My orders', await db.purchase_orders.count_documents({'buyer_id': uid}))
+        add('pending_orders', 'Orders awaiting seller', await db.purchase_orders.count_documents({'buyer_id': uid, 'status': 'PLACED'}))
+        add('accepted_orders', 'Accepted orders', await db.purchase_orders.count_documents({'buyer_id': uid, 'status': 'ACCEPTED'}))
+        add('pending_deliveries', 'Awaiting my delivery decision', await db.shipments.count_documents({'buyer_id': uid, 'status': 'OUT_FOR_DELIVERY'}))
+    elif role == UserRole.WAREHOUSE_MANAGER:
+        warehouses = await db.warehouses.find({'manager_id': uid}, {'_id': 1}).to_list(None)
+        ids = [str(warehouse['_id']) for warehouse in warehouses]
+        scope = {'warehouse_id': {'$in': ids}}
+        add('warehouses', 'Assigned warehouses', len(ids))
+        add('stock_rows', 'Inventory lots', await db.inventory_items.count_documents(scope))
+        totals = await db.inventory_items.aggregate([{'$match': scope},
+            {'$group': {'_id': None, 'available': {'$sum': '$available_kg'}}}]).to_list(1)
+        add('available_stock', 'Available stock', totals[0]['available'] if totals else 0, 'kg')
+        add('receipts', 'Recorded receipts', await db.warehouse_receipts.count_documents(scope))
+    elif role == UserRole.TRANSPORTER:
+        transporter = await db.transporters.find_one({'user_id': uid}, {'_id': 1})
+        scope = {'transporter_id': str(transporter['_id'])} if transporter else {'_id': {'$in': []}}
+        add('available_vehicles', 'Available vehicles', await db.vehicles.count_documents({**scope, 'status': 'AVAILABLE'}))
+        add('assigned_vehicles', 'Assigned vehicles', await db.vehicles.count_documents({**scope, 'status': 'ASSIGNED'}))
+        add('available_drivers', 'Available drivers', await db.drivers.count_documents({**scope, 'status': 'AVAILABLE'}))
+        add('quotes', 'My submitted quotations', await db.freight_quotations.count_documents({**scope, 'status': 'SUBMITTED'}))
+    elif role == UserRole.DRIVER:
+        scope = await shipment_scope(db, current_user)
+        add('assigned', 'My assigned shipments', await db.shipments.count_documents(scope))
+        add('awaiting_load', 'Awaiting loading', await db.shipments.count_documents({**scope, 'status': 'DRIVER_ASSIGNED'}))
+        add('in_transit', 'In transit', await db.shipments.count_documents({**scope, 'status': 'IN_TRANSIT'}))
+        related = await shipment_reference_scope(db, current_user)
+        add('alerts', 'Active shipment alerts', await db.sensor_alerts.count_documents({**related, 'status': 'ACTIVE'}))
+    else:
+        raise ForbiddenError('No workspace available for this role')
+    return WorkspaceMetrics(role=role, metrics=metrics)
+
+
 @router.get("/dashboard", response_model=DashboardMetrics)
 async def get_dashboard_metrics(
     current_user: dict = Depends(get_current_user),
@@ -75,11 +139,12 @@ async def get_dashboard_metrics(
     cancelled = await db.shipments.count_documents({**query, "status": ShipmentStatus.CANCELLED})
     
     pipeline = [
-        {"$match": query},
-        {"$group": {"_id": None, "avg_transit": {"$avg": "$actual_transit_hours"}}}
+        {"$match": {**query, "actual_dispatch_time": {"$type": "date"}, "actual_arrival_time": {"$type": "date"}}},
+        {"$group": {"_id": None, "avg_transit": {"$avg": {"$divide": [
+            {"$subtract": ["$actual_arrival_time", "$actual_dispatch_time"]}, 3600000]}}}}
     ]
     transit_result = await db.shipments.aggregate(pipeline).to_list(1)
-    avg_transit = (transit_result[0].get("avg_transit") or 0) if transit_result else 0
+    avg_transit = transit_result[0].get("avg_transit") if transit_result else None
     
     pipeline = [
         {"$match": {**query, "status": ShipmentStatus.DELIVERED,
@@ -94,7 +159,7 @@ async def get_dashboard_metrics(
         }}
     ]
     ontime_result = await db.shipments.aggregate(pipeline).to_list(1)
-    on_time_pct = 0
+    on_time_pct = None
     if ontime_result and ontime_result[0]["total"] > 0:
         on_time_pct = (ontime_result[0]["on_time"] / ontime_result[0]["total"]) * 100
     
@@ -104,8 +169,8 @@ async def get_dashboard_metrics(
         completed_shipments=completed,
         delayed_shipments=delayed,
         cancelled_shipments=cancelled,
-        average_transit_hours=round(avg_transit, 2),
-        on_time_delivery_percentage=round(on_time_pct, 2),
+        average_transit_hours=round(avg_transit, 2) if avg_transit is not None else None,
+        on_time_delivery_percentage=round(on_time_pct, 2) if on_time_pct is not None else None,
     )
 
 

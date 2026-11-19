@@ -31,11 +31,15 @@ export default function UserDetailPage() {
 
   const [feedback, setFeedback] = useState({ type: '', message: '' })
   const [showEditModal, setShowEditModal] = useState(false)
-  const [editForm, setEditForm] = useState({ full_name: '', phone: '', role: '' })
+  const [editForm, setEditForm] = useState({ full_name: '', phone: '', role: '', reason: '' })
 
   const { data: userProfile, isLoading, isError, error } = useQuery({
     queryKey: ['user-detail', id],
     queryFn: () => usersApi.get(id).then(res => res.data),
+  })
+  const { data: auditEvents = [], isError: auditError } = useQuery({
+    queryKey: ['user-audit', id],
+    queryFn: () => usersApi.auditHistory(id).then(res => res.data),
   })
 
   // Mutations
@@ -52,10 +56,11 @@ export default function UserDetailPage() {
   })
 
   const suspendMutation = useMutation({
-    mutationFn: () => usersApi.suspend(id),
+    mutationFn: (reason) => usersApi.suspend(id, reason),
     onSuccess: () => {
       setFeedback({ type: 'success', message: 'User account has been suspended.' })
       queryClient.invalidateQueries({ queryKey: ['user-detail', id] })
+      queryClient.invalidateQueries({ queryKey: ['user-audit', id] })
       queryClient.invalidateQueries({ queryKey: ['users'] })
     },
     onError: (err) => {
@@ -64,10 +69,11 @@ export default function UserDetailPage() {
   })
 
   const activateMutation = useMutation({
-    mutationFn: () => usersApi.activate(id),
+    mutationFn: (reason) => usersApi.activate(id, reason),
     onSuccess: () => {
       setFeedback({ type: 'success', message: 'User account has been reactivated.' })
       queryClient.invalidateQueries({ queryKey: ['user-detail', id] })
+      queryClient.invalidateQueries({ queryKey: ['user-audit', id] })
       queryClient.invalidateQueries({ queryKey: ['users'] })
     },
     onError: (err) => {
@@ -78,6 +84,7 @@ export default function UserDetailPage() {
   const updateMutation = useMutation({
     mutationFn: (data) => usersApi.update(id, data),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-audit', id] })
       setFeedback({ type: 'success', message: 'User profile updated successfully.' })
       setShowEditModal(false)
       queryClient.invalidateQueries({ queryKey: ['user-detail', id] })
@@ -94,6 +101,7 @@ export default function UserDetailPage() {
         full_name: userProfile.full_name || '',
         phone: userProfile.phone || '',
         role: userProfile.role || ROLES.FARMER,
+        reason: '',
       })
       setShowEditModal(true)
     }
@@ -284,29 +292,40 @@ export default function UserDetailPage() {
                 </button>
               )}
 
-              {userProfile.is_active ? (
+              {userProfile.is_active && userProfile.role !== ROLES.ADMIN ? (
                 <button
-                  onClick={() => suspendMutation.mutate()}
+                  onClick={() => { const reason = window.prompt('Reason for suspending this account:')?.trim(); if (reason) suspendMutation.mutate(reason) }}
                   disabled={suspendMutation.isPending}
                   className="w-full py-2.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                 >
                   <UserX className="w-4 h-4 text-rose-600" />
                   <span>{suspendMutation.isPending ? 'Suspending...' : 'Suspend Account'}</span>
                 </button>
-              ) : (
+              ) : !userProfile.is_active ? (
                 <button
-                  onClick={() => activateMutation.mutate()}
+                  onClick={() => { const reason = window.prompt('Reason for reactivating this account:')?.trim(); if (reason) activateMutation.mutate(reason) }}
                   disabled={activateMutation.isPending}
                   className="w-full py-2.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                 >
                   <UserCheck className="w-4 h-4 text-emerald-600" />
                   <span>{activateMutation.isPending ? 'Reactivating...' : 'Reactivate Account'}</span>
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
       </div>
+
+      <section className="glass-panel border rounded-2xl p-6 space-y-3">
+        <h2 className="font-semibold text-stone-900">Administrative change history</h2>
+        {auditError ? <p role="alert" className="text-sm text-rose-700">Unable to load change history.</p> :
+          auditEvents.length === 0 ? <p className="text-sm text-stone-500">No recorded profile changes.</p> :
+          auditEvents.map((event, index) => <article key={`${event.created_at}-${index}`} className="glass-inset rounded-xl p-3 text-sm space-y-1">
+            <p className="font-medium">{formatDateTime(event.created_at)} · Administrator {event.actor_id}</p>
+            <p>Reason: {event.reason}</p>
+            {Object.keys(event.updated || {}).map(key => <p key={key}>{key}: {String(event.previous?.[key] ?? '—')} → {String(event.updated[key] ?? '—')}</p>)}
+          </article>)}
+      </section>
 
       {/* Edit Profile Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
@@ -338,15 +357,22 @@ export default function UserDetailPage() {
                 <label className="block text-xs font-mono uppercase text-stone-600 font-semibold mb-1">Platform Role</label>
                 <select
                   value={editForm.role}
+                  disabled={userProfile?.role === ROLES.ADMIN}
                   onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
                   className="w-full px-3.5 py-2 glass-control border border-stone-200 rounded-lg text-stone-900 text-xs focus:outline-none focus:ring-2 focus:ring-[#244634]/20 focus:border-[#244634]"
                 >
-                  {ALL_ROLES.map((r) => (
+                  {ALL_ROLES.filter(r => r !== ROLES.ADMIN || userProfile?.role === ROLES.ADMIN).map((r) => (
                     <option key={r} value={r}>
                       {getRoleLabel(r)} ({r})
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-stone-600 font-semibold mb-1">Reason for change *</label>
+                <textarea value={editForm.reason} onChange={e => setEditForm({ ...editForm, reason: e.target.value })}
+                  maxLength={500} required className="w-full px-3.5 py-2 glass-control border border-stone-200 rounded-lg text-stone-900 text-xs" />
               </div>
             </div>
 
@@ -361,7 +387,7 @@ export default function UserDetailPage() {
               <button
                 type="button"
                 onClick={() => updateMutation.mutate(editForm)}
-                disabled={updateMutation.isPending}
+                disabled={updateMutation.isPending || !editForm.reason.trim()}
                 className="flex-1 py-2 rounded-lg bg-[#244634] text-white text-xs font-bold hover:bg-[#1b3527] disabled:opacity-50 shadow-xs"
               >
                 {updateMutation.isPending ? 'Saving...' : 'Save Changes'}

@@ -1,13 +1,13 @@
 import uuid
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field, ConfigDict
 from bson import ObjectId
 
 from app.db.mongodb import get_database
-from app.core.permissions import get_current_user
+from app.core.permissions import get_current_user, enforce_permission
 from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError, ConflictError
 from app.core.constants import (
     UserRole, AlertSeverity, AlertStatus,
@@ -16,7 +16,7 @@ from app.core.constants import (
 from app.services.ledger_service import append_ledger_block
 from app.core.constants import LedgerEventType
 from app.db.unit_of_work import run_in_txn
-from app.services.sensor_simulator import generate_stateless_reading
+from app.services.sensor_simulator import generate_stateless_reading, classify_reading
 from app.utils.serialization import to_response
 from app.utils.mongo import to_mongo, resolve_doc
 from app.core.access import assert_can_view_shipment
@@ -79,14 +79,14 @@ class SimulationStart(BaseModel):
     scenario: SensorScenario = SensorScenario.NORMAL
     seed: str = Field(default="agrichain", min_length=1, max_length=100)
     interval_seconds: int = Field(default=60, ge=1, le=3600)
+    playback_speed: float = Field(default=1.0, ge=0.1, le=60, allow_inf_nan=False)
     model_config = ConfigDict(extra="forbid")
 
 
 async def _simulation_shipment(db, shipment_id, user):
     shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
     await assert_can_view_shipment(db, user, shipment)
-    if user["role"] not in (UserRole.ADMIN, UserRole.DRIVER, UserRole.TRANSPORTER):
-        raise ForbiddenError("Not authorized to control this simulation")
+    enforce_permission(user, "sensors:simulate")
     return shipment
 
 
@@ -108,6 +108,7 @@ async def start_simulation(shipment_id: str, data: SimulationStart,
         doc = {"simulation_id": f"SIM-{uuid.uuid4().hex.upper()}", "shipment_id": str(shipment["_id"]),
                "scenario": data.scenario.value, "seed": data.seed, "sequence": 0, "state": "RUNNING",
                "interval_seconds": data.interval_seconds, "simulated_elapsed_seconds": 0,
+               "playback_speed": data.playback_speed, "auto_play": False,
                "created_by": current_user["sub"], "started_at": now, "created_at": now, "updated_at": now}
         await db.simulation_sessions.insert_one(doc, session=session)
         return {key: value for key, value in doc.items() if key != "_id"}
@@ -128,7 +129,8 @@ async def control_simulation(shipment_id: str, simulation_id: str, action: str,
                              current_user: dict = Depends(get_current_user), db: AsyncIOMotorDatabase = Depends(get_database)):
     shipment = await _simulation_shipment(db, shipment_id, current_user)
     transitions = {"pause": ("RUNNING", "PAUSED"), "resume": ("PAUSED", "RUNNING"),
-                   "stop": (("RUNNING", "PAUSED"), "STOPPED")}
+                   "stop": (("RUNNING", "PAUSED"), "STOPPED"),
+                   "auto-start": ("RUNNING", "RUNNING"), "auto-stop": (("RUNNING", "PAUSED"), None)}
     if action not in transitions:
         raise ValidationError("Unknown simulation control")
     expected, target = transitions[action]
@@ -139,12 +141,23 @@ async def control_simulation(shipment_id: str, simulation_id: str, action: str,
                                                  {"$set": {"updated_at": now}}, session=session)
         if not claimed.matched_count:
             raise ConflictError("Simulation controls require an in-transit shipment")
+        fields = {"updated_at": now}
+        if target is not None:
+            fields["state"] = target
+        if action == "auto-start":
+            fields.update(auto_play=True, auto_next_at=now, auto_lease_owner=None, auto_lease_until=None, auto_error=None)
+        elif action in ("auto-stop", "stop"):
+            fields.update(auto_play=False, auto_lease_owner=None, auto_lease_until=None)
+        elif action == "resume":
+            fields.update(auto_next_at=now, auto_lease_owner=None, auto_lease_until=None)
+        elif action == "pause":
+            fields.update(auto_lease_owner=None, auto_lease_until=None)
         result = await db.simulation_sessions.update_one(
             {"shipment_id": str(shipment["_id"]), "simulation_id": simulation_id, "state": {"$in": expected_states}},
-            {"$set": {"state": target, "updated_at": now}}, session=session)
+            {"$set": fields}, session=session)
         if not result.matched_count:
             raise ConflictError("Simulation not found or state has changed")
-        return {"simulation_id": simulation_id, "state": target}
+        return {"simulation_id": simulation_id, **fields}
     return await run_in_txn(transaction)
 
 
@@ -155,11 +168,14 @@ async def next_reading_endpoint(
     current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
+    return await _generate_reading(shipment_id, data, current_user, db)
+
+
+async def _generate_reading(shipment_id, data, current_user, db, auto_owner=None):
     shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
     await assert_can_view_shipment(db, current_user, shipment)
     
-    if current_user["role"] not in (UserRole.ADMIN, UserRole.DRIVER, UserRole.TRANSPORTER):
-        raise ForbiddenError("Only the assigned driver, transporter, or admin can simulate readings")
+    enforce_permission(current_user, "sensors:simulate")
     canonical_id = str(shipment["_id"])
     batch_ids = shipment.get("batch_ids", [])
     batch = await resolve_doc(db.produce_batches, batch_ids[0], "Batch", business_key="batch_id") if batch_ids else None
@@ -176,9 +192,15 @@ async def next_reading_endpoint(
             if not run or run.get("state") != "RUNNING":
                 raise ConflictError("Simulation session is not running")
             step, scenario = run["sequence"], run["scenario"]
+            run_query = {"_id": run["_id"], "state": "RUNNING", "sequence": step}
+            changes = {"updated_at": now}
+            if auto_owner is not None:
+                run_query.update(auto_play=True, auto_lease_owner=auto_owner, auto_lease_until={"$gt": now}, auto_next_at={"$lte": now})
+                delay = max(1.0, run["interval_seconds"] / run.get("playback_speed", 1.0))
+                changes.update(auto_next_at=now + timedelta(seconds=delay), auto_lease_owner=None, auto_lease_until=None)
             updated = await db.simulation_sessions.update_one(
-                {"_id": run["_id"], "state": "RUNNING", "sequence": step},
-                {"$inc": {"sequence": 1, "simulated_elapsed_seconds": run["interval_seconds"]}, "$set": {"updated_at": now}}, session=session)
+                run_query, {"$inc": {"sequence": 1, "simulated_elapsed_seconds": run["interval_seconds"]},
+                            "$set": changes}, session=session)
             if not updated.matched_count:
                 raise ConflictError("Simulation changed; retry")
             seed = run["seed"]
@@ -191,6 +213,10 @@ async def next_reading_endpoint(
             step = await db.sensor_readings.count_documents({"shipment_id": canonical_id, "scenario": scenario, "simulation_id": None}, session=session)
             seed = canonical_id
         reading = generate_stateless_reading(seed, produce, scenario, step)
+        previous_cursor = db.sensor_readings.find({"shipment_id": canonical_id, "simulation_id": data.session_id,
+                                                   "scenario": scenario}, session=session).sort("timestamp", -1).limit(1)
+        previous_readings = await previous_cursor.to_list(1)
+        reading["status"] = classify_reading(reading, previous_readings[0] if previous_readings else None)
         document = {**reading, "reading_id": f"SR-{uuid.uuid4().hex[:12].upper()}",
                     "shipment_id": canonical_id, "timestamp": now, "created_at": now,
                     "simulation_id": data.session_id, "scenario": scenario, "sequence": step,
@@ -203,10 +229,13 @@ async def next_reading_endpoint(
                 continue
             existing = await db.sensor_alerts.find_one({"shipment_id": canonical_id, "alert_type": kind, "status": "ACTIVE"}, session=session)
             if existing:
+                if reading["status"] == "CRITICAL" and existing.get("severity") != "CRITICAL":
+                    await db.sensor_alerts.update_one({"_id": existing["_id"], "status": "ACTIVE"},
+                        {"$set": {"severity": "CRITICAL", "updated_at": now}}, session=session)
                 continue
             alert = {"alert_id": f"ALERT-{uuid.uuid4().hex[:12].upper()}", "shipment_id": canonical_id,
                      "simulation_id": data.session_id,
-                     "reading_id": document["reading_id"], "alert_type": kind, "severity": "CRITICAL",
+                     "reading_id": document["reading_id"], "alert_type": kind, "severity": reading["status"],
                      "observed_value": value, "configured_min": low, "configured_max": high,
                      "status": "ACTIVE", "created_at": now}
             result = await db.sensor_alerts.insert_one(alert, session=session)
@@ -265,8 +294,7 @@ async def get_sensor_alerts(
 async def acknowledge_alert(alert_id: str, current_user: dict = Depends(get_current_user),
                             db: AsyncIOMotorDatabase = Depends(get_database)):
     alert = await resolve_doc(db.sensor_alerts, alert_id, "Alert", business_key="alert_id")
-    if current_user["role"] not in (UserRole.ADMIN, UserRole.DRIVER, UserRole.TRANSPORTER):
-        raise ForbiddenError("Not authorized to acknowledge this alert")
+    enforce_permission(current_user, "alerts:acknowledge")
     shipment = await resolve_doc(db.shipments, alert["shipment_id"], "Shipment", business_key="shipment_id")
     await assert_can_view_shipment(db, current_user, shipment)
     now = datetime.now(timezone.utc)
@@ -292,8 +320,7 @@ async def resolve_alert(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     alert = await resolve_doc(db.sensor_alerts, alert_id, "Alert", business_key="alert_id")
-    if current_user["role"] not in (UserRole.ADMIN, UserRole.DRIVER, UserRole.TRANSPORTER):
-        raise ForbiddenError("Only the assigned driver, transporter, or admin can resolve alerts")
+    enforce_permission(current_user, "alerts:resolve")
     shipment = await resolve_doc(db.shipments, alert["shipment_id"], "Shipment", business_key="shipment_id")
     await assert_can_view_shipment(db, current_user, shipment)
     action = alert_data.corrective_action.strip()

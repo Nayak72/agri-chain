@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from bson import ObjectId
 
 from app.db.mongodb import get_database
-from app.core.permissions import get_current_user
+from app.core.permissions import get_current_user, enforce_permission
 from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError, ConflictError
 from app.core.constants import (
     ShipmentStatus, UserRole, FreightBookingStatus, LedgerEventType
@@ -20,6 +20,7 @@ from app.utils.mongo import to_mongo, resolve_doc
 from app.core.access import get_transporter_for_user, get_driver_for_user, assert_can_view_shipment, shipment_scope
 from app.services.shipment_workflow import transition_shipment, cancel_shipment
 from app.services.inventory_service import release_stock
+from app.services.warehouse_capacity import lock_warehouse, check_capacity
 
 router = APIRouter()
 
@@ -416,6 +417,7 @@ async def dispatch_shipment(
                 inventory = await db.inventory_items.find_one({"_id": ObjectId(inv_id)}, session=session)
                 if not inventory or inventory.get("batch_id") != order.get("batch_id"):
                     raise ConflictError("Order inventory allocation changed")
+                await lock_warehouse(db, inventory.get("warehouse_id"), session)
                 if updated.get("loaded_weight_kg") is None:
                     raise ConflictError("Shipment has no verified loaded weight")
                 await db.inventory_movements.insert_one({
@@ -532,8 +534,7 @@ async def cancel_shipment_endpoint(
 async def receive_shipment_return(shipment_id: str, data: ShipmentReturnReceipt,
                                   current_user: dict = Depends(get_current_user),
                                   db: AsyncIOMotorDatabase = Depends(get_database)):
-    if current_user["role"] not in (UserRole.ADMIN, UserRole.WAREHOUSE_MANAGER):
-        raise ForbiddenError("Only the assigned warehouse manager or admin can receive returned stock")
+    enforce_permission(current_user, "returns:receive")
     shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
     if not data.inspected_usable or not data.condition.strip():
         raise ValidationError("Confirm the returned goods are usable and describe their condition")
@@ -545,6 +546,8 @@ async def receive_shipment_return(shipment_id: str, data: ShipmentReturnReceipt,
 
     async def transaction(session):
         order = await resolve_doc(db.purchase_orders, shipment.get("purchase_order_id"), "Purchase Order", session=session)
+        if Decimal(str(order.get("accepted_quantity_kg", 0))) != Decimal(str(data.returned_quantity_kg)):
+            raise ConflictError("Returned quantity does not match the remaining order reservation; reconcile this legacy order first")
         inv_id = order.get("inventory_id")
         if not inv_id or not ObjectId.is_valid(inv_id):
             raise ConflictError("Return requires a valid inventory allocation")
@@ -555,6 +558,11 @@ async def receive_shipment_return(shipment_id: str, data: ShipmentReturnReceipt,
             warehouse = await resolve_doc(db.warehouses, inventory.get("warehouse_id"), "Warehouse", session=session)
             if warehouse.get("manager_id") != current_user["sub"]:
                 raise ForbiddenError("Return belongs to another warehouse")
+        warehouse = await resolve_doc(db.warehouses, inventory.get("warehouse_id"), "Warehouse", session=session)
+        cold_storage = inventory.get("cold_storage")
+        if cold_storage is None:
+            cold_storage = bool(warehouse.get("has_refrigeration"))
+        await check_capacity(db, inventory.get("warehouse_id"), data.returned_quantity_kg, cold_storage, session)
         order_claim = await db.purchase_orders.update_one({"_id": order["_id"], "status": "ACCEPTED"},
             {"$set": {"updated_at": now}}, session=session)
         if not order_claim.matched_count:
