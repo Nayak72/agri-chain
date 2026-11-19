@@ -26,7 +26,9 @@ async def occupancy(db, warehouse_id, warehouse, session):
         {'$match': {'warehouse_id': str(warehouse_id)}},
         {'$lookup': {'from': 'inventory_movements', 'let': {'inv': {'$toString': '$_id'}}, 'pipeline': [
             {'$match': {'$expr': {'$and': [{'$eq': ['$inventory_id', '$$inv']},
-                                           {'$in': ['$type', ['DISPATCH', 'RETURN_RECEIPT_RESERVED']]}]}}},
+                                           {'$in': ['$type', ['DISPATCH', 'RETURN_RECEIPT_RESERVED',
+                                                               'RETURN_RECEIPT_USABLE', 'RETURN_RECEIPT_DAMAGED',
+                                                               'RETURN_RECEIPT_REJECTED']]}]}}},
             {'$group': {'_id': None, 'net_out': {'$sum': {'$cond': [
                 {'$eq': ['$type', 'DISPATCH']}, '$quantity_kg', {'$multiply': [-1, '$quantity_kg']}]}}}}
         ], 'as': 'custody'}},
@@ -36,7 +38,7 @@ async def occupancy(db, warehouse_id, warehouse, session):
             {'$ifNull': ['$cold_storage', bool(warehouse.get('has_refrigeration'))]}, '$stored', 0]}}}},
     ]
     result = await db.inventory_items.aggregate(pipeline, session=session).to_list(1)
-    return (result[0]['total'], result[0]['cold']) if result else (0.0, 0.0)
+    return (result[0].get('total', 0.0), result[0].get('cold', 0.0)) if result else (0.0, 0.0)
 
 
 async def check_capacity(db, warehouse_id, added_kg, cold_storage, session):

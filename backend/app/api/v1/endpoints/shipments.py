@@ -19,7 +19,7 @@ from app.utils.serialization import to_response
 from app.utils.mongo import to_mongo, resolve_doc
 from app.core.access import get_transporter_for_user, get_driver_for_user, assert_can_view_shipment, shipment_scope
 from app.services.shipment_workflow import transition_shipment, cancel_shipment
-from app.services.inventory_service import release_stock
+from app.services.inventory_service import release_stock, kilograms_to_grams
 from app.services.warehouse_capacity import lock_warehouse, check_capacity
 
 router = APIRouter()
@@ -52,6 +52,17 @@ class ShipmentReturnReceipt(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ShipmentPartialReturn(BaseModel):
+    usable_quantity_kg: float = Field(0.0, ge=0, allow_inf_nan=False, multiple_of=0.001)
+    damaged_quantity_kg: float = Field(0.0, ge=0, allow_inf_nan=False, multiple_of=0.001)
+    rejected_quantity_kg: float = Field(0.0, ge=0, allow_inf_nan=False, multiple_of=0.001)
+    condition: str = Field(..., min_length=1, max_length=1000)
+    disposition_notes: Optional[str] = Field(None, max_length=1000)
+    received_by: str = Field(..., min_length=1, max_length=200)
+    inspected_usable: bool = True
+    model_config = ConfigDict(extra="forbid")
+
+
 class ShipmentResponse(BaseModel):
     id: str
     shipment_id: str
@@ -79,7 +90,11 @@ class ShipmentResponse(BaseModel):
     return_received_at: Optional[datetime] = None
     return_received_by: Optional[str] = None
     returned_quantity_kg: Optional[float] = None
+    returned_usable_quantity_kg: Optional[float] = None
+    returned_damaged_quantity_kg: Optional[float] = None
+    returned_rejected_quantity_kg: Optional[float] = None
     return_condition: Optional[str] = None
+    return_disposition: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -308,7 +323,6 @@ async def load_shipment(
     if load_data.actual_weight_kg > shipment["cargo_quantity_kg"]:
         raise ValidationError("Loaded weight cannot exceed planned cargo")
     if load_data.batch_quantities:
-        from decimal import Decimal, InvalidOperation
         try:
             ids = [item["batch_id"] for item in load_data.batch_quantities]
             quantities = [Decimal(str(item["quantity_kg"])) for item in load_data.batch_quantities]
@@ -583,6 +597,182 @@ async def receive_shipment_return(shipment_id: str, data: ShipmentReturnReceipt,
             entity_type="SHIPMENT", entity_id=str(shipment["_id"]), actor_id=current_user["sub"],
             actor_role=current_user["role"], event_summary="Full usable shipment return received",
             payload={"quantity_kg": data.returned_quantity_kg, "condition": data.condition.strip()}, session=session)
+        return await db.shipments.find_one({"_id": shipment["_id"]}, session=session)
+
+    return to_response(ShipmentResponse, _shipment_response(await run_in_txn(transaction)))
+
+
+@router.post("/{shipment_id}/partial-return", response_model=ShipmentResponse)
+async def receive_partial_shipment_return(
+    shipment_id: str,
+    data: ShipmentPartialReturn,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    enforce_permission(current_user, "returns:receive")
+    shipment = await resolve_doc(db.shipments, shipment_id, "Shipment", business_key="shipment_id")
+
+    total_returned_parts = (
+        Decimal(str(data.usable_quantity_kg)) +
+        Decimal(str(data.damaged_quantity_kg)) +
+        Decimal(str(data.rejected_quantity_kg))
+    )
+    if total_returned_parts <= 0:
+        raise ValidationError("Total returned quantity must be greater than zero")
+
+    if data.usable_quantity_kg > 0 and not data.inspected_usable:
+        raise ValidationError("Usable goods must pass physical inspection before being accepted as usable stock")
+
+    status = shipment.get("status")
+    allowed_statuses = ("CANCELLED", "DELIVERY_REJECTED", "PARTIALLY_DELIVERED")
+    if status not in allowed_statuses:
+        raise ValidationError(f"Returns are only permitted for CANCELLED, DELIVERY_REJECTED, or PARTIALLY_DELIVERED shipments (current: {status})")
+
+    loaded_weight = shipment.get("loaded_weight_kg")
+    if loaded_weight is None:
+        raise ConflictError("Shipment has no verified loaded weight")
+
+    if status in ("CANCELLED", "DELIVERY_REJECTED"):
+        eligible_max = Decimal(str(loaded_weight))
+    else:
+        report = await db.delivery_reports.find_one({"$or": [{"shipment_id": str(shipment["_id"])}, {"shipment_id": shipment.get("shipment_id")}]})
+        delivered = Decimal(str(report.get("delivered_quantity_kg", 0.0))) if report else Decimal("0")
+        eligible_max = Decimal(str(loaded_weight)) - delivered
+
+    if total_returned_parts > eligible_max:
+        raise ValidationError(f"Total returned quantity ({total_returned_parts}kg) cannot exceed eligible dispatched quantity ({eligible_max}kg)")
+
+    if shipment.get("return_received_at") is not None:
+        raise ConflictError("Return has already been received for this shipment")
+
+    now = datetime.now(timezone.utc)
+
+    async def transaction(session):
+        order = await resolve_doc(db.purchase_orders, shipment.get("purchase_order_id"), "Purchase Order", session=session)
+        inv_id = order.get("inventory_id")
+        if not inv_id or not ObjectId.is_valid(inv_id):
+            raise ConflictError("Return requires a valid inventory allocation")
+
+        inventory = await db.inventory_items.find_one({"_id": ObjectId(inv_id)}, session=session)
+        if not inventory or inventory.get("batch_id") != order.get("batch_id"):
+            raise ConflictError("Order inventory allocation changed")
+
+        warehouse = await resolve_doc(db.warehouses, inventory.get("warehouse_id"), "Warehouse", session=session)
+        if current_user["role"] == UserRole.WAREHOUSE_MANAGER and warehouse.get("manager_id") != current_user["sub"]:
+            raise ForbiddenError("Return belongs to another warehouse")
+
+        cold_storage = inventory.get("cold_storage")
+        if cold_storage is None:
+            cold_storage = bool(warehouse.get("has_refrigeration"))
+
+        total_ret_float = float(total_returned_parts)
+        await check_capacity(db, inventory.get("warehouse_id"), total_ret_float, cold_storage, session)
+
+        claim = await db.shipments.update_one(
+            {"_id": shipment["_id"], "return_received_at": None},
+            {"$set": {
+                "return_received_at": now,
+                "return_received_by": current_user["sub"],
+                "returned_quantity_kg": total_ret_float,
+                "returned_usable_quantity_kg": data.usable_quantity_kg,
+                "returned_damaged_quantity_kg": data.damaged_quantity_kg,
+                "returned_rejected_quantity_kg": data.rejected_quantity_kg,
+                "return_condition": data.condition.strip(),
+                "return_disposition": data.disposition_notes.strip() if data.disposition_notes else None,
+                "updated_at": now
+            }}, session=session
+        )
+        if not claim.matched_count:
+            raise ConflictError("Return was already recorded or shipment changed")
+
+        # 1. Usable quantity handling
+        if data.usable_quantity_kg > 0:
+            if order.get("status") in ("CANCELLED", "FAILED"):
+                await release_stock(db, inv_id, data.usable_quantity_kg, session)
+                inv_fresh = await db.inventory_items.find_one({"_id": ObjectId(inv_id)}, session=session)
+                prev_avail = inventory["available_kg"]
+                new_avail = inv_fresh["available_kg"]
+                mov_type = "RETURN_RECEIPT_USABLE"
+            else:
+                prev_avail = inventory["available_kg"]
+                new_avail = inventory["available_kg"]
+                mov_type = "RETURN_RECEIPT_RESERVED"
+
+            await db.inventory_movements.insert_one({
+                "type": mov_type, "inventory_id": inv_id,
+                "batch_id": order.get("batch_id"), "warehouse_id": inventory.get("warehouse_id"),
+                "quantity_kg": data.usable_quantity_kg,
+                "previous_available_kg": prev_avail,
+                "new_available_kg": new_avail,
+                "actor_id": current_user["sub"], "actor_role": current_user["role"],
+                "reference_type": "SHIPMENT", "reference_id": str(shipment["_id"]),
+                "reason": f"Usable return: {data.condition.strip()}",
+                "created_at": now
+            }, session=session)
+
+        # 2. Damaged quantity handling
+        if data.damaged_quantity_kg > 0:
+            damaged_g = kilograms_to_grams(data.damaged_quantity_kg)
+            await db.inventory_items.update_one(
+                {"_id": ObjectId(inv_id)},
+                {"$inc": {"damaged_kg": data.damaged_quantity_kg, "damaged_g": damaged_g}, "$set": {"updated_at": now}},
+                session=session
+            )
+            await db.inventory_movements.insert_one({
+                "type": "RETURN_RECEIPT_DAMAGED", "inventory_id": inv_id,
+                "batch_id": order.get("batch_id"), "warehouse_id": inventory.get("warehouse_id"),
+                "quantity_kg": data.damaged_quantity_kg,
+                "previous_available_kg": inventory["available_kg"],
+                "new_available_kg": inventory["available_kg"],
+                "actor_id": current_user["sub"], "actor_role": current_user["role"],
+                "reference_type": "SHIPMENT", "reference_id": str(shipment["_id"]),
+                "reason": f"Damaged return: {data.condition.strip()}",
+                "created_at": now
+            }, session=session)
+
+        # 3. Rejected quantity handling
+        if data.rejected_quantity_kg > 0:
+            rejected_g = kilograms_to_grams(data.rejected_quantity_kg)
+            await db.inventory_items.update_one(
+                {"_id": ObjectId(inv_id)},
+                {"$inc": {"rejected_kg": data.rejected_quantity_kg, "rejected_g": rejected_g}, "$set": {"updated_at": now}},
+                session=session
+            )
+            await db.inventory_movements.insert_one({
+                "type": "RETURN_RECEIPT_REJECTED", "inventory_id": inv_id,
+                "batch_id": order.get("batch_id"), "warehouse_id": inventory.get("warehouse_id"),
+                "quantity_kg": data.rejected_quantity_kg,
+                "previous_available_kg": inventory["available_kg"],
+                "new_available_kg": inventory["available_kg"],
+                "actor_id": current_user["sub"], "actor_role": current_user["role"],
+                "reference_type": "SHIPMENT", "reference_id": str(shipment["_id"]),
+                "reason": f"Rejected return: {data.condition.strip()}",
+                "created_at": now
+            }, session=session)
+
+        non_resellable = float(Decimal(str(data.damaged_quantity_kg)) + Decimal(str(data.rejected_quantity_kg)))
+        if non_resellable > 0 and order.get("status") == "ACCEPTED":
+            await db.purchase_orders.update_one(
+                {"_id": order["_id"]},
+                {"$inc": {"accepted_quantity_kg": -non_resellable}, "$set": {"updated_at": now}},
+                session=session
+            )
+
+        await append_ledger_block(
+            db, event_type=LedgerEventType.SHIPMENT_RETURN_RECEIVED,
+            entity_type="SHIPMENT", entity_id=str(shipment["_id"]),
+            actor_id=current_user["sub"], actor_role=current_user["role"],
+            event_summary=f"Shipment return received ({total_ret_float}kg: usable={data.usable_quantity_kg}kg, damaged={data.damaged_quantity_kg}kg, rejected={data.rejected_quantity_kg}kg)",
+            payload={
+                "quantity_kg": total_ret_float,
+                "usable_kg": data.usable_quantity_kg,
+                "damaged_kg": data.damaged_quantity_kg,
+                "rejected_kg": data.rejected_quantity_kg,
+                "condition": data.condition.strip(),
+                "disposition": data.disposition_notes,
+            }, session=session
+        )
+
         return await db.shipments.find_one({"_id": shipment["_id"]}, session=session)
 
     return to_response(ShipmentResponse, _shipment_response(await run_in_txn(transaction)))

@@ -125,11 +125,22 @@ async def test_short_load_keeps_stock_reserved(monkeypatch):
         yield object()
 
     shipment_id = ObjectId()
+    po_id = ObjectId()
+    inv_id = ObjectId()
     shipment = {"_id": shipment_id, "shipment_id": "S-1", "status": "DRIVER_ASSIGNED",
-                "cargo_quantity_kg": 100, "total_cargo_weight_kg": 100, "batch_ids": ["batch"]}
+                "cargo_quantity_kg": 100, "total_cargo_weight_kg": 100, "batch_ids": ["batch"],
+                "purchase_order_id": str(po_id)}
+    po = {"_id": po_id, "status": "ACCEPTED", "accepted_quantity_kg": 100, "inventory_id": str(inv_id), "batch_id": "batch"}
+    inv = {"_id": inv_id, "batch_id": "batch", "accepted_kg": 100.0, "available_kg": 0.0,
+           "accepted_g": 100000, "available_g": 0, "warehouse_id": "wh-1"}
     database = MagicMock()
     database.shipments.find_one = AsyncMock(return_value=shipment)
-    database.inventory_items.find_one = AsyncMock()
+    database.purchase_orders.find_one = AsyncMock(return_value=po)
+    database.purchase_orders.update_one = AsyncMock(return_value=MagicMock(matched_count=1))
+    database.inventory_items.find_one = AsyncMock(return_value=inv)
+    database.inventory_items.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
+    database.inventory_movements.insert_one = AsyncMock()
+    database.shipment_items.update_one = AsyncMock(return_value=MagicMock(matched_count=1))
     monkeypatch.setattr(shipments, "assert_can_view_shipment", AsyncMock())
     monkeypatch.setattr(shipments, "run_in_txn", lambda callback: callback(object()))
     transition = AsyncMock(return_value=shipment)
@@ -139,7 +150,7 @@ async def test_short_load_keeps_stock_reserved(monkeypatch):
                                   {"role": UserRole.ADMIN, "sub": "admin"}, database)
     assert transition.await_args.kwargs["extra_updates"]["loaded_weight_kg"] == 90
     assert "total_cargo_weight_kg" not in transition.await_args.kwargs["extra_updates"]
-    database.inventory_items.find_one.assert_not_awaited()
+    database.inventory_movements.insert_one.assert_awaited()
 
 
 @pytest.mark.asyncio

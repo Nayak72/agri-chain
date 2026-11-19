@@ -23,6 +23,13 @@ async def reconcile(db):
     for order in await db.purchase_orders.find({"status": {"$in": list(CONSUMING_ORDER_STATUSES)}}).to_list(None):
         quantity = float(order.get("accepted_quantity_kg") or order.get("requested_quantity_kg") or 0)
         consumed[str(order.get("batch_id"))] += quantity
+
+    # Account for returned goods that restored available stock
+    for return_mov in await db.inventory_movements.find({"type": "RETURN_RECEIPT_USABLE"}).to_list(None):
+        qty = float(return_mov.get("quantity_kg", 0))
+        batch_id = str(return_mov.get("batch_id"))
+        consumed[batch_id] = max(0.0, consumed[batch_id] - qty)
+
     stock = defaultdict(lambda: {"accepted": 0.0, "available": 0.0})
     for item in await db.inventory_items.find({}).to_list(None):
         batch_id = str(item.get("batch_id"))
@@ -30,6 +37,15 @@ async def reconcile(db):
         available = float(item.get("available_kg", 0))
         if accepted < 0 or available < -1e-6 or available > accepted + 1e-6:
             violations.append(f"inventory {item['_id']}: invalid accepted/available balance")
+        if "accepted_g" in item and "available_g" in item:
+            acc_g = item.get("accepted_g")
+            avail_g = item.get("available_g")
+            if not isinstance(acc_g, int) or not isinstance(avail_g, int) or not (0 <= avail_g <= acc_g):
+                violations.append(f"inventory {item['_id']}: invalid gram balances accepted_g={acc_g}, available_g={avail_g}")
+            if round(accepted * 1000) != acc_g:
+                violations.append(f"inventory {item['_id']}: accepted_kg cache ({accepted}) mismatch with accepted_g ({acc_g})")
+            if round(available * 1000) != avail_g:
+                violations.append(f"inventory {item['_id']}: available_kg cache ({available}) mismatch with available_g ({avail_g})")
         stock[batch_id]["accepted"] += accepted
         stock[batch_id]["available"] += available
     for batch_id, balance in stock.items():

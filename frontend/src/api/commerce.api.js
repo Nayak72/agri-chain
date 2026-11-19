@@ -58,6 +58,7 @@ export const shipmentsApi = {
   outForDelivery: (id) => apiClient.post(`/shipments/${id}/out-for-delivery`),
   cancel: (id, reason) => apiClient.post(`/shipments/${id}/cancel`, { reason }),
   receiveReturn: (id, data) => apiClient.post(`/shipments/${id}/return-receipt`, data),
+  receivePartialReturn: (id, data) => apiClient.post(`/shipments/${id}/partial-return`, data),
 }
 
 export const checkpointsApi = {

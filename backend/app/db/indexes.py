@@ -80,6 +80,7 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     # Inventory movements
     await _create_index_safe(db.inventory_movements, [("inventory_id", 1), ("created_at", 1)])
     await _create_index_safe(db.inventory_movements, [("reference_type", 1), ("reference_id", 1)])
+    await _create_index_safe(db.inventory_movements, [("reference_type", 1), ("reference_id", 1), ("type", 1)], unique=True, sparse=True)
     
     # Purchase orders
     await _create_index_safe(db.purchase_orders, "order_id", unique=True)

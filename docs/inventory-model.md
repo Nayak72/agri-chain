@@ -2,123 +2,110 @@
 
 ## 1. Core Conservation Law
 
-Every kilogram of produce received into AgriChain is strictly accounted for across mutually exclusive inventory buckets. At all times and after every state transition or stock movement, the inventory conservation equation holds:
+Every gram of produce received into AgriChain is strictly accounted for across mutually exclusive inventory buckets. At all times and after every state transition or stock movement, the inventory conservation equation holds:
 
 $$\text{Received Total} = \text{Available} + \text{Reserved} + \text{Dispatched} + \text{Delivered} + \text{Damaged} + \text{Rejected}$$
 
-Each quantity is a non-negative real number ($\ge 0.0$ kg) rounded to 2 decimal places.
+### 1.1 Authoritative Integer-Gram Representation
+AgriChain uses an **authoritative integer-gram quantity model** (`_g` fields) across all balance calculations and ledger records:
+- Authoritative fields: `accepted_g`, `available_g`, `reserved_g`, `damaged_g`, `rejected_g`.
+- Base unit: **Whole grams** ($1\text{ g} = 0.001\text{ kg}$).
+- Input validation: All API inputs require finite, non-negative numbers with precision up to whole grams (`multiple_of=0.001`). Sub-gram fractional quantities, negative numbers, `NaN`, and `Infinity` are strictly rejected by the schema layer rather than silently rounded.
+- Kilogram compatibility: Kilogram values (`accepted_kg`, `available_kg`, etc.) are computed on-demand or as derived read-only fields (`g / 1000.0`). Kilogram fields are never maintained as independently writable sources of truth.
+
+---
 
 ## 2. Bucket Definitions
 
-| Bucket | Definition |
-|---|---|
-| **Available** | Produce physically in the warehouse, quality inspected and passed, available for new purchase orders or allocations. |
-| **Reserved** | Produce committed to an active purchase order / shipment booking, sequestered to prevent overselling. |
-| **Dispatched** | Produce loaded onto an assigned transport vehicle and currently in transit. |
-| **Delivered** | Produce successfully received and signed off by the buyer at destination. |
-| **Damaged** | Produce spoiled, deteriorated, or physically damaged (either at intake, in storage, or during transit). |
-| **Rejected** | Produce failing quality inspection criteria (substandard grade, foreign matter, pesticide residue) or rejected by the buyer on delivery. |
+| Bucket | Authoritative Field | Definition |
+|---|---|---|
+| **Available** | `available_g` | Produce physically in the warehouse, QC inspected and passed, uncommitted and available for purchase order allocation. |
+| **Reserved** | `reserved_g` | Produce committed to an accepted purchase order, sequestered to prevent double-selling. |
+| **Dispatched** | `loaded_weight_g` (shipment) | Produce physically loaded onto an active transport vehicle and in transit. |
+| **Delivered** | `delivered_quantity_kg` (report) | Produce accepted and signed off by the buyer at destination. |
+| **Damaged** | `damaged_g` | Produce spoiled or deteriorated at intake, during storage, or returned damaged from transit. |
+| **Rejected** | `rejected_g` | Produce failing quality inspection or rejected by the buyer on delivery and returned to the warehouse. |
 
-## 3. Allowed Bucket Transitions
+---
 
-All stock movements are atomic and strictly conserve total mass:
+## 3. Stock Movement Ledger & Allowed Bucket Transitions
+
+All physical stock changes execute within an atomic MongoDB transaction (`run_in_txn`) and record an immutable entry in `inventory_movements`.
 
 ```
-                  +----------------------------------------------+
-                  |               Intake / Receipt               |
-                  +----------------------------------------------+
-                               /          |          \
-                 (Passed QC)  /      (Damaged) \      \ (Failed QC)
-                             v                  v      v
-+-------------------> [AVAILABLE] --------> [DAMAGED] [REJECTED]
-|                         |       (Spoilage)    ^          ^
-|           (Reserve PO)  |                     |          |
-|                         v                     |          |
-|                    [RESERVED]                 |          |
-|                         |                     |          |
-|             (Dispatch)  |                     |          |
-|                         v                     |          |
-|                   [DISPATCHED]                |          |
-|                    /    |    \                |          |
-|     (Return Usable)     |     \ (Return Bad)  |          |
-+-------------------------+      +--------------+----------+
-                          |
-             (Delivery)   |
-                          v
-                     [DELIVERED]
+                    ┌──────────────────────────────────────────────┐
+                    │              Warehouse Intake                │
+                    └──────────────────────┬───────────────────────┘
+                                           │ QC Inspection
+                       ┌───────────────────┼───────────────────┐
+                       ▼ (Passed QC)       ▼ (Intake Damage)   ▼ (Failed QC)
+                ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+  ┌────────────►│  AVAILABLE   │    │   DAMAGED    │    │   REJECTED   │
+  │             └──────┬───────┘    └──────▲───────┘    └──────▲───────┘
+  │                    │                   │                   │
+  │ Short Load Release │ Order Accept      │                   │
+  ├────────────────────┤                   │                   │
+  │                    ▼                   │                   │
+  │             ┌──────────────┐           │                   │
+  │             │   RESERVED   │           │                   │
+  │             └──────┬───────┘           │                   │
+  │                    │ Dispatch          │                   │
+  │                    ▼                   │                   │
+  │             ┌──────────────┐           │                   │
+  │             │  DISPATCHED  │           │                   │
+  │             └──────┬───────┘           │                   │
+  │                    │                   │                   │
+  │ Return Usable      ├─ Return Damaged ──┘                   │
+  └────────────────────┼─ Return Rejected ─────────────────────┘
+                       │ Delivery Signoff
+                       ▼
+                ┌──────────────┐
+                │  DELIVERED   │
+                └──────────────┘
 ```
 
-### Transition Matrix
+### 3.1 Movement Types
+| Movement Type | Event Source | Physical Balance Effect | Concurrency Reference |
+|---|---|---|---|
+| `RECEIPT` | Warehouse intake | `+available_g` (or `+damaged_g`, `+rejected_g`) | Warehouse Receipt ID |
+| `SHORT_LOAD_RELEASE` | Shipment load | `+available_g`, `-reserved_g` (shortfall) | Shipment ID |
+| `DISPATCH` | Shipment depart | Decouples custody; decrements warehouse occupancy | Shipment ID |
+| `RETURN_RECEIPT_USABLE` | Cancelled / rejected return | `+available_g`, restores stock if order cancelled | Shipment ID |
+| `RETURN_RECEIPT_RESERVED`| Active order return | Restores stock to reservation for redelivery | Shipment ID |
+| `RETURN_RECEIPT_DAMAGED`| Damaged return | `+damaged_g`, reduces order reservation | Shipment ID |
+| `RETURN_RECEIPT_REJECTED`| Rejected delivery return | `+rejected_g`, reduces order reservation | Shipment ID |
+| `OPENING_BALANCE` | Historical migration | Establishes immutable baseline for legacy rows | Inventory Item ID |
 
-1. **Intake / Receipt**:
-   - `received_total += input_kg`
-   - `available += accepted_kg`
-   - `damaged += damaged_kg`
-   - `rejected += rejected_kg`
-   - Requirement: `input_kg == accepted_kg + damaged_kg + rejected_kg`.
+### 3.2 Duplicate Prevention & Concurrency Control
+To prevent duplicate movements during network retries or concurrent requests:
+1. Compound unique index: `[("reference_type", 1), ("reference_id", 1), ("type", 1)]` (sparse=True).
+2. Optimistic concurrency control: updates check state invariants (`return_received_at: None`, `capacity_revision`).
 
-2. **Reservation (`RESERVE`)**:
-   - Precondition: `available >= quantity_kg`
-   - `available -= quantity_kg`
-   - `reserved += quantity_kg`
+---
 
-3. **Release (`RELEASE`)**:
-   - Precondition: `reserved >= quantity_kg`
-   - `reserved -= quantity_kg`
-   - `available += quantity_kg`
+## 4. Warehouse & Cold-Storage Capacity Enforcement
 
-4. **Dispatch (`DISPATCH`)**:
-   - Precondition: `reserved >= quantity_kg` (or `available >= quantity_kg` if unreserved)
-   - `reserved -= quantity_kg`
-   - `dispatched += quantity_kg`
+Warehouse physical occupancy is calculated transactionally as:
 
-5. **Delivery (`DELIVER`)**:
-   - Precondition: `dispatched >= quantity_kg`
-   - `dispatched -= quantity_kg`
-   - `delivered += quantity_kg`
+$$\text{Occupancy} = \sum \text{accepted\_kg} - \sum (\text{DISPATCH} - \text{ALL\_RETURNS})$$
 
-6. **Return - Reusable (`RETURN_REUSABLE`)**:
-   - Precondition: `dispatched >= quantity_kg` (or `delivered >= quantity_kg`)
-   - `dispatched -= quantity_kg`
-   - `available += quantity_kg`
+Where $\text{ALL\_RETURNS}$ includes:
+- `RETURN_RECEIPT_USABLE`
+- `RETURN_RECEIPT_RESERVED`
+- `RETURN_RECEIPT_DAMAGED`
+- `RETURN_RECEIPT_REJECTED`
 
-7. **Return - Damaged (`RETURN_DAMAGED`)**:
-   - Precondition: `dispatched >= quantity_kg`
-   - `dispatched -= quantity_kg`
-   - `damaged += quantity_kg`
+### 4.1 Cold-Storage Classification Rules
+- **Mandatory Cold Storage**: If a batch has `requires_cold_storage: true` OR the produce handling profile specifies `max_temp_c <= 10.0`, the warehouse operator cannot bypass cold storage. Intake into a non-refrigerated warehouse or selection of ambient storage is strictly blocked.
+- **Legacy Safety Rule**: Inventory items without explicit cold storage classifications default to refrigerated accounting in cold-storage warehouses, guaranteeing capacity is never understated.
+- **Capacity Floors**: Decreasing configured warehouse capacity below currently recorded physical occupancy is prevented transactionally.
 
-8. **Return - Rejected (`RETURN_REJECTED`)**:
-   - Precondition: `dispatched >= quantity_kg`
-   - `dispatched -= quantity_kg`
-   - `rejected += quantity_kg`
+---
 
-9. **Storage Spoilage (`STORAGE_DAMAGE`)**:
-   - Precondition: `available >= quantity_kg`
-   - `available -= quantity_kg`
-   - `damaged += quantity_kg`
+## 5. Migration & Reconciliation Tools
 
-10. **Storage Rejection (`STORAGE_REJECT`)**:
-    - Precondition: `available >= quantity_kg`
-    - `available -= quantity_kg`
-    - `rejected += quantity_kg`
-
-## 4. Invariant Assertion Function
-
-```python
-def assert_inventory_invariant(item: dict) -> None:
-    received = round(float(item.get("received_total_kg", item.get("quantity_kg", 0.0))), 2)
-    available = round(float(item.get("available_quantity_kg", item.get("quantity_kg", 0.0))), 2)
-    reserved = round(float(item.get("reserved_quantity_kg", 0.0)), 2)
-    dispatched = round(float(item.get("dispatched_quantity_kg", 0.0)), 2)
-    delivered = round(float(item.get("delivered_quantity_kg", 0.0)), 2)
-    damaged = round(float(item.get("damaged_quantity_kg", 0.0)), 2)
-    rejected = round(float(item.get("rejected_quantity_kg", 0.0)), 2)
-
-    total_buckets = round(available + reserved + dispatched + delivered + damaged + rejected, 2)
-    if abs(received - total_buckets) > 0.01:
-        raise AssertionError(
-            f"Inventory invariant violation: received={received} != buckets_sum={total_buckets} "
-            f"(avail={available}, res={reserved}, disp={dispatched}, deliv={delivered}, dam={damaged}, rej={rejected})"
-        )
-```
-
+| Script | Purpose | Execution Mode | Safety Guarantee |
+|---|---|---|---|
+| `scripts/backfill_inventory_movements.py` | Creates truthful `OPENING_BALANCE` movements for legacy inventory without movement histories. | Dry-run first (`--apply` required) | Idempotent, locks item in transaction, does not invent historical dispatches. |
+| `scripts/migrate_inventory_grams.py` | Migrates kilogram inventory balances to authoritative integer grams (`_g`). | Dry-run first (`--apply` required) | Fails closed on fractional-gram rows; skips already migrated items; never rounds silently. |
+| `scripts/reconcile.py` | Full database reconciliation auditor. | Read-only verification | Audits whole-gram parity, bucket balance conservation, movement ledger integrity, and warehouse capacity. |

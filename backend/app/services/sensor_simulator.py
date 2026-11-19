@@ -38,7 +38,7 @@ def classify_reading(reading: dict, previous: dict | None) -> str:
 def generate_stateless_reading(shipment_id: str, produce_type: str, scenario: str, step: int) -> dict:
     """Generate reproducible simulated values for a persisted sequence position."""
     if scenario not in ("NORMAL", "TEMP_EXCURSION", "HUMIDITY_EXCURSION", "DOOR_OPEN_EVENT",
-                        "REFRIGERATION_FAILURE", "RECOVERY_AFTER_EXCURSION") or step < 0:
+                        "REFRIGERATION_FAILURE", "RECOVERY_AFTER_EXCURSION", "TRANSIT_DELAY") or step < 0:
         raise ValueError("Unsupported scenario or reading index")
     profile = PRODUCE_HANDLING_PROFILES.get(produce_type, PRODUCE_HANDLING_PROFILES["TOMATO"])
     rng = random.Random(f"{shipment_id}:{scenario}:{step}")
@@ -57,11 +57,14 @@ def generate_stateless_reading(shipment_id: str, produce_type: str, scenario: st
         temperature = high + 0.5 + (step - 3) * 0.8
     if scenario == "RECOVERY_AFTER_EXCURSION" and step < 5:
         temperature = high + max(0, 3 - step * 0.75)
-    if scenario == "NORMAL":
+    if scenario in ("NORMAL", "TRANSIT_DELAY"):
         temperature = min(high, max(low, temperature))
         humidity = min(humidity_high, max(humidity_low, humidity))
     temperature, humidity = round(temperature, 1), round(min(100, max(0, humidity)), 1)
-    return {"temperature": temperature, "humidity": humidity,
+    reading = {"temperature": temperature, "humidity": humidity,
             "configured_temp_min": low, "configured_temp_max": high,
             "configured_humidity_min": humidity_low, "configured_humidity_max": humidity_high,
             "status": "CRITICAL" if temperature < low or temperature > high or humidity < humidity_low or humidity > humidity_high else "NORMAL"}
+    if scenario == "TRANSIT_DELAY":
+        reading["simulated_delay"] = True
+    return reading

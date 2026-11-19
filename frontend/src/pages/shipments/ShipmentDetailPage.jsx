@@ -52,6 +52,12 @@ export default function ShipmentDetailPage() {
   const [actualPackageCount, setActualPackageCount] = useState('100')
   const [returnCondition, setReturnCondition] = useState('')
   const [returnInspected, setReturnInspected] = useState(false)
+  const [returnMode, setReturnMode] = useState('full')
+  const [partialUsable, setPartialUsable] = useState('')
+  const [partialDamaged, setPartialDamaged] = useState('0')
+  const [partialRejected, setPartialRejected] = useState('0')
+  const [partialDisposition, setPartialDisposition] = useState('')
+  const [returnReceivedBy, setReturnReceivedBy] = useState(user?.full_name || '')
 
   // Checkpoint Modal
   const [showCheckpointModal, setShowCheckpointModal] = useState(false)
@@ -152,6 +158,24 @@ export default function ShipmentDetailPage() {
       setActionError('')
     },
     onError: err => setActionError(getApiError(err, 'Failed to record return.').message),
+  })
+
+  const partialReturnMutation = useMutation({
+    mutationFn: () => shipmentsApi.receivePartialReturn(id, {
+      usable_quantity_kg: parseFloat(partialUsable) || 0,
+      damaged_quantity_kg: parseFloat(partialDamaged) || 0,
+      rejected_quantity_kg: parseFloat(partialRejected) || 0,
+      condition: returnCondition.trim(),
+      disposition_notes: partialDisposition.trim() || undefined,
+      received_by: returnReceivedBy.trim() || (user?.full_name || 'Warehouse Operator'),
+      inspected_usable: returnInspected,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shipment', id] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      setActionError('')
+    },
+    onError: err => setActionError(getApiError(err, 'Failed to record partial return.').message),
   })
 
   // Load mutation
@@ -351,21 +375,109 @@ export default function ShipmentDetailPage() {
         </div>
       )}
 
-      {shipment.status === 'CANCELLED' && shipment.actual_dispatch_time && (
-        <section className="glass-panel-strong rounded-2xl border p-5 space-y-3">
-          <h2 className="font-semibold text-stone-900">Warehouse return</h2>
+      {((shipment.status === 'CANCELLED' && shipment.actual_dispatch_time) || shipment.status === 'DELIVERY_REJECTED' || shipment.status === 'PARTIALLY_DELIVERED') && (
+        <section className="glass-panel-strong rounded-2xl border p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-stone-900 text-base">Warehouse Stock Return & Reconciliation</h2>
+            {shipment.return_received_at && (
+              <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-medium">Return Completed</span>
+            )}
+          </div>
           {shipment.return_received_at ? (
-            <p className="text-sm text-stone-600">{formatWeight(shipment.returned_quantity_kg)} received on {formatDateTime(shipment.return_received_at)}. Stock remains reserved until the buyer cancels the order.</p>
+            <div className="space-y-2 text-sm text-stone-700 bg-stone-50/80 p-4 rounded-xl border border-stone-200">
+              <p className="font-medium text-stone-900">Total Returned: {formatWeight(shipment.returned_quantity_kg)} received on {formatDateTime(shipment.return_received_at)}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs font-mono">
+                <div className="p-2 rounded bg-white border border-stone-200">Usable (Stocked): <strong>{formatWeight(shipment.returned_usable_quantity_kg ?? shipment.returned_quantity_kg)}</strong></div>
+                <div className="p-2 rounded bg-white border border-stone-200">Damaged: <strong>{formatWeight(shipment.returned_damaged_quantity_kg ?? 0)}</strong></div>
+                <div className="p-2 rounded bg-white border border-stone-200">Rejected (Disposed): <strong>{formatWeight(shipment.returned_rejected_quantity_kg ?? 0)}</strong></div>
+              </div>
+              <p className="text-xs pt-1">Condition: <span className="font-mono">{shipment.return_condition}</span></p>
+              {shipment.return_disposition && <p className="text-xs">Disposition: <span className="font-mono">{shipment.return_disposition}</span></p>}
+              <p className="text-xs text-stone-500">Receiver: {shipment.return_received_by}</p>
+            </div>
           ) : can('returns:receive') ? (
-            <form className="space-y-3" onSubmit={event => { event.preventDefault(); returnMutation.mutate() }}>
-              <p className="text-sm text-stone-600">Record the full {formatWeight(shipment.loaded_weight_kg)} after physical inspection. Partial or damaged returns require a separate workflow.</p>
-              <label className="block text-sm">Condition description
-                <input className="glass-control border rounded-xl p-2 w-full" value={returnCondition} onChange={event => setReturnCondition(event.target.value)} maxLength={500} required />
-              </label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={returnInspected} onChange={event => setReturnInspected(event.target.checked)} /> I inspected all returned goods and confirm they are usable.</label>
-              <button className="glass-button rounded-xl bg-forest px-4 py-2 text-white disabled:opacity-50" disabled={!returnInspected || !returnCondition.trim() || returnMutation.isPending}>{returnMutation.isPending ? 'Recording…' : 'Record full return'}</button>
-            </form>
-          ) : <p className="text-sm text-stone-600">Awaiting warehouse inspection before the buyer can cancel the order.</p>}
+            <div className="space-y-4">
+              <div className="flex gap-2 border-b border-stone-200 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setReturnMode('full')}
+                  className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${returnMode === 'full' ? 'bg-forest text-white' : 'glass-control text-stone-600'}`}
+                >
+                  Full Usable Return
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReturnMode('partial')}
+                  className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${returnMode === 'partial' ? 'bg-forest text-white' : 'glass-control text-stone-600'}`}
+                >
+                  Partial / Graded Return
+                </button>
+              </div>
+
+              {returnMode === 'full' ? (
+                <form className="space-y-3" onSubmit={event => { event.preventDefault(); returnMutation.mutate() }}>
+                  <p className="text-sm text-stone-600">Record full return of {formatWeight(shipment.loaded_weight_kg)} as usable stock after inspection.</p>
+                  <label className="block text-sm">Condition description
+                    <input className="glass-control border rounded-xl p-2 w-full mt-1" value={returnCondition} onChange={event => setReturnCondition(event.target.value)} maxLength={500} required placeholder="e.g. Intact packaging, temperature maintained" />
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={returnInspected} onChange={event => setReturnInspected(event.target.checked)} />
+                    I inspected all returned goods and confirm they are usable.
+                  </label>
+                  <button className="glass-button rounded-xl bg-forest px-4 py-2 text-white disabled:opacity-50 text-sm font-medium" disabled={!returnInspected || !returnCondition.trim() || returnMutation.isPending}>
+                    {returnMutation.isPending ? 'Recording…' : 'Record Full Return'}
+                  </button>
+                </form>
+              ) : (
+                <form className="space-y-3" onSubmit={event => {
+                  event.preventDefault()
+                  const usable = parseFloat(partialUsable) || 0
+                  const damaged = parseFloat(partialDamaged) || 0
+                  const rejected = parseFloat(partialRejected) || 0
+                  if (usable + damaged + rejected <= 0) {
+                    setActionError('Total return weight must be greater than zero')
+                    return
+                  }
+                  if (usable > 0 && !returnInspected) {
+                    setActionError('Confirm physical inspection for usable portion')
+                    return
+                  }
+                  partialReturnMutation.mutate()
+                }}>
+                  <p className="text-sm text-stone-600">Grade returned goods into usable (resellable), damaged, and rejected (disposal) lots.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <label className="block text-xs font-mono uppercase text-stone-600">Usable (kg)
+                      <input className="glass-control border rounded-xl p-2 w-full mt-1 text-sm font-sans" type="number" step="0.001" min="0" value={partialUsable} onChange={e => setPartialUsable(e.target.value)} placeholder="0.000" />
+                    </label>
+                    <label className="block text-xs font-mono uppercase text-stone-600">Damaged (kg)
+                      <input className="glass-control border rounded-xl p-2 w-full mt-1 text-sm font-sans" type="number" step="0.001" min="0" value={partialDamaged} onChange={e => setPartialDamaged(e.target.value)} placeholder="0.000" />
+                    </label>
+                    <label className="block text-xs font-mono uppercase text-stone-600">Rejected (kg)
+                      <input className="glass-control border rounded-xl p-2 w-full mt-1 text-sm font-sans" type="number" step="0.001" min="0" value={partialRejected} onChange={e => setPartialRejected(e.target.value)} placeholder="0.000" />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="block text-sm">Condition description
+                      <input className="glass-control border rounded-xl p-2 w-full mt-1" value={returnCondition} onChange={event => setReturnCondition(event.target.value)} maxLength={500} required placeholder="Physical inspection findings" />
+                    </label>
+                    <label className="block text-sm">Disposition notes
+                      <input className="glass-control border rounded-xl p-2 w-full mt-1" value={partialDisposition} onChange={event => setPartialDisposition(event.target.value)} maxLength={500} placeholder="e.g. Restock usable, scrap damaged" />
+                    </label>
+                  </div>
+                  <label className="block text-sm">Received by
+                    <input className="glass-control border rounded-xl p-2 w-full mt-1" value={returnReceivedBy} onChange={event => setReturnReceivedBy(event.target.value)} required placeholder="Inspector / receiver name" />
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={returnInspected} onChange={event => setReturnInspected(event.target.checked)} />
+                    I physically inspected these returned goods and verified the graded quantities.
+                  </label>
+                  <button className="glass-button rounded-xl bg-forest px-4 py-2 text-white disabled:opacity-50 text-sm font-medium" disabled={!returnCondition.trim() || partialReturnMutation.isPending}>
+                    {partialReturnMutation.isPending ? 'Recording…' : 'Record Graded Return'}
+                  </button>
+                </form>
+              )}
+            </div>
+          ) : <p className="text-sm text-stone-600">Awaiting warehouse physical intake and inspection.</p>}
         </section>
       )}
 

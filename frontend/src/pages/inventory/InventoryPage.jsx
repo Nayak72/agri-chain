@@ -28,9 +28,60 @@ export default function InventoryPage() {
   const update = e => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
   const total = Number(form.accepted_weight_kg) + Number(form.damaged_weight_kg) + Number(form.rejected_weight_kg)
   return <div className="space-y-6 p-6">
-    <PageHeader title="Inventory" description="Accepted stock, available stock and warehouse receipts" />
-    <div className="flex gap-3"><button onClick={() => setTab('stock')}>Stock</button><button onClick={() => setTab('receipts')}>Receipts</button></div>
-    {tab === 'stock' && <div className="overflow-x-auto rounded-xl border glass-panel-strong"><table className="glass-data w-full text-left"><thead><tr>{['Batch', 'Warehouse', 'Produce', 'Accepted', 'Available', 'Storage', 'Shelf life end'].map(h => <th className="p-3" key={h}>{h}</th>)}</tr></thead><tbody>{stock.map(item => <tr className="border-t" key={item.id}><td className="p-3">{item.batch_id}</td><td className="p-3">{item.warehouse_id}</td><td className="p-3">{item.produce_type}</td><td className="p-3">{formatWeight(item.accepted_kg)}</td><td className="p-3">{formatWeight(item.available_kg)}</td><td className="p-3">{item.storage_location}</td><td className="p-3">{formatDate(item.estimated_shelf_life_end)}</td></tr>)}</tbody></table></div>}
+    <PageHeader title="Inventory" description="Accepted stock, available stock, cold storage classification and warehouse receipts" />
+    <div className="flex gap-2 border-b border-border pb-2">
+      <button
+        onClick={() => setTab('stock')}
+        className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'stock' ? 'bg-forest text-white' : 'glass-control text-stone-600'}`}
+      >
+        Inventory Stock
+      </button>
+      <button
+        onClick={() => setTab('receipts')}
+        className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'receipts' ? 'bg-forest text-white' : 'glass-control text-stone-600'}`}
+      >
+        Warehouse Receipts
+      </button>
+    </div>
+    {tab === 'stock' && (
+      <div className="overflow-x-auto rounded-xl border border-stone-200 glass-panel-strong shadow-xs">
+        <table className="glass-data w-full text-left text-xs font-mono">
+          <thead>
+            <tr className="border-b border-stone-200 bg-stone-50/75 text-stone-600 uppercase">
+              {['Batch ID', 'Warehouse', 'Produce', 'Accepted', 'Available', 'Damaged', 'Rejected', 'Storage Location', 'Cold Classification', 'Shelf Life End'].map(h => (
+                <th className="p-3 font-semibold" key={h}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-stone-100 text-stone-800">
+            {stock.map(item => (
+              <tr className="hover:bg-stone-50/50 transition-colors" key={item.id}>
+                <td className="p-3 font-semibold text-stone-900">{item.batch_id}</td>
+                <td className="p-3 text-stone-600 truncate max-w-[120px]">{item.warehouse_id}</td>
+                <td className="p-3 font-medium text-stone-900">{item.produce_type}</td>
+                <td className="p-3 font-semibold">{formatWeight(item.accepted_kg)}</td>
+                <td className="p-3 font-semibold text-emerald-800">{formatWeight(item.available_kg)}</td>
+                <td className="p-3 text-amber-700">{formatWeight(item.damaged_kg || 0)}</td>
+                <td className="p-3 text-rose-700">{formatWeight(item.rejected_kg || 0)}</td>
+                <td className="p-3">{item.storage_location || '—'}</td>
+                <td className="p-3">
+                  {item.cold_storage === true ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-50 text-cyan-800 border border-cyan-200">Refrigerated</span>
+                  ) : item.cold_storage === false ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-stone-100 text-stone-700">Ambient</span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-200" title="Legacy item without explicit classification; conservatively treated as cold storage in refrigerated warehouses">
+                      Unknown (cold)
+                    </span>
+                  )}
+                </td>
+                <td className="p-3 text-stone-500 whitespace-nowrap">{formatDate(item.estimated_shelf_life_end)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
     {tab === 'receipts' && <div className="space-y-5">{canReceive && <form onSubmit={e => { e.preventDefault(); if (Math.abs(Number(form.received_weight_kg) - total) > 0.000001) { setError('Received weight must equal accepted + damaged + rejected'); return } mutation.mutate() }} className="rounded-xl border glass-panel p-5 space-y-3"><h2 className="font-semibold">Record warehouse receipt</h2><select className="glass-control border rounded-xl p-2" required name="warehouse_id" value={form.warehouse_id} onChange={update}><option value="">Choose warehouse</option>{warehouses.map(w => <option value={w.id} key={w.id}>{w.name}</option>)}</select><select className="glass-control border rounded-xl p-2" required name="batch_id" value={form.batch_id} onChange={update}><option value="">Choose batch</option>{batches.filter(b => ['CREATED', 'HARVESTED'].includes(b.status)).map(b => <option value={b.id} key={b.id}>{b.batch_id}</option>)}</select>{[['received_weight_kg', 'Received kg'], ['accepted_weight_kg', 'Accepted kg'], ['damaged_weight_kg', 'Damaged kg'], ['rejected_weight_kg', 'Rejected kg']].map(([key, label]) => <label className="block" key={key}>{label}<input className="ml-2 border glass-control rounded-xl p-2" type="number" step="0.001" min="0" required name={key} value={form[key]} onChange={update} /></label>)}<select className="glass-control border rounded-xl p-2" name="inspection_result" value={form.inspection_result} onChange={update}><option value="PASSED">Passed</option><option value="FAILED">Failed</option></select><input className="border glass-control rounded-xl p-2" name="packaging_condition" value={form.packaging_condition} onChange={update} placeholder="Packaging condition" /><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.cold_storage} onChange={e => setForm(prev => ({ ...prev, cold_storage: e.target.checked }))} /> Store accepted goods in cold storage</label><input className="border glass-control rounded-xl p-2" name="storage_location" value={form.storage_location} onChange={update} placeholder="Storage location" required />{error && <p role="alert" className="text-red-700">{error}</p>}<button className="glass-button rounded-xl bg-forest px-4 py-2 text-white disabled:opacity-50" disabled={mutation.isPending}>Save receipt</button></form>}<div className="rounded-xl border glass-panel p-4">{receipts.map(r => <div key={r.id} className="border-b py-2">{r.receipt_id} · {r.batch_id} · {formatWeight(r.accepted_weight_kg)} accepted · {r.inspection_result}</div>)}</div></div>}
   </div>
 }

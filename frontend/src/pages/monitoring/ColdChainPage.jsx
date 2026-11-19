@@ -33,6 +33,7 @@ import { useAuth } from '../../context/AuthContext'
 
 const SCENARIOS = [
   { value: 'NORMAL', label: 'Normal' },
+  { value: 'TRANSIT_DELAY', label: 'Transit delay (extended journey, normal specs)' },
   { value: 'TEMP_EXCURSION', label: 'Temperature excursion' },
   { value: 'HUMIDITY_EXCURSION', label: 'Humidity excursion' },
   { value: 'DOOR_OPEN_EVENT', label: 'Door-open disturbance' },
@@ -566,7 +567,8 @@ export default function ColdChainPage() {
                   <th className="py-2.5 px-3 font-semibold">Type</th>
                   <th className="py-2.5 px-3 font-semibold">Severity</th>
                   <th className="py-2.5 px-3 font-semibold">Message</th>
-                  <th className="py-2.5 px-3 font-semibold">Status</th>
+                  <th className="py-2.5 px-3 font-semibold">Duration</th>
+                  <th className="py-2.5 px-3 font-semibold">Status / Audit</th>
                   <th className="py-2.5 px-3 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
@@ -599,17 +601,37 @@ export default function ColdChainPage() {
                       <td className="py-3 px-3 max-w-md truncate font-sans">
                         {alert.message || alert.description || 'Condition breach detected'}
                       </td>
+                      <td className="py-3 px-3 text-stone-600 whitespace-nowrap font-mono text-[11px]">
+                        {alert.created_at ? (
+                          alert.resolved_at ? (
+                            `${Math.max(1, Math.round((new Date(alert.resolved_at).getTime() - new Date(alert.created_at).getTime()) / 60000))}m`
+                          ) : (
+                            `${Math.max(1, Math.round((Date.now() - new Date(alert.created_at).getTime()) / 60000))}m (open)`
+                          )
+                        ) : '—'}
+                      </td>
                       <td className="py-3 px-3">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-medium ${
-                            alert.status === 'ACTIVE'
-                              ? 'bg-rose-50 text-rose-800 border border-rose-200'
-                              : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                          }`}
-                        >
-                          {alert.status}
-                        </span>
-                        {alert.acknowledged_at && <span className="ml-1 text-stone-600">Acknowledged</span>}
+                        <div className="flex flex-col gap-0.5">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-medium w-fit ${
+                              alert.status === 'ACTIVE'
+                                ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                                : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                            }`}
+                          >
+                            {alert.status}
+                          </span>
+                          {alert.acknowledged_at && (
+                            <span className="text-[10px] text-amber-700 font-sans">
+                              Ack: {alert.acknowledged_by ? `by ${alert.acknowledged_by}` : 'yes'}
+                            </span>
+                          )}
+                          {alert.resolved_at && (
+                            <span className="text-[10px] text-emerald-700 font-sans truncate max-w-xs" title={alert.corrective_action}>
+                              Resolved: {alert.corrective_action || 'yes'}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-3 text-right space-x-2">
 

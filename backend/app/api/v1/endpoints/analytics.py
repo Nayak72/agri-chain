@@ -38,11 +38,14 @@ class FleetMetrics(BaseModel):
 
 class FreightMetrics(BaseModel):
     total_freight_expenditure_paise: int
+    settled_freight_expenditure_paise: Optional[int] = None
+    committed_freight_expenditure_paise: Optional[int] = None
     average_freight_cost_paise: int
     freight_cost_per_kg: float
     average_quotation_value_paise: int
     transporter_wise_cost: List[dict]
     route_wise_cost: List[dict]
+    financial_semantics: Optional[dict] = None
 
 
 class QualityMetrics(BaseModel):
@@ -80,6 +83,11 @@ async def get_workspace_metrics(current_user: dict = Depends(get_current_user),
     if role == UserRole.ADMIN:
         add('farms', 'Registered farms', await db.farms.count_documents({}))
         add('batches', 'Harvest batches', await db.produce_batches.count_documents({}))
+        add('warehouses', 'Terminal warehouses', await db.warehouses.count_documents({}))
+        add('transporters', 'Registered transporters', await db.transporters.count_documents({}))
+        add('active_shipments', 'Active shipments', await db.shipments.count_documents({'status': {'$in': [
+            'DRIVER_ASSIGNED', 'LOADED', 'DISPATCHED', 'IN_TRANSIT', 'ARRIVED_AT_DESTINATION', 'OUT_FOR_DELIVERY'
+        ]}}))
         add('pending_users', 'Accounts awaiting approval', await db.users.count_documents({'is_approved': False}))
         add('alerts', 'Active shipment alerts', await db.sensor_alerts.count_documents({'status': 'ACTIVE'}))
     elif role == UserRole.FARMER:
@@ -87,11 +95,14 @@ async def get_workspace_metrics(current_user: dict = Depends(get_current_user),
         add('batches', 'My batches', await db.produce_batches.count_documents({'farmer_id': uid}))
         add('pending_orders', 'Orders awaiting my decision', await db.purchase_orders.count_documents({'seller_id': uid, 'status': 'PLACED'}))
         add('accepted_orders', 'Accepted orders', await db.purchase_orders.count_documents({'seller_id': uid, 'status': 'ACCEPTED'}))
+        add('fulfilled_orders', 'Fulfilled orders', await db.purchase_orders.count_documents({'seller_id': uid, 'status': 'FULFILLED'}))
+        add('cancelled_orders', 'Cancelled orders', await db.purchase_orders.count_documents({'seller_id': uid, 'status': 'CANCELLED'}))
     elif role == UserRole.BUYER:
         add('orders', 'My orders', await db.purchase_orders.count_documents({'buyer_id': uid}))
         add('pending_orders', 'Orders awaiting seller', await db.purchase_orders.count_documents({'buyer_id': uid, 'status': 'PLACED'}))
         add('accepted_orders', 'Accepted orders', await db.purchase_orders.count_documents({'buyer_id': uid, 'status': 'ACCEPTED'}))
         add('pending_deliveries', 'Awaiting my delivery decision', await db.shipments.count_documents({'buyer_id': uid, 'status': 'OUT_FOR_DELIVERY'}))
+        add('completed_deliveries', 'Completed orders', await db.purchase_orders.count_documents({'buyer_id': uid, 'status': 'FULFILLED'}))
     elif role == UserRole.WAREHOUSE_MANAGER:
         warehouses = await db.warehouses.find({'manager_id': uid}, {'_id': 1}).to_list(None)
         ids = [str(warehouse['_id']) for warehouse in warehouses]
@@ -102,18 +113,28 @@ async def get_workspace_metrics(current_user: dict = Depends(get_current_user),
             {'$group': {'_id': None, 'available': {'$sum': '$available_kg'}}}]).to_list(1)
         add('available_stock', 'Available stock', totals[0]['available'] if totals else 0, 'kg')
         add('receipts', 'Recorded receipts', await db.warehouse_receipts.count_documents(scope))
+        add('pending_receipts', 'Batches awaiting intake', await db.produce_batches.count_documents({'status': {'$in': ['CREATED', 'HARVESTED']}}))
+        related = await shipment_reference_scope(db, current_user)
+        add('active_alerts', 'Active alerts on assigned stock', await db.sensor_alerts.count_documents({**related, 'status': 'ACTIVE'}))
     elif role == UserRole.TRANSPORTER:
         transporter = await db.transporters.find_one({'user_id': uid}, {'_id': 1})
         scope = {'transporter_id': str(transporter['_id'])} if transporter else {'_id': {'$in': []}}
         add('available_vehicles', 'Available vehicles', await db.vehicles.count_documents({**scope, 'status': 'AVAILABLE'}))
         add('assigned_vehicles', 'Assigned vehicles', await db.vehicles.count_documents({**scope, 'status': 'ASSIGNED'}))
         add('available_drivers', 'Available drivers', await db.drivers.count_documents({**scope, 'status': 'AVAILABLE'}))
+        add('active_shipments', 'Active shipments', await db.shipments.count_documents({**scope, 'status': {'$in': [
+            'DRIVER_ASSIGNED', 'LOADED', 'DISPATCHED', 'IN_TRANSIT', 'ARRIVED_AT_DESTINATION', 'OUT_FOR_DELIVERY'
+        ]}}))
+        add('completed_shipments', 'Completed shipments', await db.shipments.count_documents({**scope, 'status': {'$in': [
+            'DELIVERED', 'PARTIALLY_DELIVERED'
+        ]}}))
         add('quotes', 'My submitted quotations', await db.freight_quotations.count_documents({**scope, 'status': 'SUBMITTED'}))
     elif role == UserRole.DRIVER:
         scope = await shipment_scope(db, current_user)
         add('assigned', 'My assigned shipments', await db.shipments.count_documents(scope))
         add('awaiting_load', 'Awaiting loading', await db.shipments.count_documents({**scope, 'status': 'DRIVER_ASSIGNED'}))
         add('in_transit', 'In transit', await db.shipments.count_documents({**scope, 'status': 'IN_TRANSIT'}))
+        add('out_for_delivery', 'Out for delivery', await db.shipments.count_documents({**scope, 'status': 'OUT_FOR_DELIVERY'}))
         related = await shipment_reference_scope(db, current_user)
         add('alerts', 'Active shipment alerts', await db.sensor_alerts.count_documents({**related, 'status': 'ACTIVE'}))
     else:
@@ -277,13 +298,26 @@ async def get_freight_analytics(
     ]
     route_costs = await db.shipments.aggregate(route_pipeline).to_list(None)
     
-    total_quoted = cost_result[0]["total_quoted"] if cost_result else 0
-    quote_count = cost_result[0]["count"] if cost_result else 0
+    total_quoted = cost_result[0].get("total_quoted", 0) if cost_result else 0
+    quote_count = cost_result[0].get("count", 0) if cost_result else 0
     avg_quote = int(total_quoted / quote_count) if quote_count > 0 else 0
     
-    total_expenditure = accepted_result[0]["total_accepted"] if accepted_result else 0
-    accepted_count = accepted_result[0]["count"] if accepted_result else 0
+    total_expenditure = accepted_result[0].get("total_accepted", 0) if accepted_result else 0
+    accepted_count = accepted_result[0].get("count", 0) if accepted_result else 0
     avg_freight = int(total_expenditure / accepted_count) if accepted_count > 0 else avg_quote
+
+    # Settled expenditure: quotations tied to completed shipments (DELIVERED, PARTIALLY_DELIVERED)
+    completed_shipments = await db.shipments.find(
+        {**shipment_query, "status": {"$in": [ShipmentStatus.DELIVERED, ShipmentStatus.PARTIALLY_DELIVERED]}},
+        {"accepted_quotation_id": 1}
+    ).to_list(None)
+    completed_quote_ids = [ObjectId(s["accepted_quotation_id"]) for s in completed_shipments if ObjectId.is_valid(s.get("accepted_quotation_id", ""))]
+    settled_res = await db.freight_quotations.aggregate([
+        {"$match": {"_id": {"$in": completed_quote_ids}}},
+        {"$group": {"_id": None, "total": {"$sum": "$total_freight_charge_paise"}}}
+    ]).to_list(1) if completed_quote_ids else []
+    settled_expenditure = settled_res[0]["total"] if settled_res else 0
+    committed_expenditure = max(0, total_expenditure - settled_expenditure)
     
     # Delivered weight for cost per kg
     weight_res = await db.delivery_reports.aggregate([
@@ -293,13 +327,24 @@ async def get_freight_analytics(
     total_kg = weight_res[0]["total"] if weight_res else 0
     cost_per_kg = round((total_expenditure / 100) / total_kg, 2) if total_kg > 0 else 0.0
     
+    financial_semantics = {
+        "currency": "INR",
+        "smallest_unit": "paise (1/100 INR)",
+        "settled_expenditure_criteria": "Accepted quotations for delivered shipments (DELIVERED, PARTIALLY_DELIVERED)",
+        "committed_expenditure_criteria": "Accepted quotations for active or pending shipments",
+        "cancellations": "Excluded from settled expenditure; refunded/voided upon shipment cancellation",
+    }
+
     return {
         "total_freight_expenditure_paise": total_expenditure,
+        "settled_freight_expenditure_paise": settled_expenditure,
+        "committed_freight_expenditure_paise": committed_expenditure,
         "average_freight_cost_paise": avg_freight,
         "freight_cost_per_kg": cost_per_kg,
         "average_quotation_value_paise": avg_quote,
         "transporter_wise_cost": transporter_costs,
         "route_wise_cost": [{"route": f"{r['_id']['origin']} → {r['_id']['dest']}", "shipments": r["count"], "weight_kg": r["total_weight"]} for r in route_costs if r.get("_id")],
+        "financial_semantics": financial_semantics,
     }
 
 

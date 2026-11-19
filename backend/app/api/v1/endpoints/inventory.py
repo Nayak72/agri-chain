@@ -83,8 +83,13 @@ async def create_warehouse_receipt(
         raise ValidationError("Received weight must exactly equal sum of accepted, damaged, and rejected weights")
     if receipt_data.inspection_result == InspectionResult.FAILED and receipt_data.accepted_weight_kg > 0:
         raise ValidationError("Failed inspections cannot create accepted inventory")
-    if batch.get("requires_cold_storage") and not receipt_data.cold_storage:
-        raise ValidationError("This batch requires cold storage")
+    batch_requires_cold = bool(batch.get("requires_cold_storage"))
+    if not batch_requires_cold:
+        profile = PRODUCE_HANDLING_PROFILES.get(batch.get("produce_type"))
+        if profile and profile.get("max_temp_c", 25) <= 10:
+            batch_requires_cold = True
+    if batch_requires_cold and not receipt_data.cold_storage:
+        raise ValidationError("This batch requires cold storage and cannot be stored at ambient temperatures")
     
     receipt_id = f"WR-{warehouse_id[:8]}-{uuid.uuid4().hex[:8].upper()}"
     now = datetime.now(timezone.utc)
@@ -139,8 +144,12 @@ async def create_warehouse_receipt(
             "produce_type": batch["produce_type"],
             "accepted_kg": receipt_data.accepted_weight_kg,
             "available_kg": receipt_data.accepted_weight_kg,
+            "damaged_kg": receipt_data.damaged_weight_kg,
+            "rejected_kg": receipt_data.rejected_weight_kg,
             "accepted_g": kilograms_to_grams(receipt_data.accepted_weight_kg),
             "available_g": kilograms_to_grams(receipt_data.accepted_weight_kg),
+            "damaged_g": kilograms_to_grams(receipt_data.damaged_weight_kg),
+            "rejected_g": kilograms_to_grams(receipt_data.rejected_weight_kg),
             "balance_unit": "g",
             "status": InventoryStatus.AVAILABLE.value if hasattr(InventoryStatus.AVAILABLE, "value") else InventoryStatus.AVAILABLE,
             "storage_location": receipt_data.storage_location,
@@ -218,6 +227,8 @@ class InventoryItemResponse(BaseModel):
     produce_type: ProduceType
     accepted_kg: float
     available_kg: float
+    damaged_kg: float = 0.0
+    rejected_kg: float = 0.0
     status: InventoryStatus
     storage_location: Optional[str] = None
     cold_storage: Optional[bool] = None

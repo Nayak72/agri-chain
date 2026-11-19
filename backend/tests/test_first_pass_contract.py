@@ -12,30 +12,54 @@ from app.core.constants import UserRole
 
 @pytest.mark.asyncio
 async def test_stock_reservation_is_conditional_and_single_counter():
-    db = MagicMock()
-    db.inventory_items.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
     inv_id = str(ObjectId())
+    db = MagicMock()
+    # ensure_gram_balance needs find_one to return a doc with accepted_kg/available_kg
+    inventory_doc = {
+        "_id": ObjectId(inv_id),
+        "accepted_kg": 100.0,
+        "available_kg": 100.0,
+        "accepted_g": 100000,
+        "available_g": 100000,
+    }
+    db.inventory_items.find_one = AsyncMock(return_value=inventory_doc)
+    db.inventory_items.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
     session = object()
     await reserve_stock(db, inv_id, 25, session)
-    query, update = db.inventory_items.update_one.await_args.args
-    assert query == {"_id": ObjectId(inv_id), "available_kg": {"$gte": 25}}
-    assert update["$inc"] == {"available_kg": -25}
+    # reserve_stock uses update_one with available_g filter (gram-balance)
+    # Verify update_one was called at least once and the reserve call used available_g
+    assert db.inventory_items.update_one.await_count >= 1
+    # Last call is the actual reserve (after ensure_gram_balance may also call update_one)
+    last_query, last_update = db.inventory_items.update_one.await_args.args
+    assert last_query == {"_id": ObjectId(inv_id), "available_g": {"$gte": 25000}}
+    # Pipeline update sets available_g and available_kg via subtract
+    assert isinstance(last_update, list)
     assert db.inventory_items.update_one.await_args.kwargs["session"] is session
 
 
 @pytest.mark.asyncio
 async def test_reservation_rejects_shortage_and_release_has_ceiling():
-    db = MagicMock()
-    db.inventory_items.update_one = AsyncMock(return_value=MagicMock(modified_count=0))
-    db.inventory_items.find_one = AsyncMock(return_value={"available_kg": 10})
     inv_id = str(ObjectId())
+    db = MagicMock()
+    inventory_doc = {
+        "_id": ObjectId(inv_id),
+        "accepted_kg": 10.0,
+        "available_kg": 10.0,
+        "accepted_g": 10000,
+        "available_g": 10000,
+    }
+    db.inventory_items.find_one = AsyncMock(return_value=inventory_doc)
+    # reserve: update_one returns modified_count=0 (insufficient stock)
+    # release: update_one returns modified_count=0 (ceiling exceeded)
+    db.inventory_items.update_one = AsyncMock(return_value=MagicMock(modified_count=0))
     with pytest.raises(InsufficientStockError):
         await reserve_stock(db, inv_id, 50, object())
     with pytest.raises(ConflictError):
         await release_stock(db, inv_id, 50, object())
-    query, update = db.inventory_items.update_one.await_args.args
-    assert query["$expr"] == {"$lte": [{"$add": ["$available_kg", 50]}, "$accepted_kg"]}
-    assert update["$inc"] == {"available_kg": 50}
+    # Verify the release update used $expr ceiling with accepted_g
+    last_query, last_update = db.inventory_items.update_one.await_args.args
+    assert last_query["$expr"] == {"$lte": [{"$add": ["$available_g", 50000]}, "$accepted_g"]}
+    assert isinstance(last_update, list)
 
 
 def test_reduced_shipment_state_machine_is_closed():
