@@ -246,7 +246,7 @@ select.glass-control option { background: var(--color-ivory); color: var(--color
   position: absolute; left: 0; top: 0; pointer-events: none; border-radius: .75rem;
   background: linear-gradient(110deg, rgba(167,187,163,.32), rgba(145,166,140,.16));
   box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 0 0 1px rgba(167,187,163,.24), 0 4px 14px rgba(0,0,0,.09);
-  transition: transform 340ms var(--motion-ease), width 300ms var(--motion-ease), height 300ms var(--motion-ease);
+  transition: transform 240ms var(--motion-ease), width 220ms var(--motion-ease), height 220ms var(--motion-ease);
 }
 .has-nav-indicator .glass-nav-active { background: transparent; box-shadow: none; }
 

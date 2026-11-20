@@ -49,23 +49,18 @@ export default function ColdChainPage() {
 
   const [shipments, setShipments] = useState([])
   const [selectedShipmentId, setSelectedShipmentId] = useState(initialShipmentId)
+  const isMountedRef = useRef(true)
   const selectedShipmentRef = useRef(selectedShipmentId)
   const requestSeq = useRef(0)
-  const [readings, setReadings] = useState([])
-  const [alerts, setAlerts] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [actionLoading, setActionLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [successMsg, setSuccessMsg] = useState(null)
+  const msgTimerRef = useRef(null)
 
-  // Simulation controls state
-  const [scenario, setScenario] = useState('NORMAL')
-  const [playbackSpeed, setPlaybackSpeed] = useState(1)
-  const [simulation, setSimulation] = useState(null)
-
-  // Resolve alert modal
-  const [activeAlertModal, setActiveAlertModal] = useState(null)
-  const [correctiveAction, setCorrectiveAction] = useState('')
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      if (msgTimerRef.current) clearTimeout(msgTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     selectedShipmentRef.current = selectedShipmentId
@@ -76,13 +71,18 @@ export default function ColdChainPage() {
     async function loadShipments() {
       try {
         const res = await shipmentsApi.list({ page_size: 50 })
+        if (!isMountedRef.current) return
         const list = res.data || []
         setShipments(list)
-        if (!selectedShipmentId && list.length > 0) {
-          setSelectedShipmentId(list[0].id || list[0]._id)
+        if (!selectedShipmentRef.current && list.length > 0) {
+          const firstId = list[0].id || list[0]._id
+          selectedShipmentRef.current = firstId
+          setSelectedShipmentId(firstId)
         }
       } catch (err) {
-        setError(getApiError(err, 'Failed to fetch shipments').message)
+        if (isMountedRef.current) {
+          setError(getApiError(err, 'Failed to fetch shipments').message)
+        }
       }
     }
     loadShipments()
@@ -91,7 +91,7 @@ export default function ColdChainPage() {
   // 2. Fetch readings and alerts when selected shipment changes
   const fetchTelemetry = async (silent = false) => {
     const targetShipmentId = selectedShipmentRef.current || selectedShipmentId
-    if (!targetShipmentId) return
+    if (!targetShipmentId || !isMountedRef.current) return
     const currentSeq = ++requestSeq.current
     if (!silent) setLoading(true)
     setError(null)
@@ -101,7 +101,8 @@ export default function ColdChainPage() {
         sensorsApi.alerts(targetShipmentId, { page_size: 20 }),
         sensorsApi.sessions(targetShipmentId),
       ])
-      if (currentSeq !== requestSeq.current || targetShipmentId !== selectedShipmentRef.current) {
+      // Shipment-aware response check: discard if unmounted, superseded by newer request, or shipment changed
+      if (!isMountedRef.current || currentSeq !== requestSeq.current || targetShipmentId !== selectedShipmentRef.current) {
         return
       }
       const rawReadings = readingsRes.data || []
@@ -134,13 +135,13 @@ export default function ColdChainPage() {
         return activeSession
       })
     } catch (err) {
-      if (currentSeq === requestSeq.current && targetShipmentId === selectedShipmentRef.current) {
+      if (isMountedRef.current && currentSeq === requestSeq.current && targetShipmentId === selectedShipmentRef.current) {
         if (!silent) {
           setError(getApiError(err, 'Failed to fetch sensor telemetry').message)
         }
       }
     } finally {
-      if (currentSeq === requestSeq.current && !silent) {
+      if (isMountedRef.current && currentSeq === requestSeq.current && !silent) {
         setLoading(false)
       }
     }
@@ -148,6 +149,7 @@ export default function ColdChainPage() {
 
   useEffect(() => {
     if (selectedShipmentId) {
+      selectedShipmentRef.current = selectedShipmentId
       setSearchParams({ shipmentId: selectedShipmentId })
       setReadings([])
       setAlerts([])
@@ -158,7 +160,9 @@ export default function ColdChainPage() {
 
   useEffect(() => {
     if (!selectedShipmentId || !simulation?.auto_play || simulation.state !== 'RUNNING') return
-    const timer = setInterval(() => fetchTelemetry(true), 5000)
+    const timer = setInterval(() => {
+      if (isMountedRef.current) fetchTelemetry(true)
+    }, 5000)
     return () => clearInterval(timer)
   }, [selectedShipmentId, simulation?.auto_play, simulation?.state])
 
@@ -167,13 +171,21 @@ export default function ColdChainPage() {
     setActionLoading(true)
     try {
       await sensorsApi.nextReading(selectedShipmentId, scenario, simulation?.simulation_id || null)
+      if (!isMountedRef.current) return
       setSuccessMsg('Manual reading generated')
-      setTimeout(() => setSuccessMsg(null), 2000)
+      if (msgTimerRef.current) clearTimeout(msgTimerRef.current)
+      msgTimerRef.current = setTimeout(() => {
+        if (isMountedRef.current) setSuccessMsg(null)
+      }, 2000)
       fetchTelemetry(true)
     } catch (err) {
-      setError(getApiError(err, 'Failed to trigger single reading').message)
+      if (isMountedRef.current) {
+        setError(getApiError(err, 'Failed to trigger single reading').message)
+      }
     } finally {
-      setActionLoading(false)
+      if (isMountedRef.current) {
+        setActionLoading(false)
+      }
     }
   }
 
@@ -183,11 +195,17 @@ export default function ColdChainPage() {
     try {
       if (action === 'start') await sensorsApi.startSession(selectedShipmentId, { scenario, playback_speed: playbackSpeed })
       else await sensorsApi.controlSession(selectedShipmentId, simulation.simulation_id, action)
-      await fetchTelemetry(true)
+      if (isMountedRef.current) {
+        await fetchTelemetry(true)
+      }
     } catch (err) {
-      setError(getApiError(err, 'Simulation control failed').message)
+      if (isMountedRef.current) {
+        setError(getApiError(err, 'Simulation control failed').message)
+      }
     } finally {
-      setActionLoading(false)
+      if (isMountedRef.current) {
+        setActionLoading(false)
+      }
     }
   }
 
@@ -196,11 +214,17 @@ export default function ColdChainPage() {
     setError(null)
     try {
       await sensorsApi.acknowledgeAlert(alertId)
-      await fetchTelemetry(true)
+      if (isMountedRef.current) {
+        await fetchTelemetry(true)
+      }
     } catch (err) {
-      setError(getApiError(err, 'Failed to acknowledge alert').message)
+      if (isMountedRef.current) {
+        setError(getApiError(err, 'Failed to acknowledge alert').message)
+      }
     } finally {
-      setActionLoading(false)
+      if (isMountedRef.current) {
+        setActionLoading(false)
+      }
     }
   }
 
@@ -213,15 +237,23 @@ export default function ColdChainPage() {
     setActionLoading(true)
     try {
       await sensorsApi.resolveAlert(alertId, { corrective_action: correctiveAction })
+      if (!isMountedRef.current) return
       setSuccessMsg('Alert resolved and ledger entry logged')
       setActiveAlertModal(null)
       setCorrectiveAction('')
-      setTimeout(() => setSuccessMsg(null), 3000)
+      if (msgTimerRef.current) clearTimeout(msgTimerRef.current)
+      msgTimerRef.current = setTimeout(() => {
+        if (isMountedRef.current) setSuccessMsg(null)
+      }, 3000)
       fetchTelemetry(true)
     } catch (err) {
-      setError(getApiError(err, 'Failed to update alert').message)
+      if (isMountedRef.current) {
+        setError(getApiError(err, 'Failed to update alert').message)
+      }
     } finally {
-      setActionLoading(false)
+      if (isMountedRef.current) {
+        setActionLoading(false)
+      }
     }
   }
 
