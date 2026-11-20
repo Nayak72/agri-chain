@@ -93,7 +93,7 @@ async def seed():
                 "vehicle_id": f"VEH-DEMO-{number}",
                 "registration_number": f"MH15RE{number:04d}",
                 "transporter_id": transporter_id, "category": "REFRIGERATED_TRUCK",
-                "vehicle_type": "10T_TRUCK", "max_payload_kg": 10000,
+                "vehicle_type": "10T_TRUCK", "max_payload_kg": 10000, "available_capacity_kg": 10000,
                 "refrigeration_available": True, "temperature_min": 7,
                 "temperature_max": 13, "status": "AVAILABLE",
                 "created_at": now, "updated_at": now,

@@ -283,7 +283,7 @@ export default function ShipmentDetailPage() {
             </button>
 
             {/* Loading Action */}
-            {['DRIVER_ASSIGNED'].includes(shipment.status) && (
+            {[ROLES.ADMIN, ROLES.TRANSPORTER, ROLES.WAREHOUSE_MANAGER].includes(userRole) && ['DRIVER_ASSIGNED'].includes(shipment.status) && (
               <button
                 onClick={() => {
                   setActualWeight(String(shipment.cargo_quantity_kg || 2000))
@@ -297,7 +297,7 @@ export default function ShipmentDetailPage() {
             )}
 
             {/* Dispatch Action */}
-            {['LOADED'].includes(shipment.status) && (
+            {[ROLES.ADMIN, ROLES.TRANSPORTER, ROLES.DRIVER].includes(userRole) && ['LOADED'].includes(shipment.status) && (
               <button
                 onClick={() => dispatchMutation.mutate()}
                 disabled={dispatchMutation.isPending}
@@ -308,7 +308,7 @@ export default function ShipmentDetailPage() {
             )}
 
             {/* Start Transit Action */}
-            {['DISPATCHED'].includes(shipment.status) && (
+            {[ROLES.ADMIN, ROLES.TRANSPORTER, ROLES.DRIVER].includes(userRole) && ['DISPATCHED'].includes(shipment.status) && (
               <button
                 onClick={() => startTransitMutation.mutate()}
                 disabled={startTransitMutation.isPending}
@@ -319,7 +319,7 @@ export default function ShipmentDetailPage() {
             )}
 
             {/* Arrive at Destination Action */}
-            {['IN_TRANSIT'].includes(shipment.status) && (
+            {[ROLES.ADMIN, ROLES.TRANSPORTER, ROLES.DRIVER].includes(userRole) && ['IN_TRANSIT'].includes(shipment.status) && (
               <button
                 onClick={() => arriveMutation.mutate()}
                 disabled={arriveMutation.isPending}
@@ -330,7 +330,7 @@ export default function ShipmentDetailPage() {
             )}
 
             {/* Out for Delivery Action */}
-            {['ARRIVED_AT_DESTINATION'].includes(shipment.status) && (
+            {[ROLES.ADMIN, ROLES.TRANSPORTER, ROLES.DRIVER].includes(userRole) && ['ARRIVED_AT_DESTINATION'].includes(shipment.status) && (
               <button
                 onClick={() => outForDeliveryMutation.mutate()}
                 disabled={outForDeliveryMutation.isPending}

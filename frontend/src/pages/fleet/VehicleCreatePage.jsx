@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useQuery } from '@tanstack/react-query'
 import { transportersApi } from '../../api/commerce.api'
 import { ROLES, isRoleAllowed } from '../../constants/roles'
-import { VEHICLE_CATEGORIES } from '../../constants/domain'
+import { VEHICLE_CATEGORIES, VEHICLE_TYPES } from '../../constants/domain'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, AlertCircle, Truck, ThermometerSnowflake } from 'lucide-react'
@@ -27,7 +27,7 @@ export default function VehicleCreatePage() {
     transporter_id: '',
     registration_number: '',
     category: 'REFRIGERATED_TRUCK',
-    vehicle_type: 'Refrigerated Truck',
+    vehicle_type: '10T_TRUCK',
     max_payload_kg: '3500',
     refrigeration_available: true,
     temperature_min: '7.0',
@@ -170,15 +170,9 @@ export default function VehicleCreatePage() {
                 <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
                   Vehicle Make / Body Type *
                 </label>
-                <Input
-                  type="text"
-                  required
-                  name="vehicle_type"
-                  value={form.vehicle_type}
-                  onChange={handleChange}
-                  placeholder="Tata Ultra T.7 Reefer"
-                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
-                />
+                <Select name="vehicle_type" required value={form.vehicle_type} onChange={handleChange}>
+                  {VEHICLE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                </Select>
               </div>
 
               <div className="space-y-1.5">
