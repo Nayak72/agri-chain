@@ -58,7 +58,7 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     
     # Warehouse receipts
     await _create_index_safe(db.warehouse_receipts, "receipt_id", unique=True)
-    await db.warehouse_receipts.create_index([("batch_id", 1), ("warehouse_id", 1)], unique=True)
+    await _create_index_safe(db.warehouse_receipts, [("batch_id", 1), ("warehouse_id", 1)], unique=True)
     await _create_index_safe(db.warehouse_receipts, "warehouse_id")
     await _create_index_safe(db.warehouse_receipts, "batch_id")
     await _create_index_safe(db.warehouse_receipts, "farmer_id")
@@ -117,7 +117,7 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     
     # Freight bookings
     await _create_index_safe(db.freight_bookings, "booking_id", unique=True)
-    await db.freight_bookings.create_index("purchase_order_id", unique=True, name="one_booking_per_order")
+    await _create_index_safe(db.freight_bookings, "purchase_order_id", unique=True, name="one_booking_per_order")
     await _create_index_safe(db.freight_bookings, "buyer_id")
     await _create_index_safe(db.freight_bookings, "seller_id")
     await _create_index_safe(db.freight_bookings, "status")
@@ -170,7 +170,8 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     
     # Sensor alerts
     await _create_index_safe(db.sensor_alerts, "alert_id", unique=True)
-    await db.sensor_alerts.create_index(
+    await _create_index_safe(
+        db.sensor_alerts,
         [("shipment_id", 1), ("alert_type", 1)], unique=True,
         partialFilterExpression={"status": "ACTIVE"}, name="one_active_alert_per_type",
     )

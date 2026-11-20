@@ -15,10 +15,11 @@ _supports_transactions = False
 def get_sanitized_uri(uri: str) -> str:
     """Return MongoDB URI with credentials stripped."""
     try:
-        parsed = parse_uri(uri)
-        nodelist = ",".join(f"{host}:{port}" for host, port in parsed["nodelist"])
-        database = parsed.get("database") or settings.database_name
-        return f"mongodb://[REDACTED]@{nodelist}/{database}"
+        if "@" in uri:
+            scheme_part, rest = uri.split("://", 1)
+            _, host_part = rest.split("@", 1)
+            return f"{scheme_part}://[REDACTED]@{host_part}"
+        return uri
     except Exception:
         return "mongodb://[REDACTED]"
 
