@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   TrendingUp,
   Truck,
@@ -76,28 +76,28 @@ export default function AnalyticsPage() {
   }, [])
 
   // Prepare chart datasets
-  const fleetDistribution = fleetData ? [
+  const fleetDistribution = useMemo(() => fleetData ? [
     { name: 'Assigned', value: fleetData.assigned_vehicles || 0, color: '#244634' },
     { name: 'Available', value: fleetData.available_vehicles || 0, color: '#10b981' },
     { name: 'Maintenance', value: fleetData.maintenance_vehicles || 0, color: '#f59e0b' },
-  ] : []
+  ] : [], [fleetData])
 
-  const coldChainDistribution = coldChainData ? [
+  const coldChainDistribution = useMemo(() => coldChainData ? [
     { name: 'Normal', value: coldChainData.normal_readings || 0, color: '#10b981' },
     { name: 'Critical', value: coldChainData.critical_readings || 0, color: '#ef4444' },
-  ] : []
+  ] : [], [coldChainData])
 
-  const qualityCargoData = qualityData ? [
+  const qualityCargoData = useMemo(() => qualityData ? [
     { name: 'Accepted Cargo', kg: qualityData.accepted_quantity_kg || 0 },
     { name: 'Damaged Cargo', kg: qualityData.damaged_quantity_kg || 0 },
     { name: 'Missing Cargo', kg: qualityData.missing_quantity_kg || 0 },
     { name: 'Rejected Cargo', kg: qualityData.rejected_quantity_kg || 0 },
-  ] : []
+  ] : [], [qualityData])
 
-  const transporterCostChartData = freightData?.transporter_wise_cost?.map((item, idx) => ({
+  const transporterCostChartData = useMemo(() => freightData?.transporter_wise_cost?.map((item, idx) => ({
     name: item.transporter_name || `Transporter #${idx + 1}`,
     cost: (item.total_cost_paise || item.cost || 0) / 100,
-  })) || []
+  })) || [], [freightData])
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">

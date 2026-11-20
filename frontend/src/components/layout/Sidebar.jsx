@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import NavIndicator from './NavIndicator'
 import { pageCapabilityForPath } from '@/constants/pageCapabilities'
 import { NavLink, useLocation } from 'react-router-dom'
@@ -99,14 +99,14 @@ export function Sidebar({ collapsed, onToggleCollapse, className }) {
   const location = useLocation()
 
   // Filter sectors and items based strictly on user role
-  const visibleSectors = NAVIGATION_SECTORS.map((sec) => ({
+  const visibleSectors = useMemo(() => NAVIGATION_SECTORS.map((sec) => ({
     ...sec,
     items: sec.items.filter((item) => can(pageCapabilityForPath(item.path))),
-  })).filter((sec) => sec.items.length > 0)
+  })).filter((sec) => sec.items.length > 0), [can])
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 hidden lg:flex flex-col glass-sidebar border-r text-[#F6F4EC] transition-all duration-200 select-none ${
+      className={`fixed inset-y-0 left-0 z-40 hidden lg:flex flex-col glass-sidebar border-r text-[#F6F4EC] transition-[width] duration-[220ms] select-none ${
         collapsed ? 'w-[72px]' : 'w-[252px]'
       } ${className || ''}`}
     >

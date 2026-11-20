@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { analyticsApi } from '../api/analytics.api'
@@ -121,7 +121,9 @@ export default function DashboardPage() {
     refetchWorkspace()
   }
 
-  const actions = (ROLE_QUICK_ACTIONS[userRole] || []).filter(action => can(pageCapabilityForPath(action.path)))
+  const actions = useMemo(() => {
+    return (ROLE_QUICK_ACTIONS[userRole] || []).filter(action => can(pageCapabilityForPath(action.path)))
+  }, [userRole, can])
 
   return (
     <div className="space-y-8 animate-fade-in-up">

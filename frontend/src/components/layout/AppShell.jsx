@@ -24,7 +24,7 @@ export default function AppShell() {
 
       {/* Main Content Area */}
       <div
-        className={`flex-1 flex flex-col min-h-screen shell-content transition-all duration-300 ${
+        className={`flex-1 flex flex-col min-h-screen shell-content transition-[padding] duration-[220ms] ${
           collapsed ? 'lg:pl-[72px]' : 'lg:pl-[252px]'
         }`}
       >

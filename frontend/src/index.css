@@ -97,8 +97,8 @@
   --ambient-sage: rgba(145, 166, 140, .46);
   --ambient-harvest: rgba(216, 188, 141, .24);
   --motion-ease: cubic-bezier(.22, 1, .36, 1);
-  --motion-fast: 180ms;
-  --motion-page: 380ms;
+  --motion-fast: 150ms;
+  --motion-page: 220ms;
 }
 
 #root { isolation: isolate; }
@@ -186,7 +186,7 @@ select.glass-control option { background: var(--color-ivory); color: var(--color
   background: linear-gradient(130deg, rgba(255,255,255,.94), rgba(167,187,163,.22));
   box-shadow: var(--glass-highlight), 0 2px 5px rgba(36,70,52,.08);
 }
-.glass-button { transition-timing-function: var(--motion-ease); box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
+.glass-button { transition-property: color, background-color, border-color, box-shadow, transform; transition-duration: var(--motion-fast); transition-timing-function: var(--motion-ease); box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
 .glass-button:active:not(:disabled) { transform: translateY(1px) scale(.985); }
 .glass-overlay {
   background: rgba(27,53,39,.38);
@@ -203,11 +203,13 @@ select.glass-control option { background: var(--color-ivory); color: var(--color
 ::view-transition-new(agri-content) { animation: glass-enter var(--motion-page) var(--motion-ease) both; }
 ::view-transition-group(agri-content) { animation-duration: var(--motion-page); }
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
-.dialog-presence .glass-overlay { animation: overlay-in 220ms ease both; }
-.dialog-presence .glass-dialog { animation: glass-enter 280ms var(--motion-ease) both; }
+.dialog-presence .glass-overlay { animation: overlay-in 200ms ease both; }
+.dialog-presence .glass-dialog { animation: glass-enter 200ms var(--motion-ease) both; }
 .dialog-presence[data-closing="true"] { pointer-events: none; }
 .dialog-presence[data-closing="true"] .glass-overlay { animation: overlay-out 180ms ease both; }
 .dialog-presence[data-closing="true"] .glass-dialog { animation: glass-exit 180ms ease both; }
+::view-transition-new(agri-content) .route-enter, :root:active-view-transition .route-enter { animation: none; }
+.tab-panel-enter { animation: tab-enter 150ms var(--motion-ease) both; }
 .mobile-presence { visibility: hidden; pointer-events: none; transition: visibility 240ms; }
 .mobile-presence[data-open="true"] { visibility: visible; pointer-events: auto; }
 .mobile-presence .glass-overlay { opacity: 0; transition: opacity 240ms; }
@@ -220,8 +222,9 @@ select.glass-control option { background: var(--color-ivory); color: var(--color
   .glass-panel.cursor-pointer:hover, button.glass-metric:hover { transform: translateY(-2px); }
 }
 @keyframes ambient-drift { to { transform: translate3d(3%, -2%, 0) scale(1.06); } }
-@keyframes glass-enter { from { opacity: 0; filter: blur(6px); transform: translateY(10px) scale(.99); } to { opacity: 1; filter: none; transform: none; } }
-@keyframes glass-exit { to { opacity: 0; filter: blur(4px); transform: translateY(-4px) scale(.995); } }
+@keyframes glass-enter { from { opacity: 0; transform: translateY(6px) scale(.995); } to { opacity: 1; transform: none; } }
+@keyframes glass-exit { to { opacity: 0; transform: translateY(-4px) scale(.995); } }
+@keyframes tab-enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes overlay-out { from { opacity: 1; } to { opacity: 0; } }
 @media (max-width: 767px) {

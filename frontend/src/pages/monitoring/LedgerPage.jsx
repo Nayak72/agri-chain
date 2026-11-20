@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   ShieldCheck,
   ShieldAlert,
@@ -82,7 +82,11 @@ export default function LedgerPage() {
   }
 
   const copyToClipboard = (text, id) => {
-    navigator.clipboard.writeText(text)
+    try {
+      navigator.clipboard?.writeText(text)
+    } catch {
+      // Ignore clipboard permission errors in restricted contexts
+    }
     setCopiedHash(id)
     setTimeout(() => setCopiedHash(null), 2000)
   }
@@ -111,7 +115,7 @@ export default function LedgerPage() {
     })
   }
 
-  const filteredBlocks = blocks.filter(b => {
+  const filteredBlocks = useMemo(() => blocks.filter(b => {
     if (filterType && b.event_type !== filterType) return false
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
@@ -122,10 +126,10 @@ export default function LedgerPage() {
       return inSummary || inEntity || inActor || inHash
     }
     return true
-  })
+  }), [blocks, filterType, searchQuery])
 
   // Distinct event types
-  const eventTypes = Array.from(new Set(blocks.map(b => b.event_type))).filter(Boolean)
+  const eventTypes = useMemo(() => Array.from(new Set(blocks.map(b => b.event_type))).filter(Boolean), [blocks])
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">

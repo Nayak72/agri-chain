@@ -83,7 +83,7 @@ export function TabsContent({ value, className, children, ...props }) {
       id={`${id}-panel-${value}`}
       aria-labelledby={`${id}-tab-${value}`}
       tabIndex={0}
-      className={cn('mt-4 focus-visible:outline-none animate-fade-in-up', className)}
+      className={cn('mt-4 focus-visible:outline-none tab-panel-enter', className)}
       {...props}
     >
       {children}

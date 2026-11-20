@@ -1,5 +1,5 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams, useLocation, Link } from 'react-router-dom'
 import {
   Thermometer,
@@ -49,6 +49,8 @@ export default function ColdChainPage() {
 
   const [shipments, setShipments] = useState([])
   const [selectedShipmentId, setSelectedShipmentId] = useState(initialShipmentId)
+  const selectedShipmentRef = useRef(selectedShipmentId)
+  const requestSeq = useRef(0)
   const [readings, setReadings] = useState([])
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(false)
@@ -64,6 +66,10 @@ export default function ColdChainPage() {
   // Resolve alert modal
   const [activeAlertModal, setActiveAlertModal] = useState(null)
   const [correctiveAction, setCorrectiveAction] = useState('')
+
+  useEffect(() => {
+    selectedShipmentRef.current = selectedShipmentId
+  }, [selectedShipmentId])
 
   // 1. Fetch available shipments on mount
   useEffect(() => {
@@ -84,26 +90,59 @@ export default function ColdChainPage() {
 
   // 2. Fetch readings and alerts when selected shipment changes
   const fetchTelemetry = async (silent = false) => {
-    if (!selectedShipmentId) return
+    const targetShipmentId = selectedShipmentRef.current || selectedShipmentId
+    if (!targetShipmentId) return
+    const currentSeq = ++requestSeq.current
     if (!silent) setLoading(true)
     setError(null)
     try {
       const [readingsRes, alertsRes, sessionsRes] = await Promise.all([
-        sensorsApi.readings(selectedShipmentId, { page_size: 60 }),
-        sensorsApi.alerts(selectedShipmentId, { page_size: 20 }),
-        sensorsApi.sessions(selectedShipmentId),
+        sensorsApi.readings(targetShipmentId, { page_size: 60 }),
+        sensorsApi.alerts(targetShipmentId, { page_size: 20 }),
+        sensorsApi.sessions(targetShipmentId),
       ])
+      if (currentSeq !== requestSeq.current || targetShipmentId !== selectedShipmentRef.current) {
+        return
+      }
       const rawReadings = readingsRes.data || []
       const chronological = [...rawReadings].reverse()
-      setReadings(chronological)
-      setAlerts(alertsRes.data || [])
-      setSimulation((sessionsRes.data || []).find(item => ['RUNNING', 'PAUSED'].includes(item.state)) || null)
+      setReadings(prev => {
+        if (prev.length === chronological.length && prev.length > 0) {
+          const pLast = prev[prev.length - 1], nLast = chronological[chronological.length - 1]
+          if (pLast?.id === nLast?.id && pLast?.timestamp === nLast?.timestamp && pLast?.temperature === nLast?.temperature && pLast?.humidity === nLast?.humidity) {
+            return prev
+          }
+        }
+        return chronological
+      })
+      const nextAlerts = alertsRes.data || []
+      setAlerts(prev => {
+        if (prev.length === nextAlerts.length && prev.length > 0) {
+          const p0 = prev[0], n0 = nextAlerts[0]
+          if (p0?.id === n0?.id && p0?.status === n0?.status && p0?.acknowledged_at === n0?.acknowledged_at && p0?.resolved_at === n0?.resolved_at) {
+            return prev
+          }
+        }
+        return nextAlerts
+      })
+      const activeSession = (sessionsRes.data || []).find(item => ['RUNNING', 'PAUSED'].includes(item.state)) || null
+      setSimulation(prev => {
+        if (!prev && !activeSession) return null
+        if (prev && activeSession && prev.simulation_id === activeSession.simulation_id && prev.state === activeSession.state && prev.auto_play === activeSession.auto_play && prev.sequence === activeSession.sequence) {
+          return prev
+        }
+        return activeSession
+      })
     } catch (err) {
-      if (!silent) {
-        setError(getApiError(err, 'Failed to fetch sensor telemetry').message)
+      if (currentSeq === requestSeq.current && targetShipmentId === selectedShipmentRef.current) {
+        if (!silent) {
+          setError(getApiError(err, 'Failed to fetch sensor telemetry').message)
+        }
       }
     } finally {
-      if (!silent) setLoading(false)
+      if (currentSeq === requestSeq.current && !silent) {
+        setLoading(false)
+      }
     }
   }
 
@@ -119,7 +158,7 @@ export default function ColdChainPage() {
 
   useEffect(() => {
     if (!selectedShipmentId || !simulation?.auto_play || simulation.state !== 'RUNNING') return
-    const timer = setInterval(() => fetchTelemetry(true), 2000)
+    const timer = setInterval(() => fetchTelemetry(true), 5000)
     return () => clearInterval(timer)
   }, [selectedShipmentId, simulation?.auto_play, simulation?.state])
 
@@ -191,12 +230,14 @@ export default function ColdChainPage() {
   const latestReading = readings.length > 0 ? readings[readings.length - 1] : null
 
   // Format data for chart
-  const chartData = readings.map((r, idx) => ({
-    time: r.timestamp ? new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : `#${idx + 1}`,
-    temperature: Number(r.temperature.toFixed(1)),
-    humidity: Number(r.humidity.toFixed(1)),
-    status: r.status,
-  }))
+  const chartData = useMemo(() => {
+    return readings.map((r, idx) => ({
+      time: r.timestamp ? new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : `#${idx + 1}`,
+      temperature: Number(r.temperature.toFixed(1)),
+      humidity: Number(r.humidity.toFixed(1)),
+      status: r.status,
+    }))
+  }, [readings])
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -527,6 +568,7 @@ export default function ColdChainPage() {
                   strokeWidth={2}
                   dot={{ r: 2, fill: '#0284c7' }}
                   activeDot={{ r: 5 }}
+                  isAnimationActive={false}
                 />
                 <Line
                   yAxisId="humidity"
@@ -537,6 +579,7 @@ export default function ColdChainPage() {
                   strokeWidth={2}
                   dot={{ r: 2, fill: '#16a34a' }}
                   activeDot={{ r: 5 }}
+                  isAnimationActive={false}
                 />
               </LineChart>
             </ResponsiveContainer>
