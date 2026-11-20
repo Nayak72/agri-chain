@@ -1,0 +1,45 @@
+name: Render backend heartbeat (10 minutes)
+
+on:
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-backend-heartbeat
+  cancel-in-progress: false
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    env:
+      RENDER_HEALTH_URL: ${{ secrets.RENDER_HEALTH_URL }}
+
+    steps:
+      - name: Request FastAPI liveness endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${RENDER_HEALTH_URL:-}" ]]; then
+            echo 'Missing GitHub Actions secret: RENDER_HEALTH_URL' >&2
+            exit 1
+          fi
+
+          if [[ "$RENDER_HEALTH_URL" != https://* ]]; then
+            echo 'RENDER_HEALTH_URL must be an HTTPS URL.' >&2
+            exit 1
+          fi
+
+          curl --fail --silent --show-error \
+            --retry 1 --retry-delay 3 \
+            --max-time 90 \
+            --output /dev/null \
+            --write-out 'Health check HTTP status: %{http_code}\n' \
+            "$RENDER_HEALTH_URL"
+
