@@ -1,3 +1,4 @@
+import { useAuth } from '../../context/AuthContext'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, AlertCircle, ShieldAlert, Package, ThermometerSnowflake } from 'lucide-react'
@@ -9,6 +10,7 @@ import { Card, CardContent } from '../../components/ui/card'
 
 export default function ProduceDetailPage() {
   const { id } = useParams()
+  const { can } = useAuth()
   const navigate = useNavigate()
 
   const { data: item, isLoading, error } = useQuery({
@@ -76,14 +78,14 @@ export default function ProduceDetailPage() {
             </div>
 
             <div className="flex gap-3">
-              <Button
+              {can('page:batch-create') && (<Button
                 variant="primary"
                 onClick={() => navigate('/batches/new', { state: { produceType: item.produce_type } })}
                 className="gap-2 bg-[#244634] hover:bg-[#1A3326] text-white shadow-sm"
               >
                 <Plus className="w-4 h-4" />
                 Create Batch for this Produce
-              </Button>
+              </Button>)}
             </div>
           </div>
         </CardContent>

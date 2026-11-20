@@ -10,7 +10,7 @@ from app.core.permissions import get_current_user, enforce_permission
 from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError, ConflictError
 from app.core.constants import (
     InventoryStatus, WarehouseReceiptStatus, InspectionResult,
-    UserRole, ProduceType, LedgerEventType
+    UserRole, ProduceType, LedgerEventType, PRODUCE_HANDLING_PROFILES
 )
 from app.services.ledger_service import append_ledger_block
 from app.services.warehouse_capacity import check_capacity

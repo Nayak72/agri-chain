@@ -22,7 +22,7 @@ export default function InventoryPage() {
       received_weight_kg: Number(form.received_weight_kg), accepted_weight_kg: Number(form.accepted_weight_kg),
       damaged_weight_kg: Number(form.damaged_weight_kg), rejected_weight_kg: Number(form.rejected_weight_kg),
     }),
-    onSuccess: () => { setError(''); client.invalidateQueries({ queryKey: ['inventory'] }); client.invalidateQueries({ queryKey: ['receipts'] }); setTab('stock') },
+    onSuccess: () => { setError(''); client.invalidateQueries({ queryKey: ['inventory'] }); client.invalidateQueries({ queryKey: ['receipts'] }); client.invalidateQueries({ queryKey: ['batches'] }); setTab('stock') },
     onError: e => setError(getApiError(e, 'Receipt failed').message),
   })
   const update = e => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))

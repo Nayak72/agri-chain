@@ -94,6 +94,15 @@ async def create_purchase_order(
     if seller.get("role") not in [UserRole.FARMER, UserRole.ADMIN]:
         raise ValidationError("Seller must be an active farmer")
     
+    if not seller.get("is_active", True) or not seller.get("is_approved", True):
+        raise ValidationError("Seller must be active and approved")
+    if batch.get("status") != "AT_WAREHOUSE":
+        raise ValidationError("Batch must be received at a warehouse before ordering")
+    stock = await db.inventory_items.find({"batch_id": str(batch["_id"])}).to_list(None)
+    available = sum(Decimal(str(row.get("available_kg", 0))) for row in stock)
+    if Decimal(str(order_data.requested_quantity_kg)) > available:
+        raise ValidationError("Requested quantity exceeds available warehouse stock")
+
     order_id = generate_order_id()
     # High-precision integer paise calculation
     qty_dec = Decimal(str(order_data.requested_quantity_kg))

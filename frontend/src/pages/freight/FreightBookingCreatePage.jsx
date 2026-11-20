@@ -1,3 +1,5 @@
+import { useQueryClient } from '@tanstack/react-query'
+import { VEHICLE_CATEGORIES } from '../../constants/domain'
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -12,6 +14,7 @@ import { Textarea } from '../../components/ui/textarea'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card'
 
 export default function FreightBookingCreatePage() {
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
   const [loading, setLoading] = useState(false)
@@ -41,14 +44,14 @@ export default function FreightBookingCreatePage() {
     package_count: '100',
     pickup_city: 'Nashik',
     pickup_state: 'Maharashtra',
-    destination_city: 'Navi Mumbai',
-    destination_state: 'Maharashtra',
+    destination_city: 'Bengaluru',
+    destination_state: 'Karnataka',
     requested_pickup_date: new Date().toISOString().split('T')[0],
     required_delivery_date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
     preferred_vehicle_category: 'REFRIGERATED_TRUCK',
     refrigeration_required: true,
-    temperature_min: '2.0',
-    temperature_max: '8.0',
+    temperature_min: '7.0',
+    temperature_max: '13.0',
     packaging_details: 'Standard ventilated agricultural crates on plastic pallets',
   })
 
@@ -61,12 +64,12 @@ export default function FreightBookingCreatePage() {
     const selectedPo = acceptedOrders.find(po => (po.id || po._id) === poId || po.order_id === poId)
     if (selectedPo) {
       const canonicalPoId = selectedPo.id || selectedPo._id
-      const linkedBatchIds = selectedPo.batch_id ? [selectedPo.batch_id] : (batches[0] ? [batches[0].id || batches[0]._id] : [])
+      const linkedBatchIds = selectedPo.batch_id ? [selectedPo.batch_id] : []
       setForm(prev => ({
         ...prev,
         purchase_order_id: canonicalPoId,
         batch_ids: linkedBatchIds,
-        cargo_quantity_kg: String(selectedPo.requested_quantity_kg || prev.cargo_quantity_kg || 2000),
+        cargo_quantity_kg: String(selectedPo.accepted_quantity_kg),
       }))
     }
   }
@@ -155,6 +158,7 @@ export default function FreightBookingCreatePage() {
 
       const res = await freightBookingsApi.create(payload)
       const newKey = res.data.id || res.data._id || res.data.booking_id
+      queryClient.invalidateQueries()
       navigate(`/freight-bookings/${newKey}`)
     } catch (err) {
       console.error('Freight booking creation error:', err)
@@ -268,11 +272,7 @@ export default function FreightBookingCreatePage() {
                   onChange={handleChange}
                   className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
-                  <option value="REFRIGERATED_TRUCK">Refrigerated Truck (14ft / 3.5 Ton)</option>
-                  <option value="REEFER_20FT">Refrigerated Truck (20ft / 7 Ton)</option>
-                  <option value="REEFER_32FT">Refrigerated Trailer (32ft / 15 Ton)</option>
-                  <option value="OPEN_TRUCK">Open Tarpaulin Truck (General Cargo)</option>
-                  <option value="CLOSED_CONTAINER">Closed Metal Container</option>
+                  {VEHICLE_CATEGORIES.map(category => <option key={category} value={category}>{category.replaceAll('_', ' ')}</option>)}
                 </Select>
               </div>
             </div>

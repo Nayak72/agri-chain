@@ -1,3 +1,4 @@
+import { useAuth } from '../../context/AuthContext'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ShoppingBag, ShieldCheck, AlertCircle, Calendar, Package, MapPin } from 'lucide-react'
@@ -10,6 +11,7 @@ import { StatusBadge } from '../../components/common/StatusBadge'
 
 export default function BatchDetailPage() {
   const { id } = useParams()
+  const { can } = useAuth()
   const navigate = useNavigate()
 
   const { data: batch, isLoading, error } = useQuery({
@@ -76,14 +78,14 @@ export default function BatchDetailPage() {
             </div>
 
             <div className="flex gap-3">
-              <Button
+              {can('page:order-create') && batch.status === 'AT_WAREHOUSE' && batch.available_kg > 0 && (<Button
                 variant="primary"
                 onClick={() => navigate('/purchase-orders/new', { state: { batchId: batch.batch_id } })}
                 className="gap-2 bg-[#244634] hover:bg-[#1A3326] text-white shadow-sm"
               >
                 <ShoppingBag className="w-4 h-4" />
                 <span>Create Purchase Order</span>
-              </Button>
+              </Button>)}
             </div>
           </div>
         </CardContent>

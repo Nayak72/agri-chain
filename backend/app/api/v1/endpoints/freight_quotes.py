@@ -9,7 +9,7 @@ from bson import ObjectId
 from app.db.mongodb import get_database
 from app.core.permissions import get_current_user
 from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError, ConflictError
-from app.core.constants import UserRole, FreightBookingStatus, LedgerEventType
+from app.core.constants import UserRole, FreightBookingStatus, LedgerEventType, VehicleCategory
 from app.services.ledger_service import append_ledger_block
 from app.db.unit_of_work import run_in_txn
 from app.utils.serialization import to_response
@@ -21,7 +21,7 @@ router = APIRouter()
 
 class FreightQuotationCreate(BaseModel):
     booking_id: str
-    proposed_vehicle_category: str = Field(...)
+    proposed_vehicle_category: VehicleCategory
     freight_base_charge_paise: int = Field(..., ge=0)
     fuel_surcharge_paise: int = Field(0, ge=0)
     planned_distance_km: float = Field(..., gt=0)
@@ -64,10 +64,12 @@ async def create_freight_quotation(
         raise ForbiddenError("Only transporters or admins can submit quotations")
     
     transporter = await db.transporters.find_one({"user_id": current_user["sub"]})
-    if not transporter and current_user["role"] != UserRole.ADMIN:
+    if not transporter:
         raise NotFoundError("Transporter profile", current_user["sub"])
     
-    t_id = str(transporter["_id"]) if transporter else current_user["sub"]
+    if transporter.get("approval_status") != "APPROVED" or not transporter.get("is_active", True):
+        raise ForbiddenError("Transporter must be active and approved to quote")
+    t_id = str(transporter["_id"])
     
 
     booking = await resolve_doc(db.freight_bookings, quotation_data.booking_id, "Freight Booking", business_key="booking_id")
@@ -83,6 +85,8 @@ async def create_freight_quotation(
     if booking["status"] not in allowed_statuses:
         raise ValidationError(f"Booking is not accepting quotations (status: {booking['status']})")
     
+    if quotation_data.proposed_vehicle_category != booking.get("preferred_vehicle_category"):
+        raise ValidationError("Quotation vehicle category must match the booking")
     existing = await db.freight_quotations.find_one({
         "booking_id": str(booking["_id"]),
         "transporter_id": t_id,
@@ -118,6 +122,14 @@ async def create_freight_quotation(
     }
     
     async def _transaction(session):
+        claim = await db.freight_bookings.update_one(
+            {"_id": booking["_id"], "status": {"$in": ["REQUESTED", "QUOTATION_PENDING", "QUOTED"]}},
+            {"$set": {"status": "QUOTED", "updated_at": now}}, session=session)
+        if not claim.matched_count:
+            raise ConflictError("Booking is no longer accepting quotations")
+        if await db.freight_quotations.find_one({"booking_id": str(booking["_id"]),
+                "transporter_id": t_id, "status": {"$in": ["SUBMITTED", "ACCEPTED"]}}, session=session):
+            raise ConflictError("An active quotation already exists for your company")
         result = await db.freight_quotations.insert_one(to_mongo(quotation_doc), session=session)
         quotation_doc["_id"] = result.inserted_id
         
@@ -164,7 +176,7 @@ async def list_freight_quotations(
     elif current_user["role"] != UserRole.ADMIN:
         raise ForbiddenError("Not authorized to view freight quotations")
     
-    if booking_id and current_user["role"] == UserRole.ADMIN:
+    if booking_id and current_user["role"] in [UserRole.ADMIN, UserRole.TRANSPORTER]:
         b = await resolve_doc(db.freight_bookings, booking_id, "Freight Booking", business_key="booking_id")
         query["booking_id"] = str(b["_id"])
     
@@ -228,6 +240,14 @@ async def accept_freight_quotation(
     qid = quotation["_id"]
     now = datetime.now(timezone.utc)
     async def _transaction(session):
+        claim = await db.freight_bookings.update_one(
+            {"_id": booking["_id"], "status": {"$in": ["REQUESTED", "QUOTATION_PENDING", "QUOTED"]}},
+            {"$set": {"status": "CONFIRMED", "accepted_quotation_id": str(qid), "updated_at": now}}, session=session)
+        if not claim.matched_count:
+            raise ConflictError("Booking already confirmed or closed")
+        carrier = await db.transporters.find_one({"_id": ObjectId(quotation["transporter_id"])}, session=session)
+        if not carrier or carrier.get("approval_status") != "APPROVED" or not carrier.get("is_active", True):
+            raise ValidationError("Quoted transporter is no longer active and approved")
         await db.freight_quotations.update_one(
             {"_id": qid},
             {"$set": {"status": "ACCEPTED", "updated_at": now}},

@@ -1,3 +1,4 @@
+import { ROLES, isRoleAllowed } from '../../constants/roles'
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -39,7 +40,8 @@ export default function FreightBookingDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['freight-booking', id] })
       queryClient.invalidateQueries({ queryKey: ['freight-quotes', id] })
-      navigate('/shipments')
+      queryClient.invalidateQueries({ queryKey: ['freight-bookings'] })
+      queryClient.invalidateQueries({ queryKey: ['freight-quotes-all'] })
     },
     onError: (err) => {
       const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Quotation acceptance failed.'
@@ -76,8 +78,9 @@ export default function FreightBookingDetailPage() {
   }
 
   const bookingKey = booking.id || booking._id || booking.booking_id
-  const isTransporter = user?.role === 'transporter' || user?.role === 'admin'
-  const isBuyerOrFarmer = user?.role === 'buyer' || user?.role === 'farmer' || user?.role === 'admin'
+  const isTransporter = isRoleAllowed(user?.role, [ROLES.TRANSPORTER])
+  const isBuyerOrFarmer = isRoleAllowed(user?.role, [ROLES.ADMIN]) || (isRoleAllowed(user?.role, [ROLES.BUYER]) && user?.id === booking.buyer_id) || (isRoleAllowed(user?.role, [ROLES.FARMER]) && user?.id === booking.seller_id)
+  const isOpen = ['REQUESTED', 'QUOTATION_PENDING', 'QUOTED'].includes(booking.status)
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in-up">
@@ -109,7 +112,8 @@ export default function FreightBookingDetailPage() {
             </div>
 
             <div className="flex gap-3">
-              {isTransporter && booking.status !== 'CONFIRMED' && (
+              {isTransporter && booking.status === 'CONFIRMED' && <Button onClick={() => navigate('/shipments/new', { state: { bookingId: bookingKey } })}>Create Shipment</Button>}
+              {isTransporter && isOpen && (
                 <Button
                   variant="primary"
                   onClick={() => navigate('/freight-quotes', { state: { bookingId: booking.booking_id || bookingKey } })}
@@ -218,7 +222,7 @@ export default function FreightBookingDetailPage() {
             <p className="text-xs text-[#526357] max-w-sm mx-auto mb-4">
               Transporters will review this dispatch request and submit pricing bids shortly.
             </p>
-            {isTransporter && (
+            {isTransporter && isOpen && (
               <Button
                 variant="outline"
                 size="sm"
@@ -259,7 +263,7 @@ export default function FreightBookingDetailPage() {
                       <StatusBadge status={q.status || 'PENDING'} />
                     </TableCell>
                     <TableCell className="text-right">
-                      {isBuyerOrFarmer && !isAccepted && booking.status !== 'CONFIRMED' && (
+                      {isBuyerOrFarmer && q.status === 'SUBMITTED' && isOpen && (
                         <Button
                           variant="primary"
                           size="sm"
@@ -267,7 +271,7 @@ export default function FreightBookingDetailPage() {
                           disabled={acceptQuoteMutation.isPending}
                           className="bg-[#244634] hover:bg-[#1A3326] text-white text-[11px] h-7"
                         >
-                          {acceptQuoteMutation.isPending ? 'Accepting...' : 'Accept & Dispatch'}
+                          {acceptQuoteMutation.isPending ? 'Accepting...' : 'Accept Quotation'}
                         </Button>
                       )}
                       {isAccepted && (

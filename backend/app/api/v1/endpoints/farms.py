@@ -65,7 +65,7 @@ async def create_farm(
         if not ObjectId.is_valid(farmer_id):
             raise ValidationError("Invalid farmer ID")
         farmer = await db.users.find_one({"_id": ObjectId(farmer_id), "role": UserRole.FARMER})
-        if not farmer:
+        if not farmer or not farmer.get("is_active", True) or not farmer.get("is_approved", True):
             raise ValidationError("Specified user is not a valid active farmer")
     
     # Pre-check unique farm name per farmer

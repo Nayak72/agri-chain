@@ -1,10 +1,10 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, AlertCircle, ShoppingBag } from 'lucide-react'
 import { ordersApi } from '../../api/commerce.api'
-import { produceApi, batchesApi } from '../../api/agriculture.api'
-import { usersApi } from '../../api/users.api'
+import { batchesApi } from '../../api/agriculture.api'
 import { formatApiErrorMessage } from '../../utils'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -12,6 +12,7 @@ import { Select } from '../../components/ui/select'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card'
 
 export default function OrderCreatePage() {
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
   const [loading, setLoading] = useState(false)
@@ -19,24 +20,12 @@ export default function OrderCreatePage() {
 
   const initialBatchId = location.state?.batchId || ''
 
-  const { data: produceList } = useQuery({
-    queryKey: ['produce'],
-    queryFn: () => produceApi.list().then(res => res.data),
-  })
-
-  const { data: batchesList } = useQuery({
+  const { data: batchesList, isLoading: batchesLoading, error: batchesError } = useQuery({
     queryKey: ['batches'],
     queryFn: () => batchesApi.list().then(res => res.data),
   })
 
-  const { data: farmersData } = useQuery({
-    queryKey: ['farmers-for-po'],
-    queryFn: () => usersApi.list({ role: 'FARMER' }).then(res => res.data),
-  })
-
-  const produceItems = Array.isArray(produceList) ? produceList : produceList?.items || []
-  const batches = Array.isArray(batchesList) ? batchesList : batchesList?.items || []
-  const farmers = Array.isArray(farmersData) ? farmersData : farmersData?.items || []
+  const batches = (Array.isArray(batchesList) ? batchesList : batchesList?.items || []).filter(b => b.status === 'AT_WAREHOUSE' && b.available_kg > 0)
 
   const [form, setForm] = useState({
     seller_id: '',
@@ -50,7 +39,7 @@ export default function OrderCreatePage() {
   // When a batch is selected, autofill produce_type, seller_id, and default quantity
   const handleBatchSelect = (batchId) => {
     if (!batchId) {
-      setForm(prev => ({ ...prev, batch_id: '' }))
+      setForm(prev => ({ ...prev, batch_id: '', seller_id: '', produce_type: '', requested_quantity_kg: '' }))
       return
     }
     const selected = batches.find(b => (b.id || b._id) === batchId || b.batch_id === batchId)
@@ -59,7 +48,7 @@ export default function OrderCreatePage() {
         ...prev,
         batch_id: selected.id || selected._id,
         produce_type: selected.produce_type,
-        seller_id: selected.farmer_id || prev.seller_id,
+        seller_id: selected.farmer_id,
         requested_quantity_kg: prev.requested_quantity_kg || String(selected.available_kg || ''),
       }))
     }
@@ -95,6 +84,12 @@ export default function OrderCreatePage() {
       return
     }
 
+    const selectedBatch = batches.find(b => b.id === form.batch_id)
+    if (!selectedBatch || qty > selectedBatch.available_kg) {
+      setError('Requested quantity exceeds available warehouse stock. Refresh and choose an available batch.')
+      return
+    }
+
     const price = parseFloat(form.unit_price_inr)
     if (isNaN(price) || price <= 0) {
       setError('Unit price must be greater than 0 INR.')
@@ -107,8 +102,8 @@ export default function OrderCreatePage() {
       const unitPricePaise = Math.round(price * 100)
 
       const payload = {
-        seller_id: form.seller_id.trim(),
-        produce_type: form.produce_type.trim(),
+        seller_id: selectedBatch.farmer_id,
+        produce_type: selectedBatch.produce_type,
         batch_id: form.batch_id.trim(),
         requested_quantity_kg: qty,
         unit_price_paise: unitPricePaise,
@@ -117,6 +112,7 @@ export default function OrderCreatePage() {
 
       const res = await ordersApi.create(payload)
       const newKey = res.data.id || res.data._id || res.data.order_id
+      queryClient.invalidateQueries()
       navigate(`/purchase-orders/${newKey}`)
     } catch (err) {
       console.error('Order creation error:', err)
@@ -162,6 +158,9 @@ export default function OrderCreatePage() {
             </div>
           )}
 
+          {batchesError && <p role="alert">Unable to load available batches. Please retry.</p>}
+          {batchesLoading && <p>Loading available batches…</p>}
+          {!batchesLoading && !batchesError && !batches.length && <p>No available warehouse stock. Ask the warehouse manager to receive a batch first.</p>}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -187,20 +186,7 @@ export default function OrderCreatePage() {
                 <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
                   Produce Commodity Type *
                 </label>
-                <Select
-                  name="produce_type"
-                  required
-                  value={form.produce_type}
-                  onChange={handleChange}
-                  className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
-                >
-                  <option value="">Select commodity...</option>
-                  {produceItems.map(p => (
-                    <option key={p.produce_type || p.id} value={p.produce_type}>
-                      {p.name} ({p.produce_type})
-                    </option>
-                  ))}
-                </Select>
+                <Input aria-label="Produce commodity" value={form.produce_type} readOnly />
               </div>
             </div>
 
@@ -208,20 +194,8 @@ export default function OrderCreatePage() {
               <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
                 Seller / Producer (Farmer) *
               </label>
-              <Select
-                name="seller_id"
-                required
-                value={form.seller_id}
-                onChange={handleChange}
-                className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
-              >
-                <option value="">Select verified farmer...</option>
-                {farmers.map(f => (
-                  <option key={f.id || f._id} value={f.id || f._id}>
-                    {f.full_name} ({f.email})
-                  </option>
-                ))}
-              </Select>
+              <Input aria-label="Seller from selected batch" value={form.seller_id} readOnly />
+              <p className="text-xs text-stone-500">The seller is the owner of the selected batch.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -231,8 +205,8 @@ export default function OrderCreatePage() {
                 </label>
                 <Input
                   type="number"
-                  step="0.1"
-                  min="0.1"
+                  step="0.001"
+                  min="0.001"
                   required
                   name="requested_quantity_kg"
                   value={form.requested_quantity_kg}

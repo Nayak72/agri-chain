@@ -1,3 +1,4 @@
+import { ROLES, isRoleAllowed } from '../../constants/roles'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
@@ -30,7 +31,7 @@ export default function FleetListPage() {
     v.vehicle_type?.toLowerCase().includes(search.toLowerCase())
   )
 
-  const canCreate = user?.role === 'admin' || user?.role === 'transporter'
+  const canCreate = isRoleAllowed(user?.role, [ROLES.ADMIN]) || isRoleAllowed(user?.role, [ROLES.TRANSPORTER])
 
   return (
     <div className="space-y-6 animate-fade-in-up">

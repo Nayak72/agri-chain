@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -10,6 +11,7 @@ import { Select } from '../../components/ui/select'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card'
 
 export default function BatchCreatePage() {
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
   const [loading, setLoading] = useState(false)
@@ -86,6 +88,7 @@ export default function BatchCreatePage() {
 
       const res = await batchesApi.create(payload)
       const newKey = res.data.batch_id || res.data.id || res.data._id
+      queryClient.invalidateQueries()
       navigate(`/batches/${newKey}`)
     } catch (err) {
       console.error('Batch creation error:', err)

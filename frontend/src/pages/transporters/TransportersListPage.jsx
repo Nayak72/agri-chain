@@ -1,3 +1,4 @@
+import { ROLES, isRoleAllowed } from '../../constants/roles'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -96,7 +97,7 @@ export default function TransportersListPage() {
     })
   }
 
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = isRoleAllowed(user?.role, [ROLES.ADMIN])
 
   return (
     <div className="space-y-6 animate-fade-in-up">

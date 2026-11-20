@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -9,6 +10,7 @@ import { formatWeight, formatApiErrorMessage } from '../../utils'
 import PageHeader from '../../components/common/PageHeader'
 
 export default function ShipmentCreatePage() {
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
@@ -124,6 +126,7 @@ export default function ShipmentCreatePage() {
 
       const res = await shipmentsApi.create(payload)
       const newId = res.data.id || res.data._id
+      queryClient.invalidateQueries()
       navigate(`/shipments/${newId}`)
     } catch (err) {
       console.error('Shipment creation error:', err)

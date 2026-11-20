@@ -1,3 +1,4 @@
+import { ROLES, isRoleAllowed } from '../../constants/roles'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
@@ -31,7 +32,7 @@ export default function FreightBookingsListPage() {
     b.preferred_vehicle_category?.toLowerCase().includes(search.toLowerCase())
   )
 
-  const canCreate = user?.role === 'admin' || user?.role === 'buyer' || user?.role === 'farmer'
+  const canCreate = isRoleAllowed(user?.role, [ROLES.ADMIN]) || isRoleAllowed(user?.role, [ROLES.BUYER]) || isRoleAllowed(user?.role, [ROLES.FARMER])
 
   return (
     <div className="space-y-6 animate-fade-in-up">

@@ -66,3 +66,6 @@ coverage/
 *.zip
 *.tar.gz
 .agri-chain/
+# Browser test artifacts
+frontend/test-results/
+frontend/playwright-report/

@@ -1,3 +1,5 @@
+import { ROLES, isRoleAllowed } from '../../constants/roles'
+import { VEHICLE_CATEGORIES } from '../../constants/domain'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -55,6 +57,8 @@ export default function FreightQuotesPage() {
     mutationFn: (data) => freightQuotesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['freight-quotes-all'] })
+      queryClient.invalidateQueries({ queryKey: ['freight-quotes'] })
+      queryClient.invalidateQueries({ queryKey: ['freight-bookings'] })
       setSuccessMsg('Quotation submitted successfully to the freight exchange!')
       setFormError('')
     },
@@ -80,7 +84,7 @@ export default function FreightQuotesPage() {
     }
 
     const fuelInr = form.fuel_surcharge_inr ? Number(form.fuel_surcharge_inr) : 0
-    if (isNaN(fuelInr)) {
+    if (!Number.isFinite(fuelInr) || fuelInr < 0) {
       setFormError('Additional charges must be valid numeric amounts.')
       return
     }
@@ -132,7 +136,7 @@ export default function FreightQuotesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Quotation Submission Form */}
-        <Card className="lg:col-span-1 glass-panel-strong border-[#E1DDD0] shadow-sm h-fit">
+        {isRoleAllowed(user?.role, [ROLES.TRANSPORTER]) && <Card className="lg:col-span-1 glass-panel-strong border-[#E1DDD0] shadow-sm h-fit">
           <CardHeader className="border-b border-[#ECE7DA] pb-5">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full bg-[#3F7C56]" />
@@ -174,7 +178,7 @@ export default function FreightQuotesPage() {
                   className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                 >
                   <option value="">Select dispatch booking...</option>
-                  {bookings.map(b => (
+                  {bookings.filter(b => ['REQUESTED', 'QUOTATION_PENDING', 'QUOTED'].includes(b.status)).map(b => (
                     <option key={b.booking_id || b.id} value={b.booking_id || b.id}>
                       {b.booking_id || b.id} — {b.pickup_city} to {b.destination_city}
                     </option>
@@ -190,11 +194,7 @@ export default function FreightQuotesPage() {
                   onChange={handleChange}
                   className="glass-control border-[#E1DDD0] text-xs font-mono focus-visible:ring-[#244634]"
                 >
-                  <option value="REFRIGERATED_TRUCK">Refrigerated Truck (14ft)</option>
-                  <option value="REEFER_20FT">Refrigerated Truck (20ft)</option>
-                  <option value="REEFER_32FT">Refrigerated Trailer (32ft)</option>
-                  <option value="OPEN_TRUCK">Open Tarpaulin Truck</option>
-                  <option value="CLOSED_CONTAINER">Closed Container</option>
+                  {VEHICLE_CATEGORIES.map(category => <option key={category} value={category}>{category.replaceAll('_', ' ')}</option>)}
                 </Select>
               </div>
 
@@ -263,7 +263,7 @@ export default function FreightQuotesPage() {
               </Button>
             </form>
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Right Column: Quotes List */}
         <Card className="lg:col-span-2 glass-panel-strong border-[#E1DDD0] overflow-hidden shadow-sm h-fit">

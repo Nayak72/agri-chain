@@ -1,3 +1,4 @@
+import { ROLES, isRoleAllowed } from '../../constants/roles'
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -26,7 +27,7 @@ export default function OrderDetailPage() {
   const acceptMutation = useMutation({
     mutationFn: () => ordersApi.accept(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchase-order', id] })
+      queryClient.invalidateQueries()
     },
     onError: (err) => {
       const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Accept failed.'
@@ -38,7 +39,7 @@ export default function OrderDetailPage() {
   const rejectMutation = useMutation({
     mutationFn: () => ordersApi.reject(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchase-order', id] })
+      queryClient.invalidateQueries()
     },
     onError: (err) => {
       const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Reject failed.'
@@ -50,7 +51,7 @@ export default function OrderDetailPage() {
   const cancelMutation = useMutation({
     mutationFn: () => ordersApi.cancel(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchase-order', id] })
+      queryClient.invalidateQueries()
     },
     onError: (err) => {
       const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Cancel failed.'
@@ -87,8 +88,8 @@ export default function OrderDetailPage() {
   }
 
   const orderKey = order.id || order._id || order.order_id
-  const isSeller = user?.id === order.seller_id || user?.email === order.seller_id || user?.role === 'farmer' || user?.role === 'admin'
-  const isBuyer = user?.id === order.buyer_id || user?.email === order.buyer_id || user?.role === 'buyer' || user?.role === 'admin'
+  const isSeller = isRoleAllowed(user?.role, [ROLES.ADMIN]) || (isRoleAllowed(user?.role, [ROLES.FARMER]) && user?.id === order.seller_id)
+  const isBuyer = isRoleAllowed(user?.role, [ROLES.ADMIN]) || (isRoleAllowed(user?.role, [ROLES.BUYER]) && user?.id === order.buyer_id)
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in-up">

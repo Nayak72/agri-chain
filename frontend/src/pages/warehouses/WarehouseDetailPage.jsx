@@ -1,3 +1,4 @@
+import { useAuth } from '../../context/AuthContext'
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -12,6 +13,7 @@ import { StatusBadge } from '../../components/common/StatusBadge'
 
 export default function WarehouseDetailPage() {
   const { id } = useParams()
+  const { can } = useAuth()
   const navigate = useNavigate()
 
   // Fetch warehouse data
@@ -135,23 +137,23 @@ export default function WarehouseDetailPage() {
 
       {/* Operational Actions Deck */}
       <div className="p-2 rounded-2xl glass-panel border border-[#E1DDD0] grid grid-cols-2 md:grid-cols-4 gap-2">
-        <Button
+        {can('page:produce-create') && (<Button
           variant="ghost"
           onClick={() => navigate('/produce/new')}
           className="h-16 flex-col gap-1 text-[#26312A] hover:bg-[#F2EFE7]"
         >
           <Package className="w-5 h-5 text-[#244634]" />
           <span className="text-xs font-semibold">Define Produce</span>
-        </Button>
+        </Button>)}
 
-        <Button
+        {can('page:batch-create') && (<Button
           variant="ghost"
           onClick={() => navigate('/batches/new')}
           className="h-16 flex-col gap-1 text-[#26312A] hover:bg-[#F2EFE7]"
         >
           <Sprout className="w-5 h-5 text-[#3F7C56]" />
           <span className="text-xs font-semibold">Add Harvest Batch</span>
-        </Button>
+        </Button>)}
 
         <Button
           variant="ghost"

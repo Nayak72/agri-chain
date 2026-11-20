@@ -183,3 +183,4 @@ No authenticated user can access arbitrary resources simply by knowing an `_id` 
 | `GET` | `/` | API Root | Public | Anyone | Root discovery endpoint. | Returns version and health links. |
 | `GET` | `/health/live` | Liveness Probe | Public | Anyone | Returns `{"status": "ok"}`. | Kubernetes/Container liveness. |
 | `GET` | `/health/ready` | Readiness Probe | Public | Anyone | Pings MongoDB database. | Returns 200 when MongoDB is connected. |
+

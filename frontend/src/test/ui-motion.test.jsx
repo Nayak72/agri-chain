@@ -35,7 +35,7 @@ describe('presentation lifecycle', () => {
     vi.stubGlobal('matchMedia', () => media)
     function Fixture() {
       const [open, setOpen] = useState(false)
-      return <MemoryRouter><AuthContext.Provider value={{ user: { role: 'FARMER' } }}>
+      return <MemoryRouter><AuthContext.Provider value={{ user: { role: 'FARMER' }, can: permission => ['page:dashboard', 'page:farms', 'page:batches', 'page:produce', 'page:orders', 'page:bookings', 'page:shipments', 'page:ledger', 'page:cold-chain'].includes(permission) }}>
         <button onClick={() => setOpen(true)}>Open drawer</button>
         <MobileNav open={open} onClose={() => setOpen(false)} />
       </AuthContext.Provider></MemoryRouter>
@@ -124,12 +124,12 @@ describe('presentation lifecycle', () => {
   })
 
   it('keeps the closed mobile drawer inert while preserving role filtering', () => {
-    const { container, rerender } = render(<MemoryRouter><AuthContext.Provider value={{ user: { role: 'FARMER' } }}>
+    const { container, rerender } = render(<MemoryRouter><AuthContext.Provider value={{ user: { role: 'FARMER' }, can: permission => ['page:dashboard', 'page:farms', 'page:batches', 'page:produce', 'page:orders', 'page:bookings', 'page:shipments', 'page:ledger', 'page:cold-chain'].includes(permission) }}>
       <MobileNav open={false} onClose={() => {}} />
     </AuthContext.Provider></MemoryRouter>)
     expect(container.querySelector('.mobile-presence')).toHaveAttribute('inert')
     expect(screen.queryByText('Manage Users')).not.toBeInTheDocument()
-    rerender(<MemoryRouter><AuthContext.Provider value={{ user: { role: 'FARMER' } }}>
+    rerender(<MemoryRouter><AuthContext.Provider value={{ user: { role: 'FARMER' }, can: permission => ['page:dashboard', 'page:farms', 'page:batches', 'page:produce', 'page:orders', 'page:bookings', 'page:shipments', 'page:ledger', 'page:cold-chain'].includes(permission) }}>
       <MobileNav open={true} onClose={() => {}} />
     </AuthContext.Provider></MemoryRouter>)
     expect(container.querySelector('.mobile-presence')).not.toHaveAttribute('inert')

@@ -75,7 +75,7 @@ export default function ShipmentDetailPage() {
   const { data: booking } = useQuery({
     queryKey: ['shipment-booking', shipment?.booking_id],
     queryFn: () => freightBookingsApi.get(shipment.booking_id).then(r => r.data),
-    enabled: !!shipment?.booking_id,
+    enabled: !!shipment?.booking_id && [ROLES.ADMIN, ROLES.TRANSPORTER, ROLES.BUYER, ROLES.FARMER].includes(userRole),
   })
 
   // Checkpoints query
@@ -542,7 +542,7 @@ export default function ShipmentDetailPage() {
                 <h3 className="text-base font-bold text-stone-900">Corridor Milestones & Checkpoints</h3>
               </div>
 
-              {userRole === ROLES.DRIVER && shipment.status === 'IN_TRANSIT' && (
+              {[ROLES.DRIVER, ROLES.TRANSPORTER].includes(userRole) && shipment.status === 'IN_TRANSIT' && (
                 <button
                   onClick={() => setShowCheckpointModal(true)}
                   className="px-3 py-1.5 rounded-lg bg-stone-100 border border-stone-200 hover:bg-stone-200/80 text-stone-700 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all"
@@ -614,13 +614,13 @@ export default function ShipmentDetailPage() {
           <div className="glass-panel-strong border border-emerald-200 rounded-2xl p-6 shadow-sm relative overflow-hidden space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded border border-emerald-200 uppercase tracking-wider font-bold">
-                TELEMETRY ACTIVE
+                SIMULATED TELEMETRY
               </span>
               <span className="flex h-2 w-2 rounded-full bg-emerald-600 animate-ping" />
             </div>
             <h3 className="text-sm font-bold text-stone-900 font-sans">Cold-Chain Datalogger</h3>
             <p className="text-xs text-stone-500 leading-relaxed font-sans">
-              Continuous temperature & humidity sensors streaming live telematics for this consignment corridor.
+              Simulated temperature and humidity readings for this consignment. No physical sensors are connected.
             </p>
             <button
               onClick={() => navigate('/cold-chain', { state: { shipmentId: sId } })}

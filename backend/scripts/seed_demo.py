@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.db.mongodb import connect_to_mongo, close_mongo_connection, get_database
 from app.db.unit_of_work import run_in_txn
 from app.core.security import get_password_hash
+from app.core.config import get_settings
 from app.core.constants import LedgerEventType
 from app.services.ledger_service import append_ledger_block
 
@@ -39,7 +40,13 @@ async def ensure(db, collection, key, document):
     return document
 
 
+def validate_demo_target(settings):
+    if settings.app_env not in ("development", "test") or not settings.database_name.startswith(("agri_chain_demo", "agri_chain_test", "agri_chain_it_")):
+        raise RuntimeError("Demo seed requires development/test APP_ENV and an isolated agri_chain_demo* or agri_chain_test* database")
+
+
 async def seed():
+    validate_demo_target(get_settings())
     await connect_to_mongo()
     try:
         db = get_database()
@@ -52,22 +59,28 @@ async def seed():
                 "full_name": full_name, "role": role, "is_active": True,
                 "is_approved": True, "created_at": now, "updated_at": now,
             })
+        await ensure(db, "produce_catalogue", {"produce_type": "TOMATO"}, {
+            "produce_type": "TOMATO", "name": "Tomato", "category": "VEGETABLE", "unit": "KG",
+            "is_active": True, "created_at": now, "updated_at": now,
+        })
         farmer_id = str(users["FARMER"]["_id"])
         manager_id = str(users["WAREHOUSE_MANAGER"]["_id"])
         transporter_user_id = str(users["TRANSPORTER"]["_id"])
-        farm = await ensure(db, "farms", {"name": "Nashik Tomato Farm"}, {
+        farm = await ensure(db, "farms", {"name": "Nashik Tomato Farm", "farmer_id": farmer_id}, {
             "name": "Nashik Tomato Farm", "farmer_id": farmer_id,
             "city": "Nashik", "state": "Maharashtra", "pincode": "422001",
             "is_active": True, "created_at": now, "updated_at": now,
         })
-        await ensure(db, "warehouses", {"name": "Bengaluru Cold Warehouse"}, {
-            "name": "Bengaluru Cold Warehouse", "manager_id": manager_id,
-            "city": "Bengaluru", "state": "Karnataka", "pincode": "560001",
-            "capacity_kg": 10000, "has_refrigeration": True,
+        await ensure(db, "warehouses", {"name": "Nashik Demo Cold Warehouse"}, {
+            "name": "Nashik Demo Cold Warehouse", "manager_id": manager_id,
+            "city": "Nashik", "state": "Maharashtra", "pincode": "422001",
+            "capacity_kg": 10000, "cold_storage_capacity_kg": 10000, "has_refrigeration": True,
+            "temperature_range_min": 7, "temperature_range_max": 13,
             "is_active": True, "created_at": now, "updated_at": now,
         })
         transporter = await ensure(db, "transporters", {"user_id": transporter_user_id}, {
             "transporter_id": "TRN-DEMO", "user_id": transporter_user_id,
+            "address": "Nashik Agricultural Logistics Park",
             "company_name": "AgriChain Cold Transport", "contact_person": "Cold Chain Transporter",
             "email": "transporter1@agrichain.com", "phone": "+919876500000",
             "city": "Nashik", "state": "Maharashtra", "pincode": "422001",
@@ -112,7 +125,7 @@ async def seed():
                     session=session,
                 )
             await run_in_txn(create_batch)
-        print("Demo ready: six roles, Nashik tomato batch (2000 kg), Bengaluru warehouse, two reefers and drivers.")
+        print("Demo ready: six roles, Nashik tomato batch (2000 kg), Nashik cold warehouse, two reefers and drivers.")
         print("Demo passwords follow Role123! (for example, Admin123!).")
     finally:
         await close_mongo_connection()

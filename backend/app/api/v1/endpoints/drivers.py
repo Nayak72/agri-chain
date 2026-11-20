@@ -93,7 +93,7 @@ async def create_driver(
         "driver_id": driver_id,
         "transporter_id": trans_id,
         "user_id": None,
-        **driver_data.model_dump(),
+        **driver_data.model_dump(exclude={"transporter_id"}),
         "status": DriverStatus.AVAILABLE.value,
         "current_assignment": None,
         "created_at": now,

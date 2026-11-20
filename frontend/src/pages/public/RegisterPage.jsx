@@ -109,6 +109,7 @@ export default function RegisterPage() {
         password: formData.password,
       })
 
+      if (!res.success) { setFormError(typeof res.error === 'string' ? res.error : 'Registration failed'); return }
       const status = res?.data?.status || res?.status
       if (status === 'PENDING_APPROVAL') {
         navigate('/pending-approval')

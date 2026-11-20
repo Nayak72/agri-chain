@@ -1,6 +1,6 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import React, { useState, useEffect } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams, useLocation, Link } from 'react-router-dom'
 import {
   Thermometer,
   Droplets,
@@ -26,7 +26,7 @@ import {
 } from 'recharts'
 import { sensorsApi } from '../../api/monitoring.api'
 import { shipmentsApi } from '../../api/commerce.api'
-import { formatDate } from '../../utils'
+import { formatDate, getApiError } from '../../utils'
 import PageHeader from '../../components/common/PageHeader'
 import StatusBadge from '../../components/common/StatusBadge'
 import { useAuth } from '../../context/AuthContext'
@@ -44,7 +44,8 @@ const SCENARIOS = [
 export default function ColdChainPage() {
   const { can } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
-  const initialShipmentId = searchParams.get('shipmentId') || ''
+  const location = useLocation()
+  const initialShipmentId = searchParams.get('shipmentId') || location.state?.shipmentId || ''
 
   const [shipments, setShipments] = useState([])
   const [selectedShipmentId, setSelectedShipmentId] = useState(initialShipmentId)
@@ -75,7 +76,7 @@ export default function ColdChainPage() {
           setSelectedShipmentId(list[0].id || list[0]._id)
         }
       } catch (err) {
-        console.error('Failed to fetch shipments:', err)
+        setError(getApiError(err, 'Failed to fetch shipments').message)
       }
     }
     loadShipments()
@@ -99,7 +100,7 @@ export default function ColdChainPage() {
       setSimulation((sessionsRes.data || []).find(item => ['RUNNING', 'PAUSED'].includes(item.state)) || null)
     } catch (err) {
       if (!silent) {
-        setError(err.response?.data?.detail || 'Failed to fetch sensor telemetry')
+        setError(getApiError(err, 'Failed to fetch sensor telemetry').message)
       }
     } finally {
       if (!silent) setLoading(false)
@@ -109,13 +110,16 @@ export default function ColdChainPage() {
   useEffect(() => {
     if (selectedShipmentId) {
       setSearchParams({ shipmentId: selectedShipmentId })
+      setReadings([])
+      setAlerts([])
+      setSimulation(null)
       fetchTelemetry()
     }
   }, [selectedShipmentId])
 
   useEffect(() => {
     if (!selectedShipmentId || !simulation?.auto_play || simulation.state !== 'RUNNING') return
-    const timer = setInterval(() => fetchTelemetry(true), 5000)
+    const timer = setInterval(() => fetchTelemetry(true), 2000)
     return () => clearInterval(timer)
   }, [selectedShipmentId, simulation?.auto_play, simulation?.state])
 
@@ -128,7 +132,7 @@ export default function ColdChainPage() {
       setTimeout(() => setSuccessMsg(null), 2000)
       fetchTelemetry(true)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to trigger single reading')
+      setError(getApiError(err, 'Failed to trigger single reading').message)
     } finally {
       setActionLoading(false)
     }
@@ -142,7 +146,7 @@ export default function ColdChainPage() {
       else await sensorsApi.controlSession(selectedShipmentId, simulation.simulation_id, action)
       await fetchTelemetry(true)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Simulation control failed')
+      setError(getApiError(err, 'Simulation control failed').message)
     } finally {
       setActionLoading(false)
     }
@@ -155,7 +159,7 @@ export default function ColdChainPage() {
       await sensorsApi.acknowledgeAlert(alertId)
       await fetchTelemetry(true)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to acknowledge alert')
+      setError(getApiError(err, 'Failed to acknowledge alert').message)
     } finally {
       setActionLoading(false)
     }
@@ -176,7 +180,7 @@ export default function ColdChainPage() {
       setTimeout(() => setSuccessMsg(null), 3000)
       fetchTelemetry(true)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to update alert')
+      setError(getApiError(err, 'Failed to update alert').message)
     } finally {
       setActionLoading(false)
     }
@@ -254,7 +258,7 @@ export default function ColdChainPage() {
               ) : (
                 shipments.map((s) => (
                   <option key={s.id || s._id} value={s.id || s._id}>
-                    {s.tracking_number || s.shipment_number || (s.id || s._id).slice(-8)} — {s.status}
+                    {s.shipment_id || s.tracking_number || s.shipment_number || (s.id || s._id).slice(-8)} — {s.status}
                   </option>
                 ))
               )}
@@ -502,17 +506,17 @@ export default function ColdChainPage() {
                 {/* Cold-chain safety reference lines */}
                 <ReferenceLine
                   yAxisId="temp"
-                  y={8}
+                  y={latestReading?.configured_temp_max}
                   stroke="#ef4444"
                   strokeDasharray="4 4"
-                  label={{ value: 'Upper Critical (8°C)', fill: '#ef4444', fontSize: 10, position: 'top' }}
+                  label={{ value: `Safe maximum (${latestReading?.configured_temp_max}°C)`, fill: '#ef4444', fontSize: 10, position: 'top' }}
                 />
                 <ReferenceLine
                   yAxisId="temp"
-                  y={4}
+                  y={latestReading?.configured_temp_min}
                   stroke="#3b82f6"
                   strokeDasharray="4 4"
-                  label={{ value: 'Lower Target (4°C)', fill: '#3b82f6', fontSize: 10, position: 'bottom' }}
+                  label={{ value: `Safe minimum (${latestReading?.configured_temp_min}°C)`, fill: '#3b82f6', fontSize: 10, position: 'bottom' }}
                 />
                 <Line
                   yAxisId="temp"
@@ -599,7 +603,7 @@ export default function ColdChainPage() {
                         </span>
                       </td>
                       <td className="py-3 px-3 max-w-md truncate font-sans">
-                        {alert.message || alert.description || 'Condition breach detected'}
+                        {alert.message || `${alert.alert_type}: ${alert.observed_value} (safe range ${alert.configured_min}–${alert.configured_max})`}
                       </td>
                       <td className="py-3 px-3 text-stone-600 whitespace-nowrap font-mono text-[11px]">
                         {alert.created_at ? (
@@ -635,11 +639,11 @@ export default function ColdChainPage() {
                       </td>
                       <td className="py-3 px-3 text-right space-x-2">
 
-                        {canManageReadings && alert.status === 'ACTIVE' && !alert.acknowledged_at && (
+                        {can('alerts:acknowledge') && alert.status === 'ACTIVE' && !alert.acknowledged_at && (
                           <button type="button" disabled={actionLoading} onClick={() => handleAcknowledge(alertId)} className="glass-control rounded-lg border px-2 py-1 text-xs disabled:opacity-50">Acknowledge</button>
                         )}
 
-                        {canManageReadings && alert.status !== 'RESOLVED' && (
+                        {can('alerts:resolve') && alert.status !== 'RESOLVED' && (
                           <button
                             onClick={() => {
                               setActiveAlertModal({ alert, mode: 'resolve' })

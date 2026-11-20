@@ -37,7 +37,7 @@ async def stock_fixture(db, accepted=100):
     farmer, manager, buyer = (str(ObjectId()) for _ in range(3))
     await db.users.insert_many([{"_id": ObjectId(farmer), "role": "FARMER"}, {"_id": ObjectId(buyer), "role": "BUYER"}])
     farm_id = (await db.farms.insert_one({"farmer_id": farmer, "is_active": True})).inserted_id
-    warehouse_id = (await db.warehouses.insert_one({"manager_id": manager})).inserted_id
+    warehouse_id = (await db.warehouses.insert_one({"manager_id": manager, "capacity_kg": 10000})).inserted_id
     batch_id = (await db.produce_batches.insert_one({
         "batch_id": f"TOM-{uuid4().hex[:8]}", "farmer_id": farmer, "farm_id": str(farm_id),
         "produce_type": "TOMATO", "initial_quantity_kg": accepted,
@@ -143,7 +143,7 @@ async def test_concurrent_shipment_vehicle_claim(db):
     requests = []
     for number in (1, 2):
         order_id = (await db.purchase_orders.insert_one({
-            "order_id": f"PO-{number}", "status": "ACCEPTED",
+            "order_id": f"PO-{number}", "status": "ACCEPTED", "accepted_quantity_kg": 20,
             "seller_id": farmer, "buyer_id": buyer,
         })).inserted_id
         booking_id = (await db.freight_bookings.insert_one({
@@ -181,7 +181,7 @@ async def test_partial_delivery_equation_and_asset_release(db):
         "status": "ACCEPTED", "batch_id": str(batch),
         "requested_quantity_kg": 100, "accepted_quantity_kg": 100,
     })).inserted_id
-    await db.inventory_items.update_one({"batch_id": str(batch)}, {"$set": {"available_kg": 0}})
+    await db.inventory_items.update_one({"batch_id": str(batch)}, {"$set": {"available_kg": 0, "available_g": 0}})
     vehicle_id = (await db.vehicles.insert_one({"status": "ASSIGNED"})).inserted_id
     driver_id = (await db.drivers.insert_one({"status": "ASSIGNED"})).inserted_id
     shipment_id = ObjectId()
@@ -364,3 +364,24 @@ async def test_legacy_movement_backfill_is_idempotent_and_does_not_invent_histor
     movement = await db.inventory_movements.find_one({'inventory_id': str(inv)})
     assert movement['type'] == 'OPENING_BALANCE' and movement['new_available_kg'] == 30
     assert await db.inventory_movements.count_documents({}) == 1
+
+
+async def test_demo_seed_idempotent_and_preserves_existing_data(db, monkeypatch):
+    from scripts import seed_demo
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    monkeypatch.setattr(seed_demo, 'get_settings', lambda: SimpleNamespace(app_env='test', database_name=db.name))
+    monkeypatch.setattr(seed_demo, 'connect_to_mongo', AsyncMock())
+    monkeypatch.setattr(seed_demo, 'close_mongo_connection', AsyncMock())
+    monkeypatch.setattr(seed_demo, 'get_database', lambda: db)
+    await seed_demo.seed()
+    collections = ['users', 'farms', 'warehouses', 'produce_catalogue', 'produce_batches', 'transporters', 'vehicles', 'drivers', 'ledger_blocks']
+    before = {name: await db[name].count_documents({}) for name in collections}
+    await db.vehicles.update_one({'vehicle_id': 'VEH-DEMO-1'}, {'$set': {'status': 'ASSIGNED', 'current_assignment': 'preserve-me'}})
+    await seed_demo.seed()
+    assert {name: await db[name].count_documents({}) for name in collections} == before
+    assert (await db.vehicles.find_one({'vehicle_id': 'VEH-DEMO-1'}))['current_assignment'] == 'preserve-me'
+    assert (await db.produce_catalogue.find_one({'produce_type': 'TOMATO'}))['category'] == 'VEGETABLE'
+    warehouse = await db.warehouses.find_one({})
+    assert warehouse['cold_storage_capacity_kg'] >= 2000
+    assert (await verify_ledger_integrity(db))['valid']

@@ -1,3 +1,8 @@
+import { useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
+import { transportersApi } from '../../api/commerce.api'
+import { ROLES, isRoleAllowed } from '../../constants/roles'
+import { VEHICLE_CATEGORIES } from '../../constants/domain'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, AlertCircle, Truck, ThermometerSnowflake } from 'lucide-react'
@@ -10,20 +15,23 @@ import { Select } from '../../components/ui/select'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card'
 
 export default function VehicleCreatePage() {
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const isAdmin = isRoleAllowed(user?.role, [ROLES.ADMIN])
+  const { data: carriers = [], isError: carrierError } = useQuery({ queryKey: ['transporters'], enabled: isAdmin, queryFn: () => transportersApi.list({ page_size: 100 }).then(r => r.data) })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const [form, setForm] = useState({
-    transporter_id: user?.id || user?._id || 'transporter1',
+    transporter_id: '',
     registration_number: '',
-    category: 'REEFER_14FT',
+    category: 'REFRIGERATED_TRUCK',
     vehicle_type: 'Refrigerated Truck',
     max_payload_kg: '3500',
     refrigeration_available: true,
-    temperature_min: '2.0',
-    temperature_max: '8.0',
+    temperature_min: '7.0',
+    temperature_max: '13.0',
   })
 
   const handleChange = (e) => {
@@ -68,7 +76,7 @@ export default function VehicleCreatePage() {
 
     try {
       const payload = {
-        transporter_id: form.transporter_id.trim(),
+        ...(form.transporter_id ? { transporter_id: form.transporter_id } : {}),
         registration_number: form.registration_number.trim().toUpperCase(),
         category: form.category,
         vehicle_type: form.vehicle_type.trim(),
@@ -79,6 +87,7 @@ export default function VehicleCreatePage() {
       }
 
       await fleetApi.createVehicle(payload)
+      queryClient.invalidateQueries()
       navigate('/fleet')
     } catch (err) {
       console.error('Vehicle registration error:', err)
@@ -124,7 +133,7 @@ export default function VehicleCreatePage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">{isAdmin && <label className="block">Transporter<select required className="block w-full border glass-control rounded-xl p-2" value={form.transporter_id || ''} onChange={e => setForm(prev => ({ ...prev, transporter_id: e.target.value }))}><option value="">Select transporter</option>{carriers.map(t => <option key={t.id} value={t.id}>{t.company_name}</option>)}</select></label>}{carrierError && <p role="alert">Unable to load transporters.</p>}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
@@ -151,11 +160,7 @@ export default function VehicleCreatePage() {
                   onChange={handleChange}
                   className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
-                  <option value="REEFER_14FT">Refrigerated Truck (14ft)</option>
-                  <option value="REEFER_20FT">Refrigerated Truck (20ft)</option>
-                  <option value="REEFER_32FT">Refrigerated Trailer (32ft)</option>
-                  <option value="OPEN_TRUCK">Open Truck (Tarpaulin)</option>
-                  <option value="CLOSED_CONTAINER">Closed Container</option>
+                  {VEHICLE_CATEGORIES.map(category => <option key={category} value={category}>{category.replaceAll('_', ' ')}</option>)}
                 </Select>
               </div>
             </div>

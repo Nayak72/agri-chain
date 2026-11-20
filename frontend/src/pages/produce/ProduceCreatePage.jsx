@@ -1,3 +1,5 @@
+import { useQueryClient } from '@tanstack/react-query'
+import { PRODUCE_TYPES } from '../../constants/domain'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, AlertCircle } from 'lucide-react'
@@ -10,6 +12,7 @@ import { Textarea } from '../../components/ui/textarea'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card'
 
 export default function ProduceCreatePage() {
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -17,7 +20,7 @@ export default function ProduceCreatePage() {
   const [form, setForm] = useState({
     name: '',
     produce_type: '',
-    category: 'VEGETABLES',
+    category: 'VEGETABLE',
     unit: 'KG',
     description: '',
   })
@@ -42,6 +45,7 @@ export default function ProduceCreatePage() {
 
       const res = await produceApi.create(payload)
       const newId = res.data.id || res.data._id
+      queryClient.invalidateQueries()
       navigate(`/produce/${newId}`)
     } catch (err) {
       console.error('Produce creation error:', err)
@@ -110,15 +114,10 @@ export default function ProduceCreatePage() {
                 <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
                   System Produce Code (Key) *
                 </label>
-                <Input
-                  type="text"
-                  name="produce_type"
-                  required
-                  value={form.produce_type}
-                  onChange={handleChange}
-                  placeholder="e.g. MANGO_ALPHONSO"
-                  className="glass-control border-[#E1DDD0] uppercase font-mono focus-visible:ring-[#244634]"
-                />
+                <Select name="produce_type" aria-label="Produce type" required value={form.produce_type} onChange={handleChange}>
+                  <option value="">Select supported produce</option>
+                  {PRODUCE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-mono font-semibold text-[#526357] uppercase tracking-wider">
@@ -130,12 +129,8 @@ export default function ProduceCreatePage() {
                   onChange={handleChange}
                   className="glass-control border-[#E1DDD0] focus-visible:ring-[#244634]"
                 >
-                  <option value="FRUITS">FRUITS</option>
-                  <option value="VEGETABLES">VEGETABLES</option>
-                  <option value="GRAINS">GRAINS</option>
-                  <option value="PULSES">PULSES</option>
-                  <option value="SPICES">SPICES</option>
-                  <option value="DAIRY">DAIRY</option>
+                  <option value="FRUIT">FRUIT</option>
+                  <option value="VEGETABLE">VEGETABLE</option>
                 </Select>
               </div>
             </div>

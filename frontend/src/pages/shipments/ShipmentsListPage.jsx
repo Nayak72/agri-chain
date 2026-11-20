@@ -1,3 +1,4 @@
+import { ROLES, isRoleAllowed } from '../../constants/roles'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
@@ -30,7 +31,7 @@ export default function ShipmentsListPage() {
     return matchesSearch && matchesStatus
   })
 
-  const canCreate = user?.role === 'admin' || user?.role === 'transporter'
+  const canCreate = isRoleAllowed(user?.role, [ROLES.TRANSPORTER])
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
