@@ -54,6 +54,22 @@ export default function ColdChainPage() {
   const requestSeq = useRef(0)
   const msgTimerRef = useRef(null)
 
+  const [readings, setReadings] = useState([])
+  const [alerts, setAlerts] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [successMsg, setSuccessMsg] = useState(null)
+
+  // Simulation controls state
+  const [scenario, setScenario] = useState('NORMAL')
+  const [playbackSpeed, setPlaybackSpeed] = useState(1)
+  const [simulation, setSimulation] = useState(null)
+
+  // Resolve alert modal
+  const [activeAlertModal, setActiveAlertModal] = useState(null)
+  const [correctiveAction, setCorrectiveAction] = useState('')
+
   useEffect(() => {
     isMountedRef.current = true
     return () => {
