@@ -3,15 +3,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://REPLACE-WITH-RENDER-HOST.onrender.com/api/:path*"
+      "destination": "https://agrichain-backend-aqfv.onrender.com/api/:path*"
     },
     {
       "source": "/health/:path*",
-      "destination": "https://REPLACE-WITH-RENDER-HOST.onrender.com/health/:path*"
+      "destination": "https://agrichain-backend-aqfv.onrender.com/health/:path*"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://REPLACE-WITH-RENDER-HOST.onrender.com/uploads/:path*"
+      "destination": "https://agrichain-backend-aqfv.onrender.com/uploads/:path*"
     },
     {
       "source": "/(.*)",
@@ -19,4 +19,3 @@
     }
   ]
 }
-
