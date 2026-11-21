@@ -53,9 +53,9 @@ it('buyer order derives seller and commodity from available batch without direct
   await screen.findByRole('option', { name: /TOM-1/ })
   expect(screen.queryByRole('option', { name: /TOM-2/ })).not.toBeInTheDocument()
   fireEvent.change(screen.getByRole('combobox'), { target: { value: 'batch-1' } })
-  for (const [name, value] of [['requested_quantity_kg', '500'], ['unit_price_inr', '30'], ['preferred_delivery_date', '2026-12-01']]) fireEvent.change(container.querySelector(`[name="${name}"]`), { target: { value } })
+  for (const [name, value] of [['requested_quantity_kg', '500'], ['unit_price_inr', '30.29'], ['preferred_delivery_date', '2026-12-01']]) fireEvent.change(container.querySelector(`[name="${name}"]`), { target: { value } })
   fireEvent.submit(container.querySelector('form'))
-  await waitFor(() => expect(ordersApi.create).toHaveBeenCalledWith(expect.objectContaining({ seller_id: 'seller-1', produce_type: 'TOMATO', unit_price_paise: 3000, requested_quantity_kg: 500 })))
+  await waitFor(() => expect(ordersApi.create).toHaveBeenCalledWith(expect.objectContaining({ seller_id: 'seller-1', produce_type: 'TOMATO', unit_price_paise: 3029, requested_quantity_kg: 500 })))
   expect(usersApi.list).not.toHaveBeenCalled()
 })
 it.each(['BUYER', 'FARMER', 'ADMIN', 'TRANSPORTER'])('quotation form respects %s role', async role => {

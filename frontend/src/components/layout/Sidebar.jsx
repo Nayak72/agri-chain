@@ -14,7 +14,7 @@ import {
   PackageSearch,
   ShoppingCart,
   CalendarCheck,
-  BadgeDollarSign,
+  IndianRupee,
   Building2,
   Truck,
   Users,
@@ -59,7 +59,7 @@ const NAVIGATION_SECTORS = [
     items: [
       { label: 'Purchase Orders', path: '/purchase-orders', icon: ShoppingCart, roles: [ROLES.ADMIN, ROLES.BUYER, ROLES.FARMER] },
       { label: 'Freight Bookings', path: '/freight-bookings', icon: CalendarCheck, roles: [ROLES.ADMIN, ROLES.BUYER, ROLES.FARMER] },
-      { label: 'Freight Quotes', path: '/freight-quotes', icon: BadgeDollarSign, roles: [ROLES.ADMIN, ROLES.TRANSPORTER, ROLES.BUYER, ROLES.FARMER] },
+      { label: 'Freight Quotes', path: '/freight-quotes', icon: IndianRupee, roles: [ROLES.ADMIN, ROLES.TRANSPORTER, ROLES.BUYER, ROLES.FARMER] },
     ],
   },
   {

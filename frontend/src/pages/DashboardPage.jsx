@@ -28,7 +28,7 @@ import {
   Boxes,
   Truck,
   ShieldCheck,
-  BadgeDollarSign,
+  IndianRupee,
   Users,
   Navigation,
   ClipboardCheck,
@@ -50,7 +50,7 @@ const ROLE_QUICK_ACTIONS = {
     { icon: ShieldCheck, label: 'Explore Ledger', desc: 'Verify produce provenance', path: '/ledger', accent: 'slate' },
   ],
   [ROLES.TRANSPORTER]: [
-    { icon: BadgeDollarSign, label: 'Submit Freight Quote', desc: 'Bid on open freight tenders', path: '/freight-quotes', accent: 'forest' },
+    { icon: IndianRupee, label: 'Submit Freight Quote', desc: 'Bid on open freight tenders', path: '/freight-quotes', accent: 'forest' },
     { icon: Truck, label: 'Add Fleet Vehicle', desc: 'Enroll reefer or container', path: '/fleet/new', accent: 'terracotta' },
     { icon: Users, label: 'Register Driver', desc: 'Onboard licensed driver', path: '/drivers/new', accent: 'harvest' },
     { icon: Navigation, label: 'Create Shipment', desc: 'Dispatch confirmed booking', path: '/shipments/new', accent: 'slate' },

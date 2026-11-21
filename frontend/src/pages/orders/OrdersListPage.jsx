@@ -152,7 +152,7 @@ export default function OrdersListPage() {
                     <TableCell className="text-[#26312A] font-sans font-medium">{order.produce_type}</TableCell>
                     <TableCell className="text-[#26312A] font-semibold">{formatWeight(order.requested_quantity_kg)}</TableCell>
                     <TableCell>
-                      <div className="text-[#244634] font-bold">{formatCurrency(order.total_amount_paise || (order.unit_price_paise * order.requested_quantity_kg))}</div>
+                      <div className="text-[#244634] font-bold">{formatCurrency(order.total_amount_paise ?? (order.unit_price_paise * order.requested_quantity_kg))}</div>
                       <div className="text-[10px] text-[#7A887E]">@{formatCurrency(order.unit_price_paise)}/kg</div>
                     </TableCell>
                     <TableCell className="text-[#B36B21]">{formatDate(order.preferred_delivery_date)}</TableCell>

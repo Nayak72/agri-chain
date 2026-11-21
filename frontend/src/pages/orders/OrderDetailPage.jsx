@@ -208,7 +208,7 @@ export default function OrderDetailPage() {
               <div className="flex justify-between py-2 border-b border-[#ECE7DA]">
                 <dt className="text-[#7A887E]">Total Contract Value</dt>
                 <dd className="text-[#244634] text-sm font-bold">
-                  {formatCurrency(order.total_amount_paise || (order.unit_price_paise * order.requested_quantity_kg))}
+                  {formatCurrency(order.total_amount_paise ?? (order.unit_price_paise * order.requested_quantity_kg))}
                 </dd>
               </div>
               <div className="flex justify-between py-2 border-b border-[#ECE7DA]">

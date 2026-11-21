@@ -3,10 +3,10 @@ import { VEHICLE_CATEGORIES } from '../../constants/domain'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { RefreshCw, CheckCircle, AlertCircle, DollarSign, Send } from 'lucide-react'
+import { RefreshCw, CheckCircle, AlertCircle, IndianRupee, Send } from 'lucide-react'
 import { freightQuotesApi, freightBookingsApi } from '../../api/commerce.api'
 import { useAuth } from '../../context/AuthContext'
-import { formatCurrency, formatDate, formatDateTime, formatStatus, getApiError } from '../../utils'
+import { formatCurrency, rupeesToPaise, formatDate, formatDateTime, formatStatus, getApiError } from '../../utils'
 import { PageHeader } from '../../components/common/PageHeader'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -77,15 +77,15 @@ export default function FreightQuotesPage() {
     setFormError('')
     setSuccessMsg('')
 
-    const baseInr = Number(form.freight_base_charge_inr)
-    if (isNaN(baseInr) || baseInr <= 0) {
-      setFormError('Base freight charge must be a positive amount.')
+    const basePaise = rupeesToPaise(form.freight_base_charge_inr)
+    if (basePaise == null || basePaise <= 0) {
+      setFormError('Base freight charge must be at least ₹0.01 with no more than two decimal places.')
       return
     }
 
-    const fuelInr = form.fuel_surcharge_inr ? Number(form.fuel_surcharge_inr) : 0
-    if (!Number.isFinite(fuelInr) || fuelInr < 0) {
-      setFormError('Additional charges must be valid numeric amounts.')
+    const fuelPaise = rupeesToPaise(form.fuel_surcharge_inr || '0')
+    if (fuelPaise == null) {
+      setFormError('Fuel surcharge must be a non-negative INR amount with no more than two decimal places.')
       return
     }
 
@@ -104,8 +104,8 @@ export default function FreightQuotesPage() {
     const payload = {
       booking_id: form.booking_id.trim(),
       proposed_vehicle_category: form.proposed_vehicle_category,
-      freight_base_charge_paise: Math.round(baseInr * 100),
-      fuel_surcharge_paise: Math.round(fuelInr * 100),
+      freight_base_charge_paise: basePaise,
+      fuel_surcharge_paise: fuelPaise,
       planned_distance_km: distanceKm,
       estimated_transit_hours: transitHours,
     }
@@ -204,6 +204,8 @@ export default function FreightQuotesPage() {
                   <Input
                     type="number"
                     required
+                    min="0.01"
+                    step="0.01"
                     name="freight_base_charge_inr"
                     value={form.freight_base_charge_inr}
                     onChange={handleChange}
@@ -218,6 +220,8 @@ export default function FreightQuotesPage() {
                   <label className="text-[10px] font-mono text-[#526357] uppercase font-semibold">Fuel Surcharge (₹)</label>
                   <Input
                     type="number"
+                    min="0"
+                    step="0.01"
                     name="fuel_surcharge_inr"
                     value={form.fuel_surcharge_inr}
                     onChange={handleChange}
@@ -282,7 +286,7 @@ export default function FreightQuotesPage() {
           ) : quotes.length === 0 ? (
             <div className="p-16 text-center">
               <div className="w-12 h-12 rounded-full bg-[#F2EFE7] text-[#7A887E] flex items-center justify-center mx-auto mb-3">
-                <DollarSign className="w-6 h-6" />
+                <IndianRupee className="w-6 h-6" />
               </div>
               <h3 className="text-sm font-semibold text-[#1B2A20] mb-1">No Quotations on Record</h3>
               <p className="text-xs text-[#526357]">Use the submission form to post a carrier bid.</p>
@@ -313,7 +317,7 @@ export default function FreightQuotesPage() {
                         {q.planned_distance_km} km • <span className="text-[#B36B21]">{q.estimated_transit_hours} hrs</span>
                       </TableCell>
                       <TableCell className="text-[#244634] font-bold">
-                        {formatCurrency(q.total_freight_charge_paise || q.freight_base_charge_paise)}
+                        {formatCurrency(q.total_freight_charge_paise ?? (q.freight_base_charge_paise + (q.fuel_surcharge_paise ?? 0)))}
                       </TableCell>
                       <TableCell>
                         <StatusBadge status={q.status || 'PENDING'} />

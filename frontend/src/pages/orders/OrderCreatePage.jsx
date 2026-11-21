@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, AlertCircle, ShoppingBag } from 'lucide-react'
 import { ordersApi } from '../../api/commerce.api'
 import { batchesApi } from '../../api/agriculture.api'
-import { formatApiErrorMessage } from '../../utils'
+import { formatApiErrorMessage, rupeesToPaise } from '../../utils'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Select } from '../../components/ui/select'
@@ -90,17 +90,15 @@ export default function OrderCreatePage() {
       return
     }
 
-    const price = parseFloat(form.unit_price_inr)
-    if (isNaN(price) || price <= 0) {
-      setError('Unit price must be greater than 0 INR.')
+    const unitPricePaise = rupeesToPaise(form.unit_price_inr)
+    if (unitPricePaise == null || unitPricePaise <= 0) {
+      setError('Unit price must be at least ₹0.01 with no more than two decimal places.')
       return
     }
 
     setLoading(true)
 
     try {
-      const unitPricePaise = Math.round(price * 100)
-
       const payload = {
         seller_id: selectedBatch.farmer_id,
         produce_type: selectedBatch.produce_type,

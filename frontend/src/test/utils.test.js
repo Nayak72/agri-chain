@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cn, formatCurrency, formatDate, getInitials, formatStatus } from '../utils/index.js'
+import { cn, formatCurrency, formatRupees, rupeesToPaise, formatDate, getInitials, formatStatus } from '../utils/index.js'
 
 describe('cn (class merger)', () => {
   it('merges classes', () => {
@@ -15,7 +15,7 @@ describe('cn (class merger)', () => {
 
 describe('formatCurrency', () => {
   it('converts paise to INR', () => {
-    expect(formatCurrency(10000)).toContain('100')
+    expect(formatCurrency(10000)).toBe('₹100.00')
   })
   it('handles null', () => {
     expect(formatCurrency(null)).toBe('—')
@@ -43,3 +43,25 @@ describe('formatStatus', () => {
   })
 })
 
+
+describe('INR money handling', () => {
+  it('formats Indian digit grouping and paise consistently', () => {
+    expect(formatCurrency(123456789)).toBe('₹12,34,567.89')
+    expect(formatCurrency(1)).toBe('₹0.01')
+    expect(formatCurrency(0)).toBe('₹0.00')
+    expect(formatRupees(1234567.89)).toBe('₹12,34,567.89')
+    expect(formatCurrency(NaN)).toBe('—')
+  })
+
+  it.each([['0.29', 29], ['35.50', 3550], ['12000', 1200000], ['0', 0], ['1.1', 110]])(
+    'converts ₹%s to exactly %i paise', (input, expected) => {
+      expect(rupeesToPaise(input)).toBe(expected)
+    },
+  )
+
+  it.each(['', '1.001', '-1', 'Infinity', 'NaN', '12abc', '9007199254740992'])(
+    'rejects invalid or unrepresentable rupee input %s', (input) => {
+      expect(rupeesToPaise(input)).toBeNull()
+    },
+  )
+})

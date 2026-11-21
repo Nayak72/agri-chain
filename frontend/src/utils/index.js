@@ -6,16 +6,30 @@ export function cn(...inputs) {
   return twMerge(clsx(inputs))
 }
 
-// Format currency from paise to INR
+// API money values are integer paise (100 paise = ₹1).
+const inrFormatter = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+export function formatRupees(rupees) {
+  if (rupees == null || !Number.isFinite(Number(rupees))) return '—'
+  return inrFormatter.format(Number(rupees))
+}
+
 export function formatCurrency(paise) {
   if (paise == null) return '—'
-  const rupees = paise / 100
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(rupees)
+  return formatRupees(Number(paise) / 100)
+}
+
+// Parse rupee inputs exactly, without floating-point multiplication or silent rounding.
+export function rupeesToPaise(value) {
+  const match = String(value).trim().match(/^(\d+)(?:\.(\d{1,2}))?$/)
+  if (!match) return null
+  const paise = Number(match[1]) * 100 + Number((match[2] || '').padEnd(2, '0'))
+  return Number.isSafeInteger(paise) ? paise : null
 }
 
 // Format date/time

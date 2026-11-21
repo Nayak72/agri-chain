@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import {
   TrendingUp,
   Truck,
-  DollarSign,
+  IndianRupee,
   ShieldCheck,
   Thermometer,
   Clock,
@@ -31,7 +31,7 @@ import {
   Legend
 } from 'recharts'
 import { analyticsApi } from '../../api/analytics.api'
-import { formatCurrency } from '../../utils'
+import { formatCurrency, formatRupees } from '../../utils'
 import PageHeader from '../../components/common/PageHeader'
 
 const COLORS = ['#244634', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#0284c7']
@@ -96,7 +96,7 @@ export default function AnalyticsPage() {
 
   const transporterCostChartData = useMemo(() => freightData?.transporter_wise_cost?.map((item, idx) => ({
     name: item.transporter_name || `Transporter #${idx + 1}`,
-    cost: (item.total_cost_paise || item.cost || 0) / 100,
+    cost: (item.total_cost_paise ?? item.total_cost ?? item.cost ?? 0) / 100,
   })) || [], [freightData])
 
   return (
@@ -155,7 +155,7 @@ export default function AnalyticsPage() {
               : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
           }`}
         >
-          <DollarSign className="h-4 w-4" />
+          <IndianRupee className="h-4 w-4" />
           Freight & Financials
         </button>
         <button
@@ -347,7 +347,7 @@ export default function AnalyticsPage() {
             <div className="rounded-xl border border-stone-200 glass-metric p-4 shadow-xs">
               <div className="text-xs font-mono uppercase text-stone-500 mb-1">Cost Per Kilogram</div>
               <div className="text-2xl font-bold font-mono text-[#244634]">
-                ₹{freightData?.freight_cost_per_kg ? freightData.freight_cost_per_kg.toFixed(2) : '0.00'} / kg
+                {formatRupees(freightData?.freight_cost_per_kg ?? 0)} / kg
               </div>
               <div className="text-xs text-stone-500 mt-1 font-sans">Transport unit economic rate</div>
             </div>
@@ -376,9 +376,9 @@ export default function AnalyticsPage() {
                   <BarChart data={transporterCostChartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} fontFamily="monospace" />
-                    <YAxis stroke="#94a3b8" fontSize={11} fontFamily="monospace" tickFormatter={(v) => `₹${v}`} />
+                    <YAxis stroke="#94a3b8" fontSize={11} fontFamily="monospace" tickFormatter={formatRupees} />
                     <Tooltip
-                      formatter={(v) => [`₹${v.toLocaleString()}`, 'Total Spend']}
+                      formatter={(v) => [formatRupees(v), 'Total Spend']}
                       contentStyle={{
                         backgroundColor: '#ffffff',
                         borderColor: '#e2e8f0',

@@ -257,7 +257,7 @@ export default function FreightBookingDetailPage() {
                     <TableCell className="text-[#526357]">{q.proposed_vehicle_category}</TableCell>
                     <TableCell className="text-[#B36B21]">{q.estimated_transit_hours} hrs</TableCell>
                     <TableCell className="text-[#244634] font-bold text-sm">
-                      {formatCurrency(q.total_freight_charge_paise || q.freight_base_charge_paise)}
+                      {formatCurrency(q.total_freight_charge_paise ?? (q.freight_base_charge_paise + (q.fuel_surcharge_paise ?? 0)))}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={q.status || 'PENDING'} />
